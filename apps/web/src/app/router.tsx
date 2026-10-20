@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { ComingSoonPage } from "@/app/ComingSoonPage";
+import { GovernancePage } from "@/features/governance/GovernancePage";
 import { OverviewPage } from "@/features/overview/OverviewPage";
 import { SignInPage } from "@/features/signin/SignInPage";
 
@@ -10,9 +11,9 @@ export function AppRouter() {
       <Route path="/" element={<Navigate to="/signin" replace />} />
       <Route path="/signin" element={<SignInPage />} />
       <Route path="/overview" element={<OverviewPage />} />
+      <Route path="/governance" element={<GovernancePage />} />
 
-      {/* Route foundations only — pages not built in Phase 1 */}
-      <Route path="/governance" element={<ComingSoonPage title="Governance & Compliance" />} />
+      {/* Route foundations only — modules not built yet */}
       <Route path="/risks" element={<ComingSoonPage title="Risk Management" />} />
       <Route path="/assets" element={<ComingSoonPage title="Assets" />} />
       <Route path="/assets/:assetId" element={<ComingSoonPage title="Asset details" />} />
