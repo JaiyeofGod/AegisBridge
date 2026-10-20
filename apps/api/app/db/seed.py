@@ -30,6 +30,7 @@ from app.models import (
     CveRecord,
     DataAsset,
     Dataset,
+    DatasetExperiment,
     DatasetVersion,
     Department,
     Detection,
@@ -53,6 +54,7 @@ from app.models import (
     PolicyAcknowledgement,
     PolicyVersion,
     RemediationTask,
+    ReportDefinition,
     Risk,
     RiskAssessment,
     RiskTreatment,
@@ -769,6 +771,381 @@ def _ensure_contract_records(session: Session, org: Organization) -> None:
                 confidence="low",
                 related_cve="CVE-2024-21887",
                 published_at=seen,
+            )
+        )
+
+    _ensure_report_definitions(session, org)
+    datasets = _ensure_datasets(session, org)
+    _ensure_dataset_experiments(session, datasets, seen)
+
+
+def _ensure_report_definitions(session: Session, org: Organization) -> None:
+    owner = session.scalar(select(User).where(User.human_id == "USR-0001"))
+    grc = session.scalar(select(User).where(User.human_id == "USR-0003"))
+    catalog = (
+        (
+            "RPT-0001",
+            "Executive Security Summary",
+            "Stored definition for an executive posture summary. No PDF is generated.",
+            "executive_security_summary",
+            "ready",
+            "schedule_defined",
+            "Weekly",
+            "PDF",
+            owner,
+        ),
+        (
+            "RPT-0002",
+            "Vulnerability Exposure Report",
+            "Stored definition for vulnerability exposure columns. No CSV is generated.",
+            "vulnerability_exposure",
+            "ready",
+            "schedule_defined",
+            "Weekly",
+            "CSV",
+            owner,
+        ),
+        (
+            "RPT-0003",
+            "Risk Register Report",
+            "Stored definition for the risk register. No export file is generated.",
+            "risk_register",
+            "ready",
+            "not_scheduled",
+            None,
+            "PDF",
+            grc,
+        ),
+        (
+            "RPT-0004",
+            "Control Assessment Report",
+            "Stored definition for control assessment summaries. CIS licensed text is omitted.",
+            "control_assessment",
+            "ready",
+            "schedule_defined",
+            "Monthly",
+            "PDF",
+            grc,
+        ),
+        (
+            "RPT-0005",
+            "Incident Summary Report",
+            "Stored definition for incident summaries. No compromise verdict is invented.",
+            "incident_summary",
+            "review",
+            "not_scheduled",
+            None,
+            "PDF",
+            owner,
+        ),
+    )
+    for (
+        human_id,
+        name,
+        description,
+        report_type,
+        status,
+        schedule_state,
+        schedule_label,
+        format_label,
+        user,
+    ) in catalog:
+        if session.scalar(select(ReportDefinition).where(ReportDefinition.human_id == human_id)):
+            continue
+        session.add(
+            ReportDefinition(
+                organization_id=org.id,
+                owner_user_id=None if user is None else user.id,
+                human_id=human_id,
+                name=name,
+                description=description,
+                report_type=report_type,
+                status=status,
+                schedule_state=schedule_state,
+                schedule_label=schedule_label,
+                format_label=format_label,
+                last_run_at=None,
+                next_run_at=None,
+            )
+        )
+
+
+def _ensure_datasets(session: Session, org: Organization) -> dict[str, Dataset]:
+    catalog = (
+        (
+            "DS-0001",
+            "Smishing Dataset – IMC25",
+            "Registry entry for the IMC25 smishing dataset. No file is stored.",
+            "IMC25 project",
+            "Publisher catalog",
+            2025,
+            "Smishing and social engineering",
+            "CC BY 4.0",
+            "not_downloaded",
+            "reviewed",
+            "Message analytics and explainable reporting",
+            "Lightweight labeled CSV",
+            "Name and license label only. The dataset file is not downloaded.",
+        ),
+        (
+            "DS-0002",
+            "CICAPT-IIoT2024 subset",
+            "Registry entry for a selected CICAPT-IIoT2024 subset. No subset file is stored.",
+            "Canadian Institute for Cybersecurity",
+            "Publisher catalog",
+            2024,
+            "IIoT APT detection",
+            "Publisher terms",
+            "not_downloaded",
+            "reviewed",
+            "Provenance and ATT&CK-relevant detection research",
+            "Selected subset only",
+            "Registry metadata only. The subset is not in the repository.",
+        ),
+        (
+            "DS-0003",
+            "CICIoT2023",
+            "Optional IoT network-attack registry entry. No capture file is stored.",
+            "Canadian Institute for Cybersecurity",
+            "Publisher catalog",
+            2023,
+            "IoT network attacks",
+            "Publisher terms",
+            "not_downloaded",
+            "not_reviewed",
+            "IDS analytics experiments",
+            "Large · subset only",
+            "Registry metadata only. Full capture is not downloaded.",
+        ),
+        (
+            "DS-0004",
+            "DataSense CIC IIoT 2025",
+            "Optional multi-modal IIoT registry entry. No file is stored.",
+            "Canadian Institute for Cybersecurity",
+            "Publisher catalog",
+            2025,
+            "IIoT sensor and network",
+            "Publisher terms",
+            "not_downloaded",
+            "not_reviewed",
+            "Multi-modal anomaly research",
+            "Large · not downloaded",
+            "Do not download the full dataset during initial development.",
+        ),
+        (
+            "DS-0005",
+            "CIC-Trap4Phish 2025",
+            "Optional phishing document and URL registry entry. Attachments are not executed.",
+            "Canadian Institute for Cybersecurity",
+            "Publisher catalog",
+            2025,
+            "Phishing documents and URLs",
+            "Publisher terms",
+            "not_downloaded",
+            "not_reviewed",
+            "Safe static features. Attachments are not executed.",
+            "Static feature subset",
+            "Registry metadata only. No attachment bytes are stored.",
+        ),
+        (
+            "DS-0006",
+            "PhreshPhish",
+            "Optional large-scale phishing registry entry. No sample file is stored.",
+            "PhreshPhish project",
+            "Publisher catalog",
+            2025,
+            "Large-scale phishing",
+            "CC BY 4.0",
+            "not_downloaded",
+            "verification_required",
+            "Sampled phishing research",
+            "About 36.6 GB · sample only",
+            "Size label is from published notes. No download and no verification run.",
+        ),
+        (
+            "DS-0007",
+            "CIC-PQC_OAV v1",
+            "Optional post-quantum TLS registry entry. No session file is stored.",
+            "Canadian Institute for Cybersecurity",
+            "Publisher catalog",
+            2025,
+            "TLS and post-quantum operations",
+            "Publisher terms",
+            "not_downloaded",
+            "not_reviewed",
+            "Later protocol research",
+            "About 40,010 sessions",
+            "Session count is a published label. No file is stored.",
+        ),
+        (
+            "DS-0008",
+            "CIC-YNU-IoTMal 2026",
+            "Optional IoT malware behavior registry entry. Raw binaries are not a dependency.",
+            "Canadian Institute for Cybersecurity",
+            "Publisher catalog",
+            2026,
+            "IoT malware behavior",
+            "Publisher terms",
+            "not_downloaded",
+            "verification_required",
+            "Derived behavior research. Raw binaries are not a dependency.",
+            "Processed features only",
+            "Registry metadata only. No malware binary is stored.",
+        ),
+        (
+            "DS-0009",
+            "AegisBridge internal telemetry",
+            "Local cyber-range telemetry placeholder. The lab host is not connected.",
+            "AegisBridge Technologies",
+            "Project-owned",
+            2026,
+            "Lab endpoint and network telemetry",
+            "Project-owned",
+            "not_downloaded",
+            "reviewed",
+            "Local validation records. Kept apart from published datasets.",
+            "Not collected",
+            "No telemetry file is stored. The lab host is not connected.",
+        ),
+    )
+    datasets: dict[str, Dataset] = {}
+    for (
+        human_id,
+        name,
+        description,
+        publisher,
+        source_label,
+        year,
+        domain,
+        license_label,
+        status,
+        verification_status,
+        purpose,
+        size_label,
+        notes,
+    ) in catalog:
+        row = session.scalar(select(Dataset).where(Dataset.human_id == human_id))
+        if row is None:
+            row = Dataset(
+                organization_id=org.id,
+                human_id=human_id,
+                name=name,
+                status=status,
+            )
+            session.add(row)
+            session.flush()
+            session.add(DatasetVersion(dataset_id=row.id, version_label="registry"))
+        row.name = name
+        row.description = description
+        row.publisher = publisher
+        row.source_label = source_label
+        row.source_url = None
+        row.publication_year = year
+        row.domain = domain
+        row.license_label = license_label
+        row.status = status
+        row.verification_status = verification_status
+        row.purpose = purpose
+        row.size_label = size_label
+        row.row_count = None
+        row.feature_count = None
+        row.notes = notes
+        datasets[human_id] = row
+    return datasets
+
+
+def _ensure_dataset_experiments(
+    session: Session,
+    datasets: dict[str, Dataset],
+    seen: datetime,
+) -> None:
+    catalog = (
+        (
+            "RSCH-0001",
+            "DS-0001",
+            "Smishing lure categories",
+            "completed",
+            "classification_summary",
+            "Manual category tabulation",
+            "Category counts were tabulated from the registry note. No model runtime was used.",
+            seen,
+            seen,
+            "Completed metadata only. No model artifact is stored.",
+        ),
+        (
+            "RSCH-0002",
+            "DS-0002",
+            "IIoT subset provenance check",
+            "completed",
+            "manifest_review",
+            "Manifest field review",
+            "Manifest fields are recorded. The subset is not in the repository.",
+            seen,
+            seen,
+            "Completed metadata only. No detection comparison was run.",
+        ),
+        (
+            "RSCH-0003",
+            "DS-0009",
+            "Range telemetry freshness",
+            "completed",
+            "telemetry_review",
+            "Simulated validation comparison",
+            "Three simulated runs are on record. The lab host is not connected.",
+            seen,
+            seen,
+            "Completed metadata only. No live range connection exists.",
+        ),
+        (
+            "RSCH-0004",
+            "DS-0005",
+            "Static phishing features",
+            "planned",
+            "static_feature_review",
+            "Static-feature plan",
+            None,
+            None,
+            None,
+            "Not started. No download and no execution.",
+        ),
+    )
+    for (
+        human_id,
+        dataset_id,
+        name,
+        status,
+        experiment_type,
+        approach,
+        metrics,
+        started_at,
+        completed_at,
+        notes,
+    ) in catalog:
+        if session.scalar(select(DatasetExperiment).where(DatasetExperiment.human_id == human_id)):
+            continue
+        dataset = datasets.get(dataset_id)
+        if dataset is None:
+            continue
+        version = session.scalar(
+            select(DatasetVersion).where(
+                DatasetVersion.dataset_id == dataset.id,
+                DatasetVersion.version_label == "registry",
+            )
+        )
+        if version is None:
+            continue
+        session.add(
+            DatasetExperiment(
+                dataset_version_id=version.id,
+                human_id=human_id,
+                name=name,
+                status=status,
+                experiment_type=experiment_type,
+                approach=approach,
+                metrics_summary=metrics,
+                started_at=started_at,
+                completed_at=completed_at,
+                notes=notes,
             )
         )
 

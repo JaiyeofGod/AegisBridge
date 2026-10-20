@@ -1,6 +1,6 @@
 # Domain model
 
-Phase 2 relational foundation. SQLAlchemy models live in `apps/api/app/models/`. Domain tables are `migrations/versions/20261020_0002_add_domain_schema.py`. Threat-intelligence tables and `integrations.human_id` are `migrations/versions/20261020_0003_add_threat_intel.py`. Development rows are loaded by `python -m app.db.seed` and are not part of the migration.
+Phase 2 relational foundation. SQLAlchemy models live in `apps/api/app/models/`. Domain tables are `migrations/versions/20261020_0002_add_domain_schema.py`. Threat-intelligence tables and `integrations.human_id` are `migrations/versions/20261020_0003_add_threat_intel.py`. Report definitions and dataset registry metadata are `migrations/versions/20261020_0004_add_reports_and_dataset_metadata.py`. Development rows are loaded by `python -m app.db.seed` and are not part of the migration.
 
 Internal primary keys are UUIDs. Operational records also have a unique `human_id`. Closed value sets are strings with check constraints. There is no combined vulnerability score.
 
@@ -20,6 +20,7 @@ Internal primary keys are UUIDs. Operational records also have a unique `human_i
 | Incident | Events, tasks, indicators, evidence links | Confirmed compromise as a stored fact |
 | Vendor / policy / dataset / integration | Their own records and versions | Secrets and live connector state |
 | Threat intelligence | Source catalog, simulated indicators, advisory metadata | A live external feed |
+| Reports | Report definition catalog | Generated PDF/CSV files and a running scheduler |
 | Audit | Actor, action, object, result, source, environment, timestamp | Updates, secrets |
 
 ## Relationships
@@ -34,7 +35,8 @@ Internal primary keys are UUIDs. Operational records also have a unique `human_i
 - A detection has versions and maps to ATT&CK techniques. Validation runs belong to a detection version.
 - An alert reference may point at an asset and a detection. An investigation may point at one alert. Wazuh remains the source system; the row is a reference.
 - An incident has events, tasks, indicators, and evidence links.
-- Vendors have services, assessments, and findings. Policies have versions and acknowledgements. Datasets have versions, file metadata, and experiments.
+- Vendors have services, assessments, and findings. Policies have versions and acknowledgements. Datasets have registry metadata, versions, optional file metadata, and experiments. Dataset `status` is a download/registry label such as `not_downloaded`. `verification_status` is a separate review label.
+- Report definitions belong to an organization and may name an owner. `schedule_defined` stores a cadence label. Generated files and execution rows are not part of this table.
 - An integration has an optional human ID, sync jobs, and one current `sync_states` row. No credential column is stored. `auth_state` is a label such as `No credentials stored`.
 - A threat-intelligence source has `connection_status` of `configured`, `reference_only`, `not_connected`, `delayed`, or `healthy`. Indicators belong to one source and may point at one asset and one ATT&CK technique. Advisories store metadata only. Incident indicators remain a separate table.
 - Audit events reference an optional user and have no `updated_at`.
@@ -47,6 +49,6 @@ Internal primary keys are UUIDs. Operational records also have a unique `human_i
 
 The seed is deterministic. When organization slug `aegisbridge-technologies` already exists, it still ensures the threat-intelligence and administration contract rows. `python -m app.db.seed --reset` deletes domain rows only when `APP_ENV` is local, development, dev, or test.
 
-Representative IDs include `AST-0007` FIN-APP-01, `AST-0018` WIN-WS-07, `AST-0003` WAZUH-01, `AST-0061` LINUX-APP-01, `AST-0031` EDGE-FW-01, `RISK-0021`, `CTRL-0002`, `EVID-0041`, `VULN-0041`, `DET-0005`, `AL-0107`, `INC-0001`, `USR-0002`, `INT-0001`, `INT-0002`, `AUD-0002`, `SRC-0006`, `IOC-0002`, and `ADV-0001`.
+Representative IDs include `AST-0007` FIN-APP-01, `AST-0018` WIN-WS-07, `AST-0003` WAZUH-01, `AST-0061` LINUX-APP-01, `AST-0031` EDGE-FW-01, `RISK-0021`, `CTRL-0002`, `EVID-0041`, `VULN-0041`, `DET-0005`, `AL-0107`, `INC-0001`, `USR-0002`, `INT-0001`, `INT-0002`, `AUD-0002`, `SRC-0006`, `IOC-0002`, `ADV-0001`, `RPT-0001`, `DS-0001`, and `RSCH-0001`.
 
 The role catalog is Administrator, CISO, GRC Analyst, SOC Analyst, Security Engineer, Auditor, and Read Only. Security Engineer was added because master requirements §6 and `SECURITY_REQUIREMENTS.md` list it as a distinct platform role. The original six roles are unchanged.

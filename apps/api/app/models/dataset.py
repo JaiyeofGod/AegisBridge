@@ -2,10 +2,20 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin, human_id_column
@@ -15,12 +25,26 @@ if TYPE_CHECKING:
 
 
 class Dataset(UUIDMixin, TimestampMixin, Base):
+    """Registry metadata. Status and verification_status are stored labels only."""
+
     __tablename__ = "datasets"
 
     organization_id: Mapped[UUID | None] = mapped_column(ForeignKey("organizations.id"), index=True)
     human_id: Mapped[str] = human_id_column()
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    publisher: Mapped[str | None] = mapped_column(String(200))
+    source_label: Mapped[str | None] = mapped_column(String(200))
+    source_url: Mapped[str | None] = mapped_column(String(500))
+    publication_year: Mapped[int | None] = mapped_column(Integer)
+    domain: Mapped[str | None] = mapped_column(String(200))
+    license_label: Mapped[str | None] = mapped_column(String(120))
+    verification_status: Mapped[str | None] = mapped_column(String(64))
+    purpose: Mapped[str | None] = mapped_column(Text)
+    size_label: Mapped[str | None] = mapped_column(String(120))
+    row_count: Mapped[int | None] = mapped_column(BigInteger)
+    feature_count: Mapped[int | None] = mapped_column(Integer)
     notes: Mapped[str | None] = mapped_column(Text)
 
     organization: Mapped[Organization | None] = relationship()
@@ -60,13 +84,21 @@ class DatasetFile(UUIDMixin, TimestampMixin, Base):
 
 
 class DatasetExperiment(UUIDMixin, TimestampMixin, Base):
+    """Stored experiment metadata. Metrics are only the text recorded in the row."""
+
     __tablename__ = "dataset_experiments"
 
     dataset_version_id: Mapped[UUID] = mapped_column(
         ForeignKey("dataset_versions.id"), nullable=False, index=True
     )
+    human_id: Mapped[str | None] = mapped_column(String(32), unique=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
+    experiment_type: Mapped[str | None] = mapped_column(String(80))
+    approach: Mapped[str | None] = mapped_column(String(200))
+    metrics_summary: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     notes: Mapped[str | None] = mapped_column(Text)
 
     dataset_version: Mapped[DatasetVersion] = relationship(back_populates="experiments")

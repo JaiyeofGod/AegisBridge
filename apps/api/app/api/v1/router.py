@@ -6,10 +6,13 @@ from app.api.v1 import (
     administration,
     alerts,
     assets,
+    datasets,
+    experiments,
     governance,
     health,
     incidents,
     overview,
+    reports,
     risks,
     threat_intel,
     vulnerabilities,
@@ -26,3 +29,6 @@ api_router.include_router(incidents.router)
 api_router.include_router(governance.router)
 api_router.include_router(threat_intel.router)
 api_router.include_router(administration.router)
+api_router.include_router(reports.router)
+api_router.include_router(datasets.router)
+api_router.include_router(experiments.router)

@@ -104,6 +104,7 @@ REQUIRED_TABLES = {
     "threat_intel_sources",
     "threat_indicators",
     "threat_advisories",
+    "report_definitions",
 }
 
 SECRET_COLUMN_NAMES = {"password", "secret", "token", "api_key", "credential"}

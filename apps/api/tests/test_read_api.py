@@ -23,6 +23,7 @@ FORBIDDEN_KEYS = {
     "threat_score",
     "maturity_score",
     "object_uri",
+    "storage_uri",
     "password",
     "secret",
     "token",
@@ -54,6 +55,13 @@ READ_PATHS = [
     "/api/v1/administration/roles",
     "/api/v1/administration/audit-events",
     "/api/v1/administration/access-reviews",
+    "/api/v1/reports/summary",
+    "/api/v1/reports/definitions",
+    "/api/v1/reports/definitions/{report_id}",
+    "/api/v1/datasets",
+    "/api/v1/datasets/{dataset_id}",
+    "/api/v1/dataset-experiments",
+    "/api/v1/dataset-experiments/{experiment_id}",
 ]
 
 
@@ -425,6 +433,113 @@ def test_administration_catalog_omits_secrets(client: TestClient) -> None:
     assert review["total_finding_count"] == 1
     assert review["due_at"] is None
     assert_safe(reviews)
+
+
+def test_reports_summary_and_definitions_omit_generated_files(client: TestClient) -> None:
+    summary = client.get("/api/v1/reports/summary").json()
+    assert summary["report_definition_count"] == 5
+    assert summary["scheduled_report_count"] == 3
+    assert summary["completed_report_count"] == 0
+    assert summary["failed_report_count"] == 0
+    assert summary["recent_execution_count"] == 0
+    assert summary["dataset_count"] == 9
+    assert summary["dataset_quality_review_count"] == 2
+    assert summary["experiment_count"] == 4
+    assert "no report execution" in summary["semantics"].lower()
+    assert_safe(summary)
+
+    listed = client.get(
+        "/api/v1/reports/definitions",
+        params={"status": "ready", "report_type": "executive_security_summary"},
+    ).json()
+    assert listed["page_size"] == 25
+    assert listed["total"] == 1
+    assert listed["items"][0]["id"] == "RPT-0001"
+    assert listed["items"][0]["schedule_state"] == "schedule_defined"
+    assert listed["items"][0]["last_run_at"] is None
+    assert listed["items"][0]["next_run_at"] is None
+    assert_safe(listed)
+
+    detail = client.get("/api/v1/reports/definitions/RPT-0001").json()
+    assert detail["name"] == "Executive Security Summary"
+    assert detail["generated_files"] == []
+    assert detail["owner"]["id"] == "USR-0001"
+    assert_safe(detail)
+    missing = client.get("/api/v1/reports/definitions/RPT-9999")
+    assert missing.status_code == 404
+    assert missing.json()["code"] == "not_found"
+    too_large = client.get("/api/v1/reports/definitions", params={"page_size": 101})
+    assert too_large.status_code == 422
+
+
+def test_dataset_registry_and_experiments_are_metadata_only(client: TestClient) -> None:
+    listed = client.get("/api/v1/datasets").json()
+    assert listed["total"] == 9
+    by_id = {item["id"]: item for item in listed["items"]}
+    assert set(by_id) == {f"DS-000{index}" for index in range(1, 10)}
+    assert by_id["DS-0001"]["name"] == "Smishing Dataset – IMC25"
+    assert by_id["DS-0001"]["license_label"] == "CC BY 4.0"
+    assert by_id["DS-0001"]["status"] == "not_downloaded"
+    assert by_id["DS-0001"]["file_count"] == 0
+    assert by_id["DS-0001"]["row_count"] is None
+    assert by_id["DS-0006"]["verification_status"] == "verification_required"
+    assert by_id["DS-0008"]["verification_status"] == "verification_required"
+    assert by_id["DS-0009"]["name"] == "AegisBridge internal telemetry"
+    assert_safe(listed)
+
+    filtered = client.get(
+        "/api/v1/datasets",
+        params={
+            "search": "Smishing",
+            "status": "not_downloaded",
+            "verification_status": "reviewed",
+            "publication_year": 2025,
+        },
+    ).json()
+    assert filtered["total"] == 1
+    assert filtered["items"][0]["id"] == "DS-0001"
+    quality = client.get(
+        "/api/v1/datasets",
+        params={"verification_status": "verification_required"},
+    ).json()
+    assert quality["total"] == 2
+    assert {item["id"] for item in quality["items"]} == {"DS-0006", "DS-0008"}
+
+    detail = client.get("/api/v1/datasets/DS-0001").json()
+    assert detail["versions"][0]["version_label"] == "registry"
+    assert detail["files"] == []
+    assert detail["source_url"] is None
+    assert any(item["id"] == "RSCH-0001" for item in detail["experiments"])
+    assert "not downloaded" in (detail["notes"] or "").lower()
+    assert_safe(detail)
+    missing = client.get("/api/v1/datasets/DS-9999")
+    assert missing.status_code == 404
+
+    experiments = client.get(
+        "/api/v1/dataset-experiments",
+        params={"dataset_id": "DS-0001", "status": "completed"},
+    ).json()
+    assert experiments["total"] == 1
+    assert experiments["items"][0]["id"] == "RSCH-0001"
+    assert experiments["items"][0]["dataset"]["id"] == "DS-0001"
+    assert experiments["items"][0]["metrics_summary"]
+    assert_safe(experiments)
+
+    planned = client.get(
+        "/api/v1/dataset-experiments",
+        params={"experiment_type": "static_feature_review", "status": "planned"},
+    ).json()
+    assert planned["total"] == 1
+    assert planned["items"][0]["id"] == "RSCH-0004"
+    assert planned["items"][0]["metrics_summary"] is None
+
+    experiment = client.get("/api/v1/dataset-experiments/RSCH-0001").json()
+    assert experiment["dataset_version_label"] == "registry"
+    assert experiment["approach"] == "Manual category tabulation"
+    assert "No model runtime" in experiment["metrics_summary"]
+    assert_safe(experiment)
+    missing_experiment = client.get("/api/v1/dataset-experiments/RSCH-9999")
+    assert missing_experiment.status_code == 404
 
 
 def test_openapi_lists_read_routes(client: TestClient) -> None:

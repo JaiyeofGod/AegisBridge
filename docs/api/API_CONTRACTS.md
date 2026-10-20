@@ -31,6 +31,13 @@ Human-readable IDs are the public identifiers (`AST-0007`, `RISK-0021`, `VULN-00
 | GET | `/administration/roles` | Stored role catalog and derived permission labels |
 | GET | `/administration/audit-events` | Append-only audit rows |
 | GET | `/administration/access-reviews` | Review status and finding counts |
+| GET | `/reports/summary` | Report definition, dataset, and experiment counts |
+| GET | `/reports/definitions` | Filters: `search`, `status`, `report_type` |
+| GET | `/reports/definitions/{report_id}` | Definition detail with empty `generated_files` |
+| GET | `/datasets` | Filters: `search`, `status`, `domain`, `verification_status`, `publication_year` |
+| GET | `/datasets/{dataset_id}` | Registry detail with versions, files, and experiments |
+| GET | `/dataset-experiments` | Filters: `search`, `status`, `dataset_id`, `experiment_type` |
+| GET | `/dataset-experiments/{experiment_id}` | Stored experiment metadata |
 
 `{asset_id}` and the other path IDs are human IDs, not UUIDs.
 
@@ -73,6 +80,9 @@ Validation uses the same shape with `code` `validation_error` and `details` entr
 - Threat-intelligence `source_health` counts stored `connection_status` values: `configured`, `reference_only`, `not_connected`, `delayed`, and `healthy`. The development seed uses only `reference_only` and `not_connected`. Named external catalogs are not connected feeds.
 - Indicator `internal_match` is a stored simulated label. It is not a live correlation and not a confirmed compromise. ATT&CK appears only when `attack_technique_id` is stored.
 - Reserved documentation addresses, `.example` domains, and hashes of labeled synthetic strings are simulated indicators.
+- Report definitions are catalog rows. `schedule_defined` stores a cadence label only. No report scheduler or worker is running. `completed_report_count`, `failed_report_count`, and `recent_execution_count` are zero because no execution or export rows are stored. Detail responses set `generated_files` to an empty list.
+- Dataset rows are registry metadata. `status` values in the seed are `not_downloaded`. `verification_status` may be `not_reviewed`, `verification_required`, or `reviewed`. File counts stay at zero unless `dataset_files` rows exist. `storage_uri` is never returned.
+- Experiment metrics are the stored `metrics_summary` text only. No model runtime or performance claim is inferred.
 
 ## Development data
 
@@ -81,3 +91,5 @@ The current seed is representative, not a copy of the frontend mocks. `AST-0007`
 Threat intelligence adds `SRC-0001` through `SRC-0006`, `IOC-0001` through `IOC-0003`, and `ADV-0001`. Only `SRC-0006` stores indicators. `IOC-0001` is TEST-NET-3 `203.0.113.50`. `IOC-0002` is `dev-watch.example` with a stored match to `AST-0007` and technique `T1059.001`.
 
 Administration adds `USR-0002` Nia Okeke as Security Engineer, `INT-0001` Wazuh, `INT-0002` example identity provider, and `AUD-0002`. The role catalog is the original six roles plus Security Engineer. That seventh role is required by master requirements §6 and `SECURITY_REQUIREMENTS.md`. Permission labels are not authorization checks.
+
+Reports add `RPT-0001` through `RPT-0005` as definitions only. Datasets `DS-0001` through `DS-0009` are registry metadata with a `registry` version and no files. Experiments `RSCH-0001` through `RSCH-0004` store notes and optional metrics text.
