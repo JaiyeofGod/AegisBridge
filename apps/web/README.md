@@ -19,6 +19,6 @@ Requires Node.js 24 LTS. Dev server: `http://127.0.0.1:5173` (proxies `/api` to 
 ## Notes
 
 - Dark theme tokens are the Phase 1 default.
-- Overview, assets, risks, and vulnerabilities read from the development API (`VITE_API_BASE_URL`, default Vite proxy `/api`). Other modules still use deterministic mocks in `src/mocks/`.
+- Overview, assets, risks, vulnerabilities, SOC, and incidents read from the development API (`VITE_API_BASE_URL`, default Vite proxy `/api`). Other modules still use deterministic mocks in `src/mocks/`.
 - Sign-in controls are UI-only; Explore demo navigates to Overview without real auth.
 - Spline/3D is not integrated; `SignInVisual` is a static fallback with a future embed boundary.

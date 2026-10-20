@@ -174,3 +174,99 @@ export type VulnerabilityQuery = {
   page?: number;
   pageSize?: number;
 };
+
+export type AlertListItem = {
+  id: string;
+  severity: string;
+  status: string;
+  summary: string;
+  observed_at: string;
+  telemetry_source: string;
+  wazuh_alert_id: string | null;
+  source_of_record: string;
+  stored_scope: string;
+  asset_id: string | null;
+  asset_hostname: string | null;
+  detection_id: string | null;
+  detection_name: string | null;
+  attack_technique_id: string | null;
+  attack_technique_name: string | null;
+  attack_tactic: string | null;
+  investigation_id: string | null;
+  assignee: PersonRef | null;
+};
+
+export type AlertDetailResponse = AlertListItem & {
+  detection_status: string | null;
+  detection_version: string | null;
+  detection_logic_summary: string | null;
+  attack_version: string | null;
+  investigation_status: string | null;
+  investigation_summary: string | null;
+};
+
+export type AlertQuery = {
+  search?: string;
+  severity?: string;
+  status?: string;
+  asset?: string;
+  attackTechnique?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+export type IncidentListItem = {
+  id: string;
+  title: string;
+  severity: string;
+  status: string;
+  containment_state: string | null;
+  summary: string;
+  owner: PersonRef | null;
+  open_task_count: number;
+  evidence_count: number;
+};
+
+export type IncidentTimelineEvent = {
+  occurred_at: string;
+  summary: string;
+};
+
+export type IncidentTaskItem = {
+  title: string;
+  status: string;
+  assignee: PersonRef | null;
+};
+
+export type IncidentIndicatorItem = {
+  kind: string;
+  value: string;
+  confidence: string;
+};
+
+export type IncidentEvidenceItem = {
+  id: string;
+  title: string;
+  sha256: string | null;
+  collected_at: string | null;
+  note: string | null;
+};
+
+export type IncidentDetailResponse = IncidentListItem & {
+  timeline: IncidentTimelineEvent[];
+  tasks: IncidentTaskItem[];
+  indicators: IncidentIndicatorItem[];
+  evidence: IncidentEvidenceItem[];
+  related_alerts: RelatedRecord[];
+  affected_assets: RelatedRecord[];
+};
+
+export type IncidentQuery = {
+  search?: string;
+  severity?: string;
+  status?: string;
+  owner?: string;
+  containmentState?: string;
+  page?: number;
+  pageSize?: number;
+};

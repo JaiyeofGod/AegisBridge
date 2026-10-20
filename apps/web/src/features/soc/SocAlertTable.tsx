@@ -3,6 +3,16 @@ import { useMemo, useState } from "react";
 import { StatusBadge } from "@/components/status/StatusBadge";
 import type { AlertSeverity, AlertStatus, SocAlert } from "@/types/soc";
 
+export type SocTableFilters = {
+  search: string;
+  severity: string;
+  status: string;
+  asset: string;
+  attack: string;
+};
+
+export type SocFilterOption = { value: string; label: string };
+
 const selectClass =
   "min-h-11 min-w-[140px] rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]";
 
@@ -20,50 +30,29 @@ function statusTone(status: AlertStatus): "warning" | "accent" | "neutral" {
 
 export function SocAlertTable({
   alerts,
+  total,
   selectedId,
   onSelect,
+  filters,
+  onFiltersChange,
+  assetOptions,
+  techniqueOptions,
 }: {
   alerts: SocAlert[];
+  total: number;
   selectedId: string;
   onSelect: (id: string) => void;
+  filters: SocTableFilters;
+  onFiltersChange: (filters: SocTableFilters) => void;
+  assetOptions: SocFilterOption[];
+  techniqueOptions: SocFilterOption[];
 }) {
-  const [query, setQuery] = useState("");
-  const [severity, setSeverity] = useState("all");
-  const [status, setStatus] = useState("all");
-  const [asset, setAsset] = useState("all");
-  const [attack, setAttack] = useState("all");
   const [owner, setOwner] = useState("all");
-
-  const assets = useMemo(
-    () => Array.from(new Set(alerts.map((item) => item.assetHostname))).sort(),
-    [alerts],
-  );
-  const techniques = useMemo(
-    () =>
-      Array.from(
-        new Set(alerts.map((item) => `${item.attackTactic} · ${item.attackTechniqueId}`)),
-      ).sort(),
-    [alerts],
-  );
   const owners = useMemo(
     () => Array.from(new Set(alerts.map((item) => item.assignee))).sort(),
     [alerts],
   );
-
-  const filtered = alerts.filter((item) => {
-    const haystack =
-      `${item.alertId} ${item.detectionName} ${item.assetHostname} ${item.account ?? ""} ${item.attackTechniqueId} ${item.telemetrySource}`.toLowerCase();
-    const matchesQuery = query.trim().length === 0 || haystack.includes(query.trim().toLowerCase());
-    const techniqueKey = `${item.attackTactic} · ${item.attackTechniqueId}`;
-    return (
-      matchesQuery &&
-      (severity === "all" || item.severity === severity) &&
-      (status === "all" || item.status === status) &&
-      (asset === "all" || item.assetHostname === asset) &&
-      (attack === "all" || techniqueKey === attack) &&
-      (owner === "all" || item.assignee === owner)
-    );
-  });
+  const visible = alerts.filter((item) => owner === "all" || item.assignee === owner);
 
   return (
     <div className="space-y-4">
@@ -75,8 +64,8 @@ export function SocAlertTable({
           <input
             id="soc-search"
             type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            value={filters.search}
+            onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
             placeholder="Search records…"
             className="min-h-11 w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 text-[var(--text)] placeholder:text-[var(--muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
           />
@@ -84,39 +73,53 @@ export function SocAlertTable({
         <Filter
           id="soc-severity"
           label="Severity"
-          value={severity}
-          onChange={setSeverity}
-          options={["Critical", "High", "Medium", "Low"]}
+          value={filters.severity}
+          onChange={(severity) => onFiltersChange({ ...filters, severity })}
+          options={[
+            { value: "critical", label: "Critical" },
+            { value: "high", label: "High" },
+            { value: "medium", label: "Medium" },
+            { value: "low", label: "Low" },
+          ]}
         />
         <Filter
           id="soc-status"
           label="Status"
-          value={status}
-          onChange={setStatus}
-          options={["New", "Requires review", "Investigation opened"]}
+          value={filters.status}
+          onChange={(status) => onFiltersChange({ ...filters, status })}
+          options={[
+            { value: "new", label: "New" },
+            { value: "requires review", label: "Requires review" },
+            { value: "investigation opened", label: "Investigation opened" },
+          ]}
         />
         <Filter
           id="soc-asset"
           label="Source asset"
-          value={asset}
-          onChange={setAsset}
-          options={assets}
+          value={filters.asset}
+          onChange={(asset) => onFiltersChange({ ...filters, asset })}
+          options={assetOptions}
         />
         <Filter
           id="soc-attack"
           label="ATT&CK tactic or technique"
-          value={attack}
-          onChange={setAttack}
-          options={techniques}
+          value={filters.attack}
+          onChange={(attack) => onFiltersChange({ ...filters, attack })}
+          options={techniqueOptions}
         />
-        <Filter id="soc-owner" label="Owner" value={owner} onChange={setOwner} options={owners} />
+        <Filter
+          id="soc-owner"
+          label="Owner"
+          value={owner}
+          onChange={setOwner}
+          options={owners.map((name) => ({ value: name, label: name }))}
+        />
         <Filter
           id="soc-saved-views"
           label="Saved views"
           value="current"
           onChange={() => undefined}
-          options={["Current queue"]}
-          optionValue={() => "current"}
+          options={[{ value: "current", label: "Current queue" }]}
         />
       </div>
 
@@ -148,14 +151,14 @@ export function SocAlertTable({
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {visible.length === 0 ? (
               <tr>
                 <td colSpan={11} className="px-3 py-8 text-[var(--muted)]">
-                  No alerts match the current filters. Clear filters to see the sample queue.
+                  No alerts are stored for the current request.
                 </td>
               </tr>
             ) : (
-              filtered.map((item) => (
+              visible.map((item) => (
                 <tr key={item.id} className="border-t border-[var(--border)]">
                   <td className="px-3 py-3">
                     <button
@@ -197,7 +200,12 @@ export function SocAlertTable({
       </div>
 
       <ul className="space-y-3 md:hidden">
-        {filtered.map((item) => (
+        {visible.length === 0 ? (
+          <li className="text-sm text-[var(--muted)]">
+            No alerts are stored for the current request.
+          </li>
+        ) : null}
+        {visible.map((item) => (
           <li key={item.id}>
             <button
               type="button"
@@ -217,8 +225,7 @@ export function SocAlertTable({
       </ul>
 
       <p className="text-xs text-[var(--muted)]">
-        Showing {filtered.length} of {alerts.length} sample records · Row selection opens record
-        details
+        Showing {visible.length} of {total} development records · Row selection opens record details
       </p>
     </div>
   );
@@ -230,14 +237,12 @@ function Filter({
   value,
   onChange,
   options,
-  optionValue,
 }: {
   id: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
-  options: string[];
-  optionValue?: (option: string) => string;
+  options: SocFilterOption[];
 }) {
   return (
     <div>
@@ -252,8 +257,8 @@ function Filter({
       >
         {id === "soc-saved-views" ? null : <option value="all">All</option>}
         {options.map((option) => (
-          <option key={option} value={optionValue ? optionValue(option) : option}>
-            {option}
+          <option key={option.value} value={option.value}>
+            {option.label}
           </option>
         ))}
       </select>

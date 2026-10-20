@@ -1,17 +1,39 @@
-import { useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { Button } from "@/components/buttons/Button";
 import { Panel } from "@/components/cards/Panel";
 import { SummaryMetric } from "@/components/cards/SummaryMetric";
+import { ErrorState } from "@/components/feedback/ErrorState";
+import { LoadingState } from "@/components/feedback/LoadingState";
 import { SimulatedDataBanner } from "@/components/feedback/SimulatedDataBanner";
 import { AppShell } from "@/components/navigation/AppShell";
 import { PageContainer } from "@/components/navigation/PageContainer";
 import { PageHeader } from "@/components/navigation/PageHeader";
 import { StatusBadge } from "@/components/status/StatusBadge";
-import { IncidentTable } from "@/features/incidents/IncidentTable";
-import { useIncidentData } from "@/features/incidents/useIncidentData";
+import { StaleDataIndicator } from "@/components/status/StaleDataIndicator";
+import { SEEDED_DATA_LABEL, SEEDED_DATA_NOTE } from "@/features/data-origin";
+import {
+  IncidentTable,
+  type IncidentFilterOption,
+  type IncidentTableFilters,
+} from "@/features/incidents/IncidentTable";
+import {
+  applyIncidentDetail,
+  evidenceFrom,
+  indicatorsFrom,
+  mapIncidentInventory,
+  tasksFrom,
+  timelineFrom,
+} from "@/features/incidents/mapIncident";
+import {
+  useIncidentCatalog,
+  useIncidentDetail,
+  useIncidentList,
+} from "@/features/incidents/useIncidentData";
 import { cn } from "@/lib/cn";
+import { formatTimestamp } from "@/lib/format";
+import type { IncidentQuery } from "@/services/api-types";
 import type { IncidentRecord, IncidentSectionId, TimelineEvent } from "@/types/incident";
 
 const sections: { id: IncidentSectionId; label: string }[] = [
@@ -22,18 +44,51 @@ const sections: { id: IncidentSectionId; label: string }[] = [
   { id: "evidence", label: "Evidence" },
 ];
 
+const emptyFilters: IncidentTableFilters = {
+  search: "",
+  severity: "all",
+  status: "all",
+  owner: "all",
+  containment: "all",
+};
+
 export function IncidentPage() {
-  const queue = useIncidentData();
+  const catalog = useIncidentCatalog();
   const [section, setSection] = useState<IncidentSectionId>("incidents");
-  const [selectedId, setSelectedId] = useState("inc-002");
+  const [selectedId, setSelectedId] = useState("");
+  const [filters, setFilters] = useState<IncidentTableFilters>(emptyFilters);
+  const deferredSearch = useDeferredValue(filters.search.trim());
+  const query = useMemo(
+    () => toIncidentQuery({ ...filters, search: deferredSearch }),
+    [filters, deferredSearch],
+  );
+  const hasServerFilters = Object.keys(query).length > 0;
+  const filtered = useIncidentList(query, hasServerFilters);
+  const generatedAt = catalog.dataUpdatedAt
+    ? new Date(catalog.dataUpdatedAt).toISOString()
+    : new Date().toISOString();
+  const sourceItems = hasServerFilters ? (filtered.data?.items ?? []) : (catalog.data?.items ?? []);
+  const snapshot = catalog.data ? mapIncidentInventory(catalog.data.items, generatedAt) : null;
+  const listed = mapIncidentInventory(sourceItems, generatedAt).incidents;
+  const selectedRow = listed.find((item) => item.id === selectedId) ?? listed[0];
+  const detail = useIncidentDetail(selectedRow?.incidentId ?? "");
   const selected =
-    queue.data.incidents.find((item) => item.id === selectedId) ?? queue.data.incidents[0];
-  const timeline = queue.data.timeline.filter((item) => item.incidentId === selected?.incidentId);
-  const tasks = queue.data.tasks.filter((item) => item.incidentId === selected?.incidentId);
-  const evidence = queue.data.evidence.filter((item) => item.incidentId === selected?.incidentId);
+    detail.data && detail.data.id === selectedRow?.incidentId
+      ? applyIncidentDetail(detail.data)
+      : selectedRow;
+  const visible = listed.map((item) => (item.id === selected?.id && selected ? selected : item));
+  const timeline = detail.data ? timelineFrom(detail.data) : [];
+  const tasks = detail.data ? tasksFrom(detail.data) : [];
+  const indicators = detail.data ? indicatorsFrom(detail.data) : [];
+  const evidence = detail.data ? evidenceFrom(detail.data) : [];
+  const ownerOptions = uniqueOptions(
+    catalog.data?.items
+      .map((item) => item.owner?.display_name)
+      .filter((value): value is string => Boolean(value)) ?? [],
+  );
 
   return (
-    <AppShell environmentLabel={queue.data.environmentLabel}>
+    <AppShell environmentLabel="Development · Seeded">
       <PageContainer data-testid="incidents-page">
         <PageHeader
           title="Incident response"
@@ -48,7 +103,12 @@ export function IncidentPage() {
               >
                 Create incident
               </Button>
-              <SimulatedDataBanner message={queue.data.snapshotLabel} />
+              <SimulatedDataBanner message={SEEDED_DATA_NOTE} />
+              {catalog.dataUpdatedAt ? (
+                <p className="text-xs text-[var(--muted)]" data-testid="last-successful-fetch">
+                  Last successful update: {formatTimestamp(generatedAt)}
+                </p>
+              ) : null}
             </div>
           }
         />
@@ -80,222 +140,314 @@ export function IncidentPage() {
           })}
         </div>
 
-        <div className="space-y-8">
-          {section === "incidents" && selected ? (
-            <>
-              <section aria-labelledby="incident-summary-heading">
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                  <h2
-                    id="incident-summary-heading"
-                    className="font-heading text-xl font-bold text-[var(--text)]"
-                  >
-                    Response snapshot
-                  </h2>
-                  <StatusBadge label="SIMULATED" tone="warning" />
-                </div>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  {queue.data.metrics.map((metric) => (
-                    <SummaryMetric key={metric.id} metric={metric} />
-                  ))}
-                </div>
-                <p className="mt-4 text-xs text-[var(--muted)]">
-                  Severity and lifecycle status stay separate. There is no aggregate security score.
-                </p>
-              </section>
+        {catalog.isPending ? <LoadingState label="Updating" rows={4} /> : null}
+        {catalog.isError ? (
+          <ErrorState
+            title="Incident data unavailable"
+            description="The development incidents API did not respond. Retry to load the seeded queue. Fixture rows are not substituted."
+            onRetry={() => void catalog.refetch()}
+          />
+        ) : null}
+        {filtered.isError ? (
+          <ErrorState
+            title="Filtered incident queue unavailable"
+            description="The incident filter request failed. Fixture rows are not added."
+            onRetry={() => void filtered.refetch()}
+          />
+        ) : null}
+        {detail.isError ? (
+          <ErrorState
+            title="Incident record unavailable"
+            description="The incident detail request failed. Related records are not invented."
+            onRetry={() => void detail.refetch()}
+          />
+        ) : null}
+        {catalog.isSuccess && (catalog.isFetching || filtered.isFetching || detail.isFetching) ? (
+          <div className="mb-6">
+            <StaleDataIndicator
+              message="Refreshing development incident queue"
+              lastSuccessfulAt={generatedAt}
+            />
+          </div>
+        ) : null}
 
-              <Panel
-                title="Incident queue"
-                description="Sample incidents from the simulated AegisBridge Technologies lab. Not every alert is an incident."
-              >
-                <IncidentTable
-                  incidents={queue.data.incidents}
-                  selectedId={selectedId}
-                  onSelect={setSelectedId}
-                />
-              </Panel>
+        {catalog.isSuccess && snapshot ? (
+          <div className="space-y-8">
+            {section === "incidents" ? (
+              <>
+                <section aria-labelledby="incident-summary-heading">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <h2
+                      id="incident-summary-heading"
+                      className="font-heading text-xl font-bold text-[var(--text)]"
+                    >
+                      Response snapshot
+                    </h2>
+                    <StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    {snapshot.metrics.map((metric) => (
+                      <SummaryMetric key={metric.id} metric={metric} />
+                    ))}
+                  </div>
+                  <p className="mt-4 text-xs text-[var(--muted)]">
+                    Severity and lifecycle status stay separate. There is no aggregate security
+                    score.
+                  </p>
+                </section>
 
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-stretch">
-                <Panel title={`${selected.incidentId} · Response timeline`} className="h-full">
-                  <IncidentContext
-                    incident={selected}
-                    timeline={timeline}
-                    openTasks={tasks.filter((item) => item.status !== "Done")}
-                    evidenceIds={evidence.map((item) => item.evidenceId)}
+                <Panel
+                  title="Incident queue"
+                  description="Development records returned by the incidents API. An alert is not an incident unless an analyst promotes it."
+                >
+                  <IncidentTable
+                    incidents={visible}
+                    total={
+                      hasServerFilters
+                        ? (filtered.data?.total ?? visible.length)
+                        : catalog.data.total
+                    }
+                    selectedId={selected?.id ?? ""}
+                    onSelect={setSelectedId}
+                    filters={filters}
+                    onFiltersChange={setFilters}
+                    ownerOptions={ownerOptions}
                   />
                 </Panel>
-                <Panel title="Workflow & interpretation" className="h-full">
-                  <ul className="space-y-3">
-                    {queue.data.workflowNotes.map((note) => (
-                      <li
-                        key={note}
-                        className="rounded-[var(--radius-control)] bg-[var(--raised)] px-3 py-3 text-sm leading-relaxed text-[var(--muted)]"
-                      >
-                        {note}
-                      </li>
-                    ))}
-                  </ul>
-                </Panel>
-              </div>
-            </>
-          ) : null}
 
-          {section === "timeline" && selected ? (
-            <Panel
-              title={`${selected.incidentId} · Timeline`}
-              description="Ordered events for the selected incident."
-              action={<StatusBadge label="SIMULATED" tone="warning" />}
-            >
-              <TimelineList events={timeline} />
-            </Panel>
-          ) : null}
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-stretch">
+                  <Panel
+                    title={
+                      selected ? `${selected.incidentId} · Response timeline` : "Response timeline"
+                    }
+                    className="h-full"
+                  >
+                    {selected ? (
+                      <IncidentContext
+                        incident={selected}
+                        timeline={timeline}
+                        openTasks={tasks.filter((item) => item.status.toLowerCase() !== "done")}
+                        evidenceIds={evidence.map((item) => item.evidenceId)}
+                      />
+                    ) : (
+                      <p className="text-sm text-[var(--muted)]">
+                        No incident is stored for the current request.
+                      </p>
+                    )}
+                  </Panel>
+                  <Panel title="Workflow & interpretation" className="h-full">
+                    <ul className="space-y-3">
+                      {snapshot.workflowNotes.map((note) => (
+                        <li
+                          key={note}
+                          className="rounded-[var(--radius-control)] bg-[var(--raised)] px-3 py-3 text-sm leading-relaxed text-[var(--muted)]"
+                        >
+                          {note}
+                        </li>
+                      ))}
+                    </ul>
+                  </Panel>
+                </div>
+              </>
+            ) : null}
 
-          {section === "tasks" ? (
-            <Panel
-              title="Tasks"
-              description="Owners, due dates, priority, and overdue state. Overdue is not a severity."
-              action={<StatusBadge label="SIMULATED" tone="warning" />}
-            >
-              <div className="hidden overflow-x-auto md:block" data-testid="incident-tasks">
-                <table className="min-w-full border-collapse text-left text-sm">
-                  <caption className="sr-only">
-                    Incident tasks with owner, due date, status, priority, and overdue state
-                  </caption>
-                  <thead className="text-[var(--muted)]">
-                    <tr>
-                      {["Task", "Incident", "Owner", "Due", "Status", "Priority", "Schedule"].map(
-                        (heading) => (
-                          <th key={heading} scope="col" className="px-3 py-3 font-medium">
-                            {heading}
-                          </th>
-                        ),
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {queue.data.tasks.map((item) => (
-                      <tr key={item.id} className="border-t border-[var(--border)]">
-                        <td className="px-3 py-3 text-[var(--text)]">
-                          {item.taskId}
-                          <span className="mt-1 block text-xs text-[var(--muted)]">
-                            {item.title}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3 text-[var(--muted)]">{item.incidentId}</td>
-                        <td className="px-3 py-3 text-[var(--muted)]">{item.owner}</td>
-                        <td className="px-3 py-3 text-[var(--muted)]">{item.dueLabel}</td>
-                        <td className="px-3 py-3 text-[var(--text)]">{item.status}</td>
-                        <td className="px-3 py-3 text-[var(--text)]">{item.priority}</td>
-                        <td className="px-3 py-3 text-[var(--muted)]">
-                          {item.overdue ? "Overdue" : "On schedule"}
-                        </td>
+            {section === "timeline" ? (
+              <Panel
+                title={selected ? `${selected.incidentId} · Timeline` : "Timeline"}
+                description="Ordered events returned for the selected incident."
+                action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
+              >
+                <TimelineList events={timeline} />
+              </Panel>
+            ) : null}
+
+            {section === "tasks" ? (
+              <Panel
+                title="Tasks"
+                description="Tasks returned with the selected incident. Due date and priority are not stored."
+                action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
+              >
+                <div className="hidden overflow-x-auto md:block" data-testid="incident-tasks">
+                  <table className="min-w-full border-collapse text-left text-sm">
+                    <caption className="sr-only">
+                      Incident tasks with owner, due date, status, priority, and overdue state
+                    </caption>
+                    <thead className="text-[var(--muted)]">
+                      <tr>
+                        {["Task", "Incident", "Owner", "Due", "Status", "Priority", "Schedule"].map(
+                          (heading) => (
+                            <th key={heading} scope="col" className="px-3 py-3 font-medium">
+                              {heading}
+                            </th>
+                          ),
+                        )}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <ul className="space-y-3 md:hidden">
-                {queue.data.tasks.map((item) => (
-                  <li
-                    key={item.id}
-                    className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
-                  >
-                    <p className="font-medium text-[var(--text)]">
-                      {item.taskId} · {item.title}
-                    </p>
-                    <p className="mt-1 text-sm text-[var(--muted)]">
-                      {item.owner} · Due {item.dueLabel} · {item.status} · {item.priority} ·{" "}
-                      {item.overdue ? "Overdue" : "On schedule"}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
-          ) : null}
+                    </thead>
+                    <tbody>
+                      {tasks.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="px-3 py-8 text-[var(--muted)]">
+                            No tasks are stored.
+                          </td>
+                        </tr>
+                      ) : null}
+                      {tasks.map((item) => (
+                        <tr key={item.id} className="border-t border-[var(--border)]">
+                          <td className="px-3 py-3 text-[var(--text)]">
+                            {item.taskId}
+                            <span className="mt-1 block text-xs text-[var(--muted)]">
+                              {item.title}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-[var(--muted)]">{item.incidentId}</td>
+                          <td className="px-3 py-3 text-[var(--muted)]">{item.owner}</td>
+                          <td className="px-3 py-3 text-[var(--muted)]">{item.dueLabel}</td>
+                          <td className="px-3 py-3 text-[var(--text)]">{item.status}</td>
+                          <td className="px-3 py-3 text-[var(--text)]">{item.priority}</td>
+                          <td className="px-3 py-3 text-[var(--muted)]">
+                            {item.overdue ? "Overdue" : "Not stored"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <ul className="space-y-3 md:hidden">
+                  {tasks.length === 0 ? (
+                    <li className="text-sm text-[var(--muted)]">No tasks are stored.</li>
+                  ) : null}
+                  {tasks.map((item) => (
+                    <li
+                      key={item.id}
+                      className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
+                    >
+                      <p className="font-medium text-[var(--text)]">
+                        {item.taskId} · {item.title}
+                      </p>
+                      <p className="mt-1 text-sm text-[var(--muted)]">
+                        {item.owner} · Due {item.dueLabel} · {item.status} · {item.priority} ·{" "}
+                        {item.overdue ? "Overdue" : "Not stored"}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </Panel>
+            ) : null}
 
-          {section === "indicators" ? (
-            <Panel
-              title="Indicators"
-              description="Simulated context only. These values are not real malicious indicators."
-              action={<StatusBadge label="SIMULATED" tone="warning" />}
-            >
-              <ul className="space-y-3" data-testid="incident-indicators">
-                {queue.data.indicators.map((item) => (
-                  <li
-                    key={item.id}
-                    className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
-                  >
-                    <p className="font-medium text-[var(--text)]">
-                      {item.indicatorId} · {item.kind}
-                    </p>
-                    <p className="mt-1 text-sm text-[var(--text)]">{item.value}</p>
-                    <p className="mt-1 text-sm text-[var(--muted)]">
-                      {item.incidentId} · {item.context}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
-          ) : null}
+            {section === "indicators" ? (
+              <Panel
+                title="Indicators"
+                description="Indicators returned with the selected incident. Confidence is the stored value."
+                action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
+              >
+                <ul className="space-y-3" data-testid="incident-indicators">
+                  {indicators.length === 0 ? (
+                    <li className="text-sm text-[var(--muted)]">No indicators are stored.</li>
+                  ) : null}
+                  {indicators.map((item) => (
+                    <li
+                      key={item.id}
+                      className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
+                    >
+                      <p className="font-medium text-[var(--text)]">
+                        {item.indicatorId} · {item.kind}
+                      </p>
+                      <p className="mt-1 text-sm text-[var(--text)]">{item.value}</p>
+                      <p className="mt-1 text-sm text-[var(--muted)]">
+                        {item.incidentId} · {item.context}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </Panel>
+            ) : null}
 
-          {section === "evidence" ? (
-            <Panel
-              title="Evidence"
-              description="References only. Object storage is not connected."
-              action={<StatusBadge label="SIMULATED" tone="warning" />}
-            >
-              <div className="hidden overflow-x-auto md:block" data-testid="incident-evidence">
-                <table className="min-w-full border-collapse text-left text-sm">
-                  <caption className="sr-only">
-                    Evidence references with type, capture time, integrity status, and linked
-                    records
-                  </caption>
-                  <thead className="text-[var(--muted)]">
-                    <tr>
-                      {["Evidence", "Type", "Captured", "Integrity", "Linked records"].map(
-                        (heading) => (
-                          <th key={heading} scope="col" className="px-3 py-3 font-medium">
-                            {heading}
-                          </th>
-                        ),
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {queue.data.evidence.map((item) => (
-                      <tr key={item.id} className="border-t border-[var(--border)]">
-                        <td className="px-3 py-3 text-[var(--text)]">{item.evidenceId}</td>
-                        <td className="px-3 py-3 text-[var(--muted)]">{item.type}</td>
-                        <td className="px-3 py-3 text-[var(--muted)]">{item.capturedLabel}</td>
-                        <td className="px-3 py-3 text-[var(--text)]">{item.integrityStatus}</td>
-                        <td className="px-3 py-3 text-[var(--muted)]">
-                          {item.linkedControls} · {item.incidentId}
-                        </td>
+            {section === "evidence" ? (
+              <Panel
+                title="Evidence"
+                description="References only. Object storage is not connected."
+                action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
+              >
+                <div className="hidden overflow-x-auto md:block" data-testid="incident-evidence">
+                  <table className="min-w-full border-collapse text-left text-sm">
+                    <caption className="sr-only">
+                      Evidence references with type, capture time, integrity status, and linked
+                      records
+                    </caption>
+                    <thead className="text-[var(--muted)]">
+                      <tr>
+                        {["Evidence", "Type", "Captured", "Integrity", "Linked records"].map(
+                          (heading) => (
+                            <th key={heading} scope="col" className="px-3 py-3 font-medium">
+                              {heading}
+                            </th>
+                          ),
+                        )}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <ul className="space-y-3 md:hidden">
-                {queue.data.evidence.map((item) => (
-                  <li
-                    key={item.id}
-                    className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
-                  >
-                    <p className="font-medium text-[var(--text)]">
-                      {item.evidenceId} · {item.type}
-                    </p>
-                    <p className="mt-1 text-sm text-[var(--muted)]">
-                      {item.capturedLabel} · {item.integrityStatus}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
-          ) : null}
-        </div>
+                    </thead>
+                    <tbody>
+                      {evidence.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-3 py-8 text-[var(--muted)]">
+                            No evidence is stored.
+                          </td>
+                        </tr>
+                      ) : null}
+                      {evidence.map((item) => (
+                        <tr key={item.id} className="border-t border-[var(--border)]">
+                          <td className="px-3 py-3 text-[var(--text)]">{item.evidenceId}</td>
+                          <td className="px-3 py-3 text-[var(--muted)]">{item.type}</td>
+                          <td className="px-3 py-3 text-[var(--muted)]">{item.capturedLabel}</td>
+                          <td className="px-3 py-3 text-[var(--text)]">{item.integrityStatus}</td>
+                          <td className="px-3 py-3 text-[var(--muted)]">
+                            {item.linkedControls} · {item.incidentId}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <ul className="space-y-3 md:hidden">
+                  {evidence.length === 0 ? (
+                    <li className="text-sm text-[var(--muted)]">No evidence is stored.</li>
+                  ) : null}
+                  {evidence.map((item) => (
+                    <li
+                      key={item.id}
+                      className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
+                    >
+                      <p className="font-medium text-[var(--text)]">
+                        {item.evidenceId} · {item.type}
+                      </p>
+                      <p className="mt-1 text-sm text-[var(--muted)]">
+                        {item.capturedLabel} · {item.integrityStatus}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </Panel>
+            ) : null}
+          </div>
+        ) : null}
       </PageContainer>
     </AppShell>
   );
+}
+
+function toIncidentQuery(filters: IncidentTableFilters): IncidentQuery {
+  return {
+    ...(filters.search ? { search: filters.search } : {}),
+    ...(filters.severity !== "all" ? { severity: filters.severity } : {}),
+    ...(filters.status !== "all" ? { status: filters.status } : {}),
+    ...(filters.owner !== "all" ? { owner: filters.owner } : {}),
+    ...(filters.containment !== "all" ? { containmentState: filters.containment } : {}),
+  };
+}
+
+function uniqueOptions(values: string[]): IncidentFilterOption[] {
+  return Array.from(new Set(values))
+    .sort()
+    .map((value) => ({ value, label: value }));
 }
 
 function IncidentContext({
@@ -329,10 +481,9 @@ function IncidentContext({
       <div>
         <p className="text-[var(--muted)]">Affected assets</p>
         <p className="mt-1 text-[var(--text)]">
-          {incident.affectedService}
           {incident.assets.length > 0
-            ? ` · ${incident.assets.map((asset) => asset.hostname).join(", ")}`
-            : ""}
+            ? incident.assets.map((asset) => asset.hostname).join(", ")
+            : "No affected assets are stored."}
           {incident.assets.some((asset) => asset.slug) ? (
             <>
               {" "}
@@ -357,7 +508,7 @@ function IncidentContext({
         <p className="mt-1 text-[var(--text)]">
           {incident.relatedAlerts.length > 0
             ? incident.relatedAlerts.join(", ")
-            : "No source alert."}
+            : "No related alerts are stored."}
         </p>
       </div>
       <div>
@@ -369,7 +520,7 @@ function IncidentContext({
         <p className="mt-1 text-[var(--text)]">
           {latest
             ? `${latest.whenLabel} · ${latest.title}. ${latest.detail}`
-            : "No events recorded."}
+            : "No timeline events are stored."}
         </p>
       </div>
       <div>
@@ -381,13 +532,13 @@ function IncidentContext({
         <p className="mt-1 text-[var(--text)]">
           {openTasks.length > 0
             ? openTasks.map((task) => `${task.taskId} ${task.title}`).join(" · ")
-            : "No open tasks."}
+            : "No tasks are stored."}
         </p>
       </div>
       <div>
         <p className="text-[var(--muted)]">Evidence</p>
         <p className="mt-1 text-[var(--text)]">
-          {evidenceIds.length > 0 ? evidenceIds.join(", ") : "No evidence reference yet."}
+          {evidenceIds.length > 0 ? evidenceIds.join(", ") : "No evidence is stored."}
         </p>
       </div>
       <div>
@@ -402,6 +553,9 @@ function IncidentContext({
 function TimelineList({ events }: { events: TimelineEvent[] }) {
   return (
     <ol className="space-y-3" aria-label="Response timeline" data-testid="incident-timeline">
+      {events.length === 0 ? (
+        <li className="text-sm text-[var(--muted)]">No timeline events are stored.</li>
+      ) : null}
       {events.map((event) => (
         <li
           key={event.id}

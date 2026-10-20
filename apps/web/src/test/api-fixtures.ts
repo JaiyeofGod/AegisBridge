@@ -1,8 +1,12 @@
 import { vi } from "vitest";
 
 import type {
+  AlertDetailResponse,
+  AlertListItem,
   AssetDetailResponse,
   AssetListItem,
+  IncidentDetailResponse,
+  IncidentListItem,
   OverviewResponse,
   RiskDetailResponse,
   RiskListItem,
@@ -246,6 +250,120 @@ export const vulnDetail: VulnerabilityDetailResponse = {
   cve_summary: "Stored catalog summary. Not a live NVD fetch.",
 };
 
+export const alertHigh: AlertListItem = {
+  id: "AL-0107",
+  severity: "high",
+  status: "new",
+  summary: "Simulated selected metadata. No raw Wazuh event is stored.",
+  observed_at: "2026-10-20T12:00:00Z",
+  telemetry_source: "not_connected",
+  wazuh_alert_id: null,
+  source_of_record: "wazuh",
+  stored_scope: "selected_metadata",
+  asset_id: "AST-0018",
+  asset_hostname: "WIN-WS-07",
+  detection_id: "DET-0005",
+  detection_name: "Suspicious PowerShell child process",
+  attack_technique_id: "T1059.001",
+  attack_technique_name: "PowerShell",
+  attack_tactic: "Execution",
+  investigation_id: "INV-0012",
+  assignee: { id: "USR-0004", display_name: "Jonah Hale" },
+};
+
+export const alertLow: AlertListItem = {
+  id: "AL-0199",
+  severity: "low",
+  status: "closed",
+  summary: "Second development alert used to prove filters.",
+  observed_at: "2026-10-20T11:00:00Z",
+  telemetry_source: "not_connected",
+  wazuh_alert_id: null,
+  source_of_record: "wazuh",
+  stored_scope: "selected_metadata",
+  asset_id: "AST-0099",
+  asset_hostname: "LAB-WS-99",
+  detection_id: "DET-0099",
+  detection_name: "Benign process start",
+  attack_technique_id: "T1110",
+  attack_technique_name: "Brute Force",
+  attack_tactic: "Credential Access",
+  investigation_id: null,
+  assignee: { id: "USR-0009", display_name: "Casey Quinn" },
+};
+
+export const alertItems = [alertHigh, alertLow];
+
+export const alertDetail: AlertDetailResponse = {
+  ...alertHigh,
+  detection_status: "simulated",
+  detection_version: "1",
+  detection_logic_summary: "Reference rule summary only. Not deployed to Wazuh.",
+  attack_version: "Enterprise v20.0",
+  investigation_status: "open",
+  investigation_summary: "Simulated investigation. No confirmed compromise.",
+};
+
+export const incidentPrimary: IncidentListItem = {
+  id: "INC-0001",
+  title: "Repeated authentication failures",
+  severity: "medium",
+  status: "investigating",
+  containment_state: null,
+  summary: "Simulated incident. Severity and status are separate. No confirmed compromise.",
+  owner: { id: "USR-0004", display_name: "Jonah Hale" },
+  open_task_count: 0,
+  evidence_count: 1,
+};
+
+export const incidentOther: IncidentListItem = {
+  id: "INC-0099",
+  title: "Low severity development incident",
+  severity: "low",
+  status: "new",
+  containment_state: null,
+  summary: "Second development incident used to prove filters.",
+  owner: { id: "USR-0009", display_name: "Casey Quinn" },
+  open_task_count: 0,
+  evidence_count: 0,
+};
+
+export const incidentItems = [incidentPrimary, incidentOther];
+
+export const incidentDetail: IncidentDetailResponse = {
+  ...incidentPrimary,
+  timeline: [
+    {
+      occurred_at: "2026-10-20T12:00:00Z",
+      summary: "Opened from simulated authentication failures.",
+    },
+  ],
+  tasks: [],
+  indicators: [],
+  evidence: [
+    {
+      id: "EVID-0041",
+      title: "Privileged account inventory",
+      sha256: "fixture-sha256",
+      collected_at: "2026-10-20T12:05:00Z",
+      note: "Reference only.",
+    },
+  ],
+  related_alerts: [],
+  affected_assets: [],
+};
+
+export const emptyIncidentDetail: IncidentDetailResponse = {
+  ...incidentPrimary,
+  evidence_count: 0,
+  timeline: [],
+  tasks: [],
+  indicators: [],
+  evidence: [],
+  related_alerts: [],
+  affected_assets: [],
+};
+
 export function installApiFetch(resolve?: (url: string) => unknown) {
   const calls: string[] = [];
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -270,6 +388,25 @@ export function installApiFetch(resolve?: (url: string) => unknown) {
     if (url.includes("/api/v1/vulnerabilities")) {
       if (url.includes("severity=critical")) return jsonResponse(assetPage([vulnCritical]));
       return jsonResponse(assetPage(vulnItems));
+    }
+    if (/\/api\/v1\/alerts\/[^?]+/.test(url)) return jsonResponse(alertDetail);
+    if (url.includes("/api/v1/alerts")) {
+      if (
+        url.includes("severity=high") ||
+        url.includes("attack_technique=T1059.001") ||
+        url.includes("asset=WIN-WS-07")
+      ) {
+        return jsonResponse(assetPage([alertHigh]));
+      }
+      return jsonResponse(assetPage(alertItems));
+    }
+    if (/\/api\/v1\/incidents\/[^?]+/.test(url)) return jsonResponse(incidentDetail);
+    if (url.includes("/api/v1/incidents")) {
+      if (url.includes("containment_state=")) return jsonResponse(assetPage([]));
+      if (url.includes("severity=medium") || url.includes("owner=Jonah")) {
+        return jsonResponse(assetPage([incidentPrimary]));
+      }
+      return jsonResponse(assetPage(incidentItems));
     }
     return jsonResponse({});
   });

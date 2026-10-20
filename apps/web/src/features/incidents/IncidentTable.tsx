@@ -1,12 +1,15 @@
-import { useMemo, useState } from "react";
-
 import { StatusBadge } from "@/components/status/StatusBadge";
-import type {
-  ContainmentState,
-  IncidentRecord,
-  IncidentSeverity,
-  IncidentStatus,
-} from "@/types/incident";
+import type { IncidentRecord, IncidentSeverity, IncidentStatus } from "@/types/incident";
+
+export type IncidentTableFilters = {
+  search: string;
+  severity: string;
+  status: string;
+  owner: string;
+  containment: string;
+};
+
+export type IncidentFilterOption = { value: string; label: string };
 
 const selectClass =
   "min-h-11 min-w-[140px] rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]";
@@ -25,7 +28,7 @@ function statusTone(status: IncidentStatus): "warning" | "accent" | "success" | 
   return "neutral";
 }
 
-const statuses: IncidentStatus[] = [
+const statuses: IncidentFilterOption[] = [
   "New",
   "Investigating",
   "Containment",
@@ -33,51 +36,38 @@ const statuses: IncidentStatus[] = [
   "Recovery",
   "Resolved",
   "Closed",
-];
+].map((label) => ({ value: label.toLowerCase(), label }));
 
-const severities: IncidentSeverity[] = ["Critical", "High", "Medium", "Low"];
+const severities: IncidentFilterOption[] = ["Critical", "High", "Medium", "Low"].map((label) => ({
+  value: label.toLowerCase(),
+  label,
+}));
 
-const containmentStates: ContainmentState[] = [
+const containmentStates: IncidentFilterOption[] = [
   "Not started",
   "Awaiting decision",
   "In progress",
   "Contained",
   "Not required",
-];
+].map((label) => ({ value: label, label }));
 
 export function IncidentTable({
   incidents,
+  total,
   selectedId,
   onSelect,
+  filters,
+  onFiltersChange,
+  ownerOptions,
 }: {
   incidents: IncidentRecord[];
+  total: number;
   selectedId: string;
   onSelect: (id: string) => void;
+  filters: IncidentTableFilters;
+  onFiltersChange: (filters: IncidentTableFilters) => void;
+  ownerOptions: IncidentFilterOption[];
 }) {
-  const [query, setQuery] = useState("");
-  const [severity, setSeverity] = useState("all");
-  const [status, setStatus] = useState("all");
-  const [owner, setOwner] = useState("all");
-  const [containment, setContainment] = useState("all");
-
-  const owners = useMemo(
-    () => Array.from(new Set(incidents.map((item) => item.owner))).sort(),
-    [incidents],
-  );
-
-  const filtered = incidents.filter((item) => {
-    const haystack =
-      `${item.incidentId} ${item.title} ${item.affectedService} ${item.owner} ${item.assets.map((asset) => asset.hostname).join(" ")} ${item.relatedAlerts.join(" ")}`.toLowerCase();
-    const matchesQuery = query.trim().length === 0 || haystack.includes(query.trim().toLowerCase());
-    return (
-      matchesQuery &&
-      (severity === "all" || item.severity === severity) &&
-      (status === "all" || item.status === status) &&
-      (owner === "all" || item.owner === owner) &&
-      (containment === "all" || item.containment === containment)
-    );
-  });
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-end">
@@ -91,8 +81,8 @@ export function IncidentTable({
           <input
             id="incident-search"
             type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            value={filters.search}
+            onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
             placeholder="Search records…"
             className="min-h-11 w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 text-[var(--text)] placeholder:text-[var(--muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
           />
@@ -100,29 +90,29 @@ export function IncidentTable({
         <Filter
           id="incident-severity"
           label="Severity"
-          value={severity}
-          onChange={setSeverity}
+          value={filters.severity}
+          onChange={(severity) => onFiltersChange({ ...filters, severity })}
           options={severities}
         />
         <Filter
           id="incident-status"
           label="Status"
-          value={status}
-          onChange={setStatus}
+          value={filters.status}
+          onChange={(status) => onFiltersChange({ ...filters, status })}
           options={statuses}
         />
         <Filter
           id="incident-owner"
           label="Owner"
-          value={owner}
-          onChange={setOwner}
-          options={owners}
+          value={filters.owner}
+          onChange={(owner) => onFiltersChange({ ...filters, owner })}
+          options={ownerOptions}
         />
         <Filter
           id="incident-containment"
           label="Containment state"
-          value={containment}
-          onChange={setContainment}
+          value={filters.containment}
+          onChange={(containment) => onFiltersChange({ ...filters, containment })}
           options={containmentStates}
         />
       </div>
@@ -157,14 +147,14 @@ export function IncidentTable({
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {incidents.length === 0 ? (
               <tr>
                 <td colSpan={13} className="px-3 py-8 text-[var(--muted)]">
-                  No incidents match the current filters. Clear filters to see the sample queue.
+                  No incidents are stored for the current request.
                 </td>
               </tr>
             ) : (
-              filtered.map((item) => (
+              incidents.map((item) => (
                 <tr key={item.id} className="border-t border-[var(--border)]">
                   <td className="px-3 py-3">
                     <button
@@ -190,13 +180,15 @@ export function IncidentTable({
                   <td className="px-3 py-3 text-[var(--muted)]">
                     {item.assets.length > 0
                       ? item.assets.map((asset) => asset.hostname).join(", ")
-                      : item.affectedService}
+                      : "No affected assets are stored."}
                   </td>
                   <td className="px-3 py-3 text-[var(--muted)]">
-                    {item.relatedAlerts.length > 0 ? item.relatedAlerts.join(", ") : "None"}
+                    {item.relatedAlerts.length > 0
+                      ? item.relatedAlerts.join(", ")
+                      : "No related alerts are stored."}
                   </td>
                   <td className="px-3 py-3 text-[var(--text)]">
-                    {item.attackMappings[0] ?? "None"}
+                    {item.attackMappings[0] ?? "Not stored"}
                   </td>
                   <td className="px-3 py-3 text-[var(--muted)]">{item.containment}</td>
                   <td className="px-3 py-3 text-[var(--muted)]">{item.evidenceCount}</td>
@@ -212,7 +204,12 @@ export function IncidentTable({
       </div>
 
       <ul className="space-y-3 md:hidden">
-        {filtered.map((item) => (
+        {incidents.length === 0 ? (
+          <li className="text-sm text-[var(--muted)]">
+            No incidents are stored for the current request.
+          </li>
+        ) : null}
+        {incidents.map((item) => (
           <li key={item.id}>
             <button
               type="button"
@@ -232,7 +229,7 @@ export function IncidentTable({
       </ul>
 
       <p className="text-xs text-[var(--muted)]">
-        Showing {filtered.length} of {incidents.length} sample records · Row selection opens record
+        Showing {incidents.length} of {total} development records · Row selection opens record
         details
       </p>
     </div>
@@ -250,7 +247,7 @@ function Filter({
   label: string;
   value: string;
   onChange: (value: string) => void;
-  options: string[];
+  options: IncidentFilterOption[];
 }) {
   return (
     <div>
@@ -265,8 +262,8 @@ function Filter({
       >
         <option value="all">All</option>
         {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
+          <option key={option.value} value={option.value}>
+            {option.label}
           </option>
         ))}
       </select>

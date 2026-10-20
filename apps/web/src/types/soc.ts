@@ -1,9 +1,9 @@
 import type { OverviewMetric } from "@/types/overview";
 
 /** Workflow status for a selected Wazuh alert reference. Not a compromise verdict. */
-export type AlertStatus = "New" | "Requires review" | "Investigation opened";
+export type AlertStatus = string;
 
-export type AlertSeverity = "Critical" | "High" | "Medium" | "Low";
+export type AlertSeverity = string;
 
 export type SocSectionId = "alerts" | "investigations" | "detections" | "attack";
 
@@ -36,7 +36,7 @@ export type SocInvestigation = {
   title: string;
   alertId: string;
   assetHostname: string;
-  status: "Open";
+  status: string;
   summary: string;
 };
 

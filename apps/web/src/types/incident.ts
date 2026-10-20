@@ -1,18 +1,16 @@
 import type { OverviewMetric } from "@/types/overview";
 
 /** Lifecycle state. Kept separate from severity. Inspired by NIST SP 800-61 Rev. 3 operations, not a NIST formula. */
-export type IncidentStatus =
-  "New" | "Investigating" | "Containment" | "Eradication" | "Recovery" | "Resolved" | "Closed";
+export type IncidentStatus = string;
 
-export type IncidentSeverity = "Low" | "Medium" | "High" | "Critical";
+export type IncidentSeverity = string;
 
-export type ContainmentState =
-  "Not started" | "Awaiting decision" | "In progress" | "Contained" | "Not required";
+export type ContainmentState = string;
 
 export type IncidentSectionId = "incidents" | "timeline" | "tasks" | "indicators" | "evidence";
 
-export type TaskStatus = "Open" | "In progress" | "Done";
-export type TaskPriority = "Low" | "Medium" | "High";
+export type TaskStatus = string;
+export type TaskPriority = string;
 
 export type IncidentRecord = {
   id: string;
@@ -58,7 +56,7 @@ export type IncidentIndicator = {
   id: string;
   indicatorId: string;
   incidentId: string;
-  kind: "IP" | "Domain" | "File hash" | "Account" | "Process";
+  kind: string;
   value: string;
   context: string;
 };

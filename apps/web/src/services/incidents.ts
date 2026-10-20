@@ -1,0 +1,23 @@
+import { apiGet } from "@/services/api-client";
+import type {
+  IncidentDetailResponse,
+  IncidentListItem,
+  IncidentQuery,
+  PageResponse,
+} from "@/services/api-types";
+
+export function fetchIncidents(query: IncidentQuery = {}) {
+  const params = new URLSearchParams();
+  if (query.search) params.set("search", query.search);
+  if (query.severity) params.set("severity", query.severity);
+  if (query.status) params.set("status", query.status);
+  if (query.owner) params.set("owner", query.owner);
+  if (query.containmentState) params.set("containment_state", query.containmentState);
+  params.set("page", String(query.page ?? 1));
+  params.set("page_size", String(query.pageSize ?? 100));
+  return apiGet<PageResponse<IncidentListItem>>(`/api/v1/incidents?${params.toString()}`);
+}
+
+export function fetchIncident(incidentId: string) {
+  return apiGet<IncidentDetailResponse>(`/api/v1/incidents/${encodeURIComponent(incidentId)}`);
+}
