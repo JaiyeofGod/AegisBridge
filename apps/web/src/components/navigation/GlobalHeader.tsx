@@ -30,13 +30,8 @@ export function GlobalHeader({
         <NotificationButton />
         <Link
           to="/account/profile"
-          className="inline-flex min-h-11 items-center rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-3 text-sm font-medium text-[var(--text)]"
+          className="inline-flex min-h-11 items-center rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-3 text-sm font-medium text-[var(--text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
           aria-label="Open my profile"
-          onClick={(event) => {
-            // Profile is not implemented in Phase 1 — keep link for route foundation.
-            event.preventDefault();
-          }}
-          title="Profile arrives in a later phase"
         >
           My Profile
         </Link>

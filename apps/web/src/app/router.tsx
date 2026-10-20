@@ -1,6 +1,9 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
-import { ComingSoonPage } from "@/app/ComingSoonPage";
+import { PreferencesPage } from "@/features/account/PreferencesPage";
+import { ProfilePage } from "@/features/account/ProfilePage";
+import { SecurityPage } from "@/features/account/SecurityPage";
+import { WorkspacePage } from "@/features/account/WorkspacePage";
 import { AdministrationPage } from "@/features/administration/AdministrationPage";
 import { AssetDetailPage } from "@/features/assets/AssetDetailPage";
 import { AssetInventoryPage } from "@/features/assets/AssetInventoryPage";
@@ -24,7 +27,6 @@ export function AppRouter() {
       <Route path="/governance" element={<GovernancePage />} />
       <Route path="/risks" element={<RiskPage />} />
 
-      {/* Route foundations only — modules not built yet */}
       <Route path="/assets" element={<AssetInventoryPage />} />
       <Route path="/assets/:assetId" element={<AssetDetailPage />} />
       <Route path="/vulnerabilities" element={<VulnerabilityPage />} />
@@ -34,10 +36,10 @@ export function AppRouter() {
       <Route path="/cyber-range" element={<CyberRangePage />} />
       <Route path="/reports" element={<ReportsPage />} />
       <Route path="/administration" element={<AdministrationPage />} />
-      <Route path="/account/profile" element={<ComingSoonPage title="My Profile" />} />
-      <Route path="/account/security" element={<ComingSoonPage title="Account Security" />} />
-      <Route path="/account/preferences" element={<ComingSoonPage title="Preferences" />} />
-      <Route path="/account/workspace" element={<ComingSoonPage title="Workspace" />} />
+      <Route path="/account/profile" element={<ProfilePage />} />
+      <Route path="/account/security" element={<SecurityPage />} />
+      <Route path="/account/preferences" element={<PreferencesPage />} />
+      <Route path="/account/workspace" element={<WorkspacePage />} />
 
       <Route path="*" element={<Navigate to="/signin" replace />} />
     </Routes>
