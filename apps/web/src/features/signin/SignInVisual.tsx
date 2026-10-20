@@ -32,7 +32,7 @@ export function SignInVisual() {
         </p>
       </div>
 
-      <div className="relative z-10 mt-8 min-h-[240px] flex-1 md:mt-10 md:min-h-[320px]">
+      <div className="relative z-10 -mx-2 mt-6 min-h-[280px] flex-1 md:-mx-4 md:mt-8 md:min-h-[360px]">
         {useLiveScene ? <SignInSplineScene /> : <SignInSceneFallback />}
       </div>
     </div>
