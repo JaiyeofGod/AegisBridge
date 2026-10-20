@@ -1,10 +1,10 @@
 import type { OverviewMetric } from "@/types/overview";
 
-export type AssetCriticality = "Low" | "Medium" | "High" | "Critical";
+export type AssetCriticality = string;
 
-export type AssetEnvironment = "Production" | "Lab" | "Development";
+export type AssetEnvironment = string;
 
-export type TelemetryStatus = "Reporting" | "Missing" | "Stale" | "Active alerts";
+export type TelemetryStatus = string;
 
 export type AssetSectionId = "all" | "business-services" | "identities" | "data-quality";
 
@@ -37,7 +37,7 @@ export type AssetRecord = {
   department: string;
   criticality: AssetCriticality;
   environment: AssetEnvironment;
-  exposure: "Internet-exposed" | "Internal";
+  exposure: string;
   telemetryStatus: TelemetryStatus;
   lastSeenLabel: string;
   vulnerabilityCount: number;
@@ -45,7 +45,7 @@ export type AssetRecord = {
   serviceSegment: string;
   ipAddress: string;
   dataClassification: string;
-  lifecycle: "Active" | "Maintenance" | "Planned";
+  lifecycle: string;
   softwareSummary: string[];
   businessContext: string;
   securityContext: string;

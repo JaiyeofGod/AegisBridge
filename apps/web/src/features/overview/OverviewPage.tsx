@@ -9,11 +9,15 @@ import { AppShell } from "@/components/navigation/AppShell";
 import { PageContainer } from "@/components/navigation/PageContainer";
 import { PageHeader } from "@/components/navigation/PageHeader";
 import { StatusBadge } from "@/components/status/StatusBadge";
+import { StaleDataIndicator } from "@/components/status/StaleDataIndicator";
+import { SEEDED_DATA_LABEL, SEEDED_DATA_NOTE } from "@/features/data-origin";
 import { useOverviewData } from "@/features/overview/useOverviewData";
+import { formatTimestamp } from "@/lib/format";
 import { fetchHealthLive } from "@/services/health";
 
 export function OverviewPage() {
   const overview = useOverviewData();
+  const lastSuccessfulAt = overview.data?.lastSuccessfulFetchAt;
   const healthQuery = useQuery({
     queryKey: ["health", "live"],
     queryFn: fetchHealthLive,
@@ -22,14 +26,19 @@ export function OverviewPage() {
   });
 
   return (
-    <AppShell environmentLabel={overview.data.environmentLabel}>
+    <AppShell environmentLabel={overview.data?.environmentLabel ?? "Development · Seeded"}>
       <PageContainer data-testid="overview-page">
         <PageHeader
           title="Overview"
           description="Priority actions, exposure, incidents, control effectiveness, and telemetry coverage for the fictional AegisBridge Technologies program."
           actions={
             <div className="flex flex-col items-end gap-2.5">
-              <SimulatedDataBanner />
+              <SimulatedDataBanner message={SEEDED_DATA_NOTE} />
+              {lastSuccessfulAt ? (
+                <p className="text-xs text-[var(--muted)]" data-testid="last-successful-fetch">
+                  Last successful update: {formatTimestamp(lastSuccessfulAt)}
+                </p>
+              ) : null}
               <p className="text-xs text-[var(--muted)]" data-testid="api-health-status">
                 API health:{" "}
                 {healthQuery.isLoading
@@ -42,18 +51,27 @@ export function OverviewPage() {
           }
         />
 
-        {overview.state === "loading" ? <LoadingState label="Updating" rows={4} /> : null}
+        {overview.isPending ? <LoadingState label="Updating" rows={4} /> : null}
 
-        {overview.state === "error" ? (
+        {overview.isError ? (
           <ErrorState
             title="Overview data unavailable"
-            description="The simulated overview source failed to load. Retry to restore the last known demo snapshot."
-            lastSuccessfulAt={overview.data.lastSuccessfulFetchAt}
-            onRetry={overview.reload}
+            description="The development overview API did not respond. Retry to load the seeded records. Fixture counts are not substituted."
+            lastSuccessfulAt={lastSuccessfulAt}
+            onRetry={() => void overview.refetch()}
           />
         ) : null}
 
-        {overview.state === "ready" ? (
+        {overview.isSuccess && overview.isFetching ? (
+          <div className="mb-6">
+            <StaleDataIndicator
+              message="Refreshing development overview"
+              lastSuccessfulAt={lastSuccessfulAt}
+            />
+          </div>
+        ) : null}
+
+        {overview.isSuccess && overview.data ? (
           <div className="space-y-8">
             <section aria-labelledby="security-overview-heading">
               <div className="mb-4 flex items-center justify-between gap-3">
@@ -63,7 +81,7 @@ export function OverviewPage() {
                 >
                   Security Overview
                 </h2>
-                <StatusBadge label="SIMULATED" tone="warning" />
+                <StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />
               </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {overview.data.metrics.map((metric) => (
@@ -78,10 +96,13 @@ export function OverviewPage() {
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-stretch">
               <Panel
                 title="My Work"
-                description="Queued analyst actions from the simulated program backlog."
+                description="Open work stored in the development database."
                 className="h-full"
               >
                 <ul className="space-y-3">
+                  {overview.data.myWork.length === 0 ? (
+                    <li className="text-sm text-[var(--muted)]">No open work items are stored.</li>
+                  ) : null}
                   {overview.data.myWork.map((item) => (
                     <li
                       key={item.id}
@@ -101,7 +122,7 @@ export function OverviewPage() {
 
               <Panel
                 title="Security highlights"
-                description="Freshness and priority context for the current demo snapshot."
+                description="Notes derived from stored development records."
                 className="h-full"
               >
                 <ul className="space-y-3">

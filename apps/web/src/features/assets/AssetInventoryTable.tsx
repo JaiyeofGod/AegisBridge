@@ -1,58 +1,56 @@
-import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { StatusBadge } from "@/components/status/StatusBadge";
-import type { AssetRecord, TelemetryStatus } from "@/types/asset";
+import type { AssetRecord } from "@/types/asset";
+
+export type FilterOption = { value: string; label: string };
+
+export type AssetTableFilters = {
+  search: string;
+  assetType: string;
+  criticality: string;
+  environment: string;
+  telemetry: string;
+};
 
 const selectClass =
   "min-h-11 min-w-[150px] rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]";
 
-function telemetryTone(status: TelemetryStatus): "critical" | "warning" | "success" | "accent" {
-  if (status === "Missing") return "critical";
-  if (status === "Stale" || status === "Active alerts") return "warning";
-  return "success";
+function telemetryTone(status: string): "critical" | "warning" | "success" | "accent" {
+  const normalized = status.toLowerCase();
+  if (normalized === "missing" || normalized === "not_connected") return "critical";
+  if (normalized === "stale" || normalized === "active alerts" || normalized === "reference_only") {
+    return "warning";
+  }
+  if (normalized === "reporting" || normalized === "active") return "success";
+  return "warning";
 }
 
 function inventoryStatus(asset: AssetRecord): string {
-  if (asset.slug === "FIN-APP-01") return `${asset.vulnerabilityCount} open findings`;
-  if (asset.telemetryStatus === "Active alerts")
-    return `${asset.openIncidentCount || 3} active alerts`;
   return asset.telemetryStatus;
 }
 
 export function AssetInventoryTable({
   assets,
+  total,
   selectedSlug,
   onSelect,
+  filters,
+  onFiltersChange,
+  typeOptions,
+  environmentOptions,
+  telemetryOptions,
 }: {
   assets: AssetRecord[];
+  total: number;
   selectedSlug: string;
   onSelect: (slug: string) => void;
+  filters: AssetTableFilters;
+  onFiltersChange: (filters: AssetTableFilters) => void;
+  typeOptions: FilterOption[];
+  environmentOptions: FilterOption[];
+  telemetryOptions: FilterOption[];
 }) {
-  const [query, setQuery] = useState("");
-  const [assetType, setAssetType] = useState("all");
-  const [criticality, setCriticality] = useState("all");
-  const [environment, setEnvironment] = useState("all");
-  const [telemetry, setTelemetry] = useState("all");
-
-  const types = useMemo(
-    () => Array.from(new Set(assets.map((asset) => asset.assetType))).sort(),
-    [assets],
-  );
-
-  const filtered = assets.filter((asset) => {
-    const haystack =
-      `${asset.assetId} ${asset.hostname} ${asset.name} ${asset.assetType} ${asset.owner} ${asset.department}`.toLowerCase();
-    const matchesQuery = query.trim().length === 0 || haystack.includes(query.trim().toLowerCase());
-    return (
-      matchesQuery &&
-      (assetType === "all" || asset.assetType === assetType) &&
-      (criticality === "all" || asset.criticality === criticality) &&
-      (environment === "all" || asset.environment === environment) &&
-      (telemetry === "all" || asset.telemetryStatus === telemetry)
-    );
-  });
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
@@ -66,8 +64,8 @@ export function AssetInventoryTable({
           <input
             id="asset-search"
             type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            value={filters.search}
+            onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
             placeholder="Search records…"
             className="min-h-11 w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 text-[var(--text)] placeholder:text-[var(--muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
           />
@@ -75,37 +73,42 @@ export function AssetInventoryTable({
         <FilterSelect
           id="asset-type"
           label="Asset type"
-          value={assetType}
-          onChange={setAssetType}
-          options={types}
+          value={filters.assetType}
+          onChange={(assetType) => onFiltersChange({ ...filters, assetType })}
+          options={typeOptions}
         />
         <FilterSelect
           id="asset-criticality"
           label="Criticality"
-          value={criticality}
-          onChange={setCriticality}
-          options={["Low", "Medium", "High", "Critical"]}
+          value={filters.criticality}
+          onChange={(criticality) => onFiltersChange({ ...filters, criticality })}
+          options={[
+            { value: "low", label: "Low" },
+            { value: "medium", label: "Medium" },
+            { value: "high", label: "High" },
+            { value: "critical", label: "Critical" },
+          ]}
         />
         <FilterSelect
           id="asset-environment"
           label="Environment"
-          value={environment}
-          onChange={setEnvironment}
-          options={["Production", "Lab", "Development"]}
+          value={filters.environment}
+          onChange={(environment) => onFiltersChange({ ...filters, environment })}
+          options={environmentOptions}
         />
         <FilterSelect
           id="asset-telemetry"
           label="Telemetry status"
-          value={telemetry}
-          onChange={setTelemetry}
-          options={["Reporting", "Missing", "Stale", "Active alerts"]}
+          value={filters.telemetry}
+          onChange={(telemetry) => onFiltersChange({ ...filters, telemetry })}
+          options={telemetryOptions}
         />
       </div>
 
       <div className="hidden overflow-x-auto rounded-[var(--radius-control)] border border-[var(--border)] md:block">
         <table className="min-w-full border-collapse text-left text-sm">
           <caption className="sr-only">
-            Asset inventory sample with type, service, owner, and text status
+            Asset inventory with type, service, owner, and text status
           </caption>
           <thead className="bg-[var(--raised)] text-[var(--muted)]">
             <tr>
@@ -124,14 +127,14 @@ export function AssetInventoryTable({
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {assets.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-4 py-8 text-[var(--muted)]">
-                  No assets match the current filters. Clear filters to see the sample inventory.
+                  No assets are stored for the current request.
                 </td>
               </tr>
             ) : (
-              filtered.map((asset) => (
+              assets.map((asset) => (
                 <tr key={asset.slug} className="border-t border-[var(--border)]">
                   <td className="px-4 py-3">
                     <Link
@@ -162,7 +165,12 @@ export function AssetInventoryTable({
       </div>
 
       <ul className="space-y-3 md:hidden">
-        {filtered.map((asset) => (
+        {assets.length === 0 ? (
+          <li className="text-sm text-[var(--muted)]">
+            No assets are stored for the current request.
+          </li>
+        ) : null}
+        {assets.map((asset) => (
           <li key={asset.slug}>
             <Link
               to={`/assets/${asset.slug}`}
@@ -180,8 +188,7 @@ export function AssetInventoryTable({
       </ul>
 
       <p className="text-xs text-[var(--muted)]">
-        Showing {filtered.length} of {assets.length} sample records · Row selection opens record
-        details
+        Showing {assets.length} of {total} development records · Row selection opens record details
       </p>
     </div>
   );
@@ -198,7 +205,7 @@ function FilterSelect({
   label: string;
   value: string;
   onChange: (value: string) => void;
-  options: string[];
+  options: FilterOption[];
 }) {
   return (
     <div>
@@ -213,8 +220,8 @@ function FilterSelect({
       >
         <option value="all">All</option>
         {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
+          <option key={option.value} value={option.value}>
+            {option.label}
           </option>
         ))}
       </select>

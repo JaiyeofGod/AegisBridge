@@ -4,12 +4,17 @@ import { Link, useParams } from "react-router-dom";
 import { Button } from "@/components/buttons/Button";
 import { Panel } from "@/components/cards/Panel";
 import { SummaryMetric } from "@/components/cards/SummaryMetric";
+import { ErrorState } from "@/components/feedback/ErrorState";
+import { LoadingState } from "@/components/feedback/LoadingState";
 import { SimulatedDataBanner } from "@/components/feedback/SimulatedDataBanner";
 import { AppShell } from "@/components/navigation/AppShell";
 import { PageContainer } from "@/components/navigation/PageContainer";
 import { PageHeader } from "@/components/navigation/PageHeader";
 import { StatusBadge } from "@/components/status/StatusBadge";
-import { assetMock, findAsset } from "@/mocks/assets";
+import { StaleDataIndicator } from "@/components/status/StaleDataIndicator";
+import { isNotFound, useAssetDetail } from "@/features/assets/useAssetData";
+import { SEEDED_DATA_LABEL, SEEDED_DATA_NOTE } from "@/features/data-origin";
+import { formatTimestamp } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import type { AssetDetailSectionId, AssetRecord, AssetRelationship } from "@/types/asset";
 import type { OverviewMetric } from "@/types/overview";
@@ -25,16 +30,30 @@ const sections: { id: AssetDetailSectionId; label: string }[] = [
 
 export function AssetDetailPage() {
   const { assetId = "" } = useParams();
-  const asset = findAsset(assetId);
+  const detail = useAssetDetail(assetId);
   const [section, setSection] = useState<AssetDetailSectionId>("summary");
+  const asset = detail.data;
+  const lastSuccessfulAt = detail.dataUpdatedAt
+    ? new Date(detail.dataUpdatedAt).toISOString()
+    : undefined;
 
-  if (!asset) {
+  if (detail.isPending) {
     return (
-      <AppShell environmentLabel={assetMock.environmentLabel}>
+      <AppShell environmentLabel="Development · Seeded">
+        <PageContainer data-testid="asset-detail-page">
+          <LoadingState label="Updating" rows={4} />
+        </PageContainer>
+      </AppShell>
+    );
+  }
+
+  if (detail.isError && isNotFound(detail.error)) {
+    return (
+      <AppShell environmentLabel="Development · Seeded">
         <PageContainer data-testid="asset-detail-page">
           <PageHeader
             title="Asset not found"
-            description="This simulated inventory has no record for that id."
+            description="The development inventory has no record for that id."
           />
           <Link
             to="/assets"
@@ -47,11 +66,26 @@ export function AssetDetailPage() {
     );
   }
 
+  if (detail.isError || !asset) {
+    return (
+      <AppShell environmentLabel="Development · Seeded">
+        <PageContainer data-testid="asset-detail-page">
+          <ErrorState
+            title="Asset record unavailable"
+            description="The development asset API did not respond. Fixture records are not substituted."
+            lastSuccessfulAt={lastSuccessfulAt}
+            onRetry={() => void detail.refetch()}
+          />
+        </PageContainer>
+      </AppShell>
+    );
+  }
+
   const metrics = detailMetrics(asset);
   const visible = relationshipsFor(asset, section);
 
   return (
-    <AppShell environmentLabel={assetMock.environmentLabel}>
+    <AppShell environmentLabel="Development · Seeded">
       <PageContainer data-testid="asset-detail-page">
         <p className="mb-3">
           <Link
@@ -74,7 +108,12 @@ export function AssetDetailPage() {
               >
                 Edit asset
               </Button>
-              <SimulatedDataBanner message={assetMock.snapshotLabel} />
+              <SimulatedDataBanner message={SEEDED_DATA_NOTE} />
+              {lastSuccessfulAt ? (
+                <p className="text-xs text-[var(--muted)]" data-testid="last-successful-fetch">
+                  Last successful update: {formatTimestamp(lastSuccessfulAt)}
+                </p>
+              ) : null}
             </div>
           }
         />
@@ -106,7 +145,21 @@ export function AssetDetailPage() {
           })}
         </div>
 
+        {detail.isFetching ? (
+          <div className="mb-6">
+            <StaleDataIndicator
+              message="Refreshing development asset"
+              lastSuccessfulAt={lastSuccessfulAt}
+            />
+          </div>
+        ) : null}
+
         <div className="space-y-8">
+          {section === "summary" ? (
+            <div className="mb-4 flex justify-end">
+              <StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />
+            </div>
+          ) : null}
           {section === "summary" ? (
             <section aria-labelledby="asset-detail-metrics">
               <h2 id="asset-detail-metrics" className="sr-only">
@@ -124,11 +177,11 @@ export function AssetDetailPage() {
           ) : null}
 
           {section === "activity" ? (
-            <Panel title="Activity" description="Recent simulated events for this asset.">
+            <Panel title="Activity" description="Stored events for this asset.">
               <ul className="space-y-3" data-testid="asset-activity">
                 {asset.activity.length === 0 ? (
                   <li className="text-sm text-[var(--muted)]">
-                    No recent activity in the sample snapshot.
+                    No activity records are stored for this asset.
                   </li>
                 ) : (
                   asset.activity.map((event) => (
@@ -171,16 +224,13 @@ function detailMetrics(asset: AssetRecord): OverviewMetric[] {
   const alerts = asset.relationships.filter((item) => item.kind === "alert");
   const controls = asset.relationships.filter((item) => item.kind === "control");
   const evidence = asset.relationships.filter((item) => item.kind === "evidence");
-  const kev = vulns.filter((item) =>
-    /known-exploited|KEV/i.test(`${item.title} ${item.context}`),
-  ).length;
   return [
     {
       id: "open-findings",
       label: "Open findings",
-      primaryValue: String(asset.vulnerabilityCount),
-      secondaryLabel: "KEV-linked findings",
-      secondaryValue: asset.slug === "FIN-APP-01" ? "4" : String(kev),
+      primaryValue: String(vulns.length),
+      secondaryLabel: "KEV label",
+      secondaryValue: "Not labeled on the finding record",
       tone: "critical",
       freshness: "fresh",
       semantics: "Open vulnerability findings on this asset. Not a security score.",
@@ -188,15 +238,13 @@ function detailMetrics(asset: AssetRecord): OverviewMetric[] {
     {
       id: "related-alerts",
       label: "Related alerts",
-      primaryValue: String(alerts.length || asset.openIncidentCount),
-      secondaryLabel: "Lined investigation",
-      secondaryValue:
-        asset.slug === "FIN-APP-01"
-          ? "1"
-          : String(alerts.filter((item) => item.statusLabel === "Investigating").length),
+      primaryValue: String(alerts.length),
+      secondaryLabel: "Stored alert references",
+      secondaryValue: String(alerts.length),
       tone: "warning",
       freshness: "fresh",
-      semantics: "Alerts observed on this asset in the simulated snapshot.",
+      semantics:
+        "Alert references stored for this asset. An empty count is an absence, not a healthy zero from a live feed.",
     },
     {
       id: "linked-controls",
@@ -289,7 +337,7 @@ function RelationshipTable({ records }: { records: AssetRelationship[] }) {
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-4 py-6 text-[var(--muted)]">
-                  No connected records in this view.
+                  No connected records are stored for this view.
                 </td>
               </tr>
             ) : (
@@ -314,7 +362,7 @@ function RelationshipTable({ records }: { records: AssetRelationship[] }) {
         </table>
       </div>
       <p className="text-xs text-[var(--muted)]">
-        Showing {filtered.length} of {records.length} sample records
+        Showing {filtered.length} of {records.length} stored records
       </p>
     </div>
   );
@@ -373,7 +421,9 @@ function EvidenceSummary({ asset }: { asset: AssetRecord }) {
   const evidence = asset.relationships.filter((item) => item.kind === "evidence");
   if (evidence.length === 0) {
     return (
-      <p className="text-sm text-[var(--muted)]">No evidence packages are linked in this sample.</p>
+      <p className="text-sm text-[var(--muted)]" data-testid="asset-evidence">
+        No evidence records are stored for this asset.
+      </p>
     );
   }
   return (

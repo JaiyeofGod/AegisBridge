@@ -1,11 +1,18 @@
 import "@testing-library/jest-dom/vitest";
 import { configure, cleanup } from "@testing-library/react";
-import { afterEach, vi } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
+
+import { installApiFetch } from "@/test/api-fixtures";
 
 configure({ asyncUtilTimeout: 10_000 });
 
+beforeEach(() => {
+  installApiFetch();
+});
+
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
 });
 
 // jsdom has no WebGL; keep Sign-in tests focused on layout/auth chrome.
