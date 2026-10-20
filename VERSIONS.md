@@ -1,8 +1,8 @@
 # AegisBridge Version Baselines
 
-**Document version:** 1.0  
+**Document version:** 1.1  
 **Planning baseline date:** October 19–20, 2026  
-**Status:** Phase 0 — planning pins (resolved package patches recorded after Phase 1 install)
+**Status:** Phase 1 — API bootstrap pins recorded
 
 Patch versions may move after testing. Major architectural changes require an ADR.
 
@@ -31,10 +31,17 @@ Patch versions may move after testing. Major architectural changes require an AD
 | Vite | 8 | Exact npm patch at install |
 | Node.js | 24 LTS | Engines pin in package manifests |
 | TypeScript | Compatible with above | Strict mode |
-| Python | 3.14.x | Do not move to 3.15 until matrix passes (ADR-013) |
-| PostgreSQL | 18 | Avoid PG 19 RC |
-| FastAPI / Pydantic / SQLAlchemy | 2.x ecosystem compatible with Py 3.14 | Locked via uv |
-| Celery | Compatible with Redis broker | Foundation in Phase 1 |
+| Python | **3.14.8** | Verified via uv (ADR-013) |
+| PostgreSQL | 18 | Compose image `postgres:18` |
+| FastAPI | **0.151.0** | Locked in `apps/api/uv.lock` |
+| Pydantic | **2.14.1** | |
+| pydantic-settings | **2.16.0** | |
+| SQLAlchemy | **2.1.5** | |
+| psycopg | **3.3.6** (+ binary) | |
+| Alembic | **1.20.0** | Empty baseline `20261020_0001` |
+| Uvicorn | **0.54.0** | |
+| Redis client | **8.1.0** | Optional readiness probe |
+| Celery | Deferred | Worker foundation not in this slice |
 | Wazuh | 4.14.9 planning baseline | Lab phases |
 | Suricata | 8.0.7 | Lab phases |
 
@@ -42,14 +49,15 @@ Patch versions may move after testing. Major architectural changes require an AD
 
 ## 3. Tooling
 
-| Tool | Choice | ADR |
-|---|---|---|
-| Frontend package manager | pnpm | ADR-014 |
-| Python env / lock | uv | ADR-015 |
-| Python typechecker | Pyright | ADR-016 |
-| Frontend formatter | Prettier | ADR-017 |
-| Python lint/format | Ruff | (master §110) |
-| Frontend lint | ESLint | (master §110) |
+| Tool | Choice | Verified version | ADR |
+|---|---|---|---|
+| Frontend package manager | pnpm | pending frontend | ADR-014 |
+| Python env / lock | uv | **0.13.3** | ADR-015 |
+| Python typechecker | Pyright | **1.1.414** | ADR-016 |
+| Frontend formatter | Prettier | pending frontend | ADR-017 |
+| Python lint/format | Ruff | **0.17.1** | master §110 |
+| Frontend lint | ESLint | pending frontend | master §110 |
+| pytest | pytest | **9.1.1** | |
 
 ---
 
@@ -66,8 +74,24 @@ Patch versions may move after testing. Major architectural changes require an AD
 
 ## 5. Resolved Install Record
 
-_Populate during Phase 1 after first successful lockfile generation:_
+Recorded 2026-10-20 after `uv sync` in `apps/api` (lockfile: `apps/api/uv.lock`).
 
 | Package / image | Resolved version | Date | Notes |
 |---|---|---|---|
-| _(pending)_ | | | |
+| CPython | 3.14.8 | 2026-10-20 | uv-managed |
+| fastapi | 0.151.0 | 2026-10-20 | |
+| pydantic | 2.14.1 | 2026-10-20 | |
+| pydantic-settings | 2.16.0 | 2026-10-20 | |
+| sqlalchemy | 2.1.5 | 2026-10-20 | |
+| psycopg | 3.3.6 | 2026-10-20 | + psycopg-binary |
+| alembic | 1.20.0 | 2026-10-20 | |
+| uvicorn | 0.54.0 | 2026-10-20 | |
+| redis | 8.1.0 | 2026-10-20 | |
+| pytest | 9.1.1 | 2026-10-20 | |
+| httpx | 0.28.1 | 2026-10-20 | |
+| ruff | 0.17.1 | 2026-10-20 | |
+| pyright | 1.1.414 | 2026-10-20 | |
+| uv | 0.13.3 | 2026-10-20 | installer |
+| postgres | 18 | Compose | healthy |
+| valkey/valkey | 8 | Compose | healthy |
+| chrislusf/seaweedfs | 4.48 | Compose | healthy |

@@ -92,11 +92,21 @@ See `VERSIONS.md` and ADRs in `docs/decisions/`.
 
 ## Current status
 
-Root hygiene and local Compose infrastructure are in place (Postgres, Valkey, SeaweedFS).
+Root hygiene, Compose infrastructure, and the **FastAPI API bootstrap** (`apps/api`) are in place.
 
-**Not yet created:** React app, FastAPI app, package installs, CI workflows.
+**API (host-run):**
 
-Next Phase 1 steps (when authorized): API/web/worker skeletons, Alembic, health checks, and CI.
+```bash
+cd apps/api
+uv sync
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Health: `/api/v1/health`, `/api/v1/health/live`, `/api/v1/health/ready`
+
+**Not yet created:** React app, Celery worker, CI workflows.
+
+Next Phase 1 steps (when authorized): frontend scaffold, then Sign-in/Overview fidelity sprint after bootstrap exit gate.
 
 ## Security reminders
 

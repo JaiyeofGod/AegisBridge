@@ -1,8 +1,8 @@
 # AegisBridge Project Status
 
 **Last updated:** October 20, 2026  
-**Current phase:** Phase 0 — Requirements Freeze (**minimal gate complete**)  
-**Next phase:** Phase 1 — Repository Bootstrap (awaiting explicit approval; not started)
+**Current phase:** Phase 1 — Repository Bootstrap (infra + API bootstrap complete)  
+**Next:** Frontend scaffold / remaining Phase 1 items (when authorized)
 
 ---
 
@@ -14,8 +14,8 @@
 | Design handoff | Present (`DESIGN_HANDOFF.md` v1.0) |
 | Phase 1 plan | Present (`PHASE_1_IMPLEMENTATION_PLAN.md` v1.1) — corrected routes/tooling |
 | Minimal Phase 0 docs | Complete |
-| Application code | Not started |
-| Package installs | Not started |
+| Application code | API bootstrap started (`apps/api`); frontend not started |
+| Package installs | API via uv (`apps/api/uv.lock`); frontend pending |
 | Cyber range | Not started |
 | Hosting | Not started |
 
