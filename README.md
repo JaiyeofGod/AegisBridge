@@ -104,9 +104,19 @@ uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 
 Health: `/api/v1/health`, `/api/v1/health/live`, `/api/v1/health/ready`
 
-**Not yet created:** React app, Celery worker, CI workflows.
+**Web (host-run):**
 
-Next Phase 1 steps (when authorized): frontend scaffold, then Sign-in/Overview fidelity sprint after bootstrap exit gate.
+```bash
+# Node 24 LTS recommended
+cd apps/web
+pnpm dev
+```
+
+Routes: `/signin`, `/overview` (other paths are Coming Soon stubs).
+
+**Not yet created:** Celery worker, CI workflows, remaining product modules.
+
+Next steps (when authorized): Phase 1 exit-gate review, then Phase 2 authentication.
 
 ## Security reminders
 

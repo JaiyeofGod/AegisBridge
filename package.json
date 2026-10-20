@@ -1,0 +1,19 @@
+{
+  "name": "aegisbridge",
+  "private": true,
+  "packageManager": "pnpm@10.18.2",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter @aegisbridge/web dev",
+    "build:web": "pnpm --filter @aegisbridge/web build",
+    "lint:web": "pnpm --filter @aegisbridge/web lint",
+    "test:web": "pnpm --filter @aegisbridge/web test"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

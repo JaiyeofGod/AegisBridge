@@ -27,10 +27,14 @@ Patch versions may move after testing. Major architectural changes require an AD
 
 | Component | Baseline | Notes |
 |---|---|---|
-| React | 19.3 | Exact npm patch at install |
-| Vite | 8 | Exact npm patch at install |
-| Node.js | 24 LTS | Engines pin in package manifests |
-| TypeScript | Compatible with above | Strict mode |
+| React | **19.3.1** | Verified in `apps/web` |
+| Vite | **8.3.4** | Verified |
+| Node.js | **24.22.0** | LTS via nvm for web builds |
+| TypeScript | **5.9.3** | Strict mode |
+| TanStack Query | **5.104.5** | |
+| React Router | **7.18.4** | |
+| Tailwind CSS | **4.3.3** | |
+| Vitest | **5.0.5** | |
 | Python | **3.14.8** | Verified via uv (ADR-013) |
 | PostgreSQL | 18 | Compose image `postgres:18` |
 | FastAPI | **0.151.0** | Locked in `apps/api/uv.lock` |
@@ -51,7 +55,7 @@ Patch versions may move after testing. Major architectural changes require an AD
 
 | Tool | Choice | Verified version | ADR |
 |---|---|---|---|
-| Frontend package manager | pnpm | pending frontend | ADR-014 |
+| Frontend package manager | pnpm | **10.18.2** | ADR-014 |
 | Python env / lock | uv | **0.13.3** | ADR-015 |
 | Python typechecker | Pyright | **1.1.414** | ADR-016 |
 | Frontend formatter | Prettier | pending frontend | ADR-017 |
