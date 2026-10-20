@@ -1,4 +1,4 @@
-"""Alembic environment. Schema migrations only — no application tables in Phase 1 baseline."""
+"""Alembic environment. Schema migrations only — seed data is not applied here."""
 
 from __future__ import annotations
 
@@ -8,13 +8,14 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from app.core.config import get_settings
+from app.models import Base
 
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = None
+target_metadata = Base.metadata
 
 settings = get_settings()
 config.set_main_option("sqlalchemy.url", settings.database_url)

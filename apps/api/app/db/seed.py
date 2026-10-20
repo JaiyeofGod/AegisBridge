@@ -1,0 +1,655 @@
+"""Deterministic development seed. Not an Alembic migration and not production data."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+from datetime import UTC, date, datetime
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.core.config import get_settings
+from app.core.db import SessionLocal
+from app.models import (
+    AccessEntitlement,
+    AccessReview,
+    AccessReviewFinding,
+    AlertReference,
+    Asset,
+    AssetDataRelationship,
+    AssetOwner,
+    AssetType,
+    AssetVulnerability,
+    AttackTechnique,
+    AuditEvent,
+    Base,
+    BusinessProcess,
+    Control,
+    ControlImplementation,
+    CveRecord,
+    DataAsset,
+    Dataset,
+    DatasetVersion,
+    Department,
+    Detection,
+    DetectionAttackMapping,
+    DetectionVersion,
+    EpssSnapshot,
+    Evidence,
+    EvidenceControlLink,
+    EvidenceRiskLink,
+    Framework,
+    FrameworkVersion,
+    Incident,
+    IncidentEvent,
+    IncidentEvidence,
+    Integration,
+    Investigation,
+    KevRecord,
+    Organization,
+    Permission,
+    Policy,
+    PolicyAcknowledgement,
+    PolicyVersion,
+    RemediationTask,
+    Risk,
+    RiskAssessment,
+    RiskTreatment,
+    Role,
+    SsvcAssessment,
+    SyncState,
+    User,
+    UserRole,
+    Vendor,
+    VendorService,
+    Vulnerability,
+)
+
+ORG_SLUG = "aegisbridge-technologies"
+
+
+def reset_domain_tables(session: Session) -> None:
+    """Delete domain rows. Local development only. Does not touch alembic_version."""
+    settings = get_settings()
+    if settings.app_env not in {"local", "development", "dev", "test"}:
+        raise RuntimeError("Refusing to reset domain tables outside a local environment.")
+    for table in reversed(Base.metadata.sorted_tables):
+        session.execute(table.delete())
+    session.commit()
+
+
+def seed_development(session: Session) -> None:
+    existing = session.scalar(select(Organization).where(Organization.slug == ORG_SLUG))
+    if existing is not None:
+        return
+
+    org = Organization(
+        name="AegisBridge Technologies",
+        slug=ORG_SLUG,
+        environment_label="Lab · Simulated",
+        data_origin="simulated",
+    )
+    session.add(org)
+    session.flush()
+
+    departments = {
+        name: Department(organization_id=org.id, name=name)
+        for name in ("Security", "GRC", "Operations", "Finance")
+    }
+    session.add_all(departments.values())
+    session.flush()
+
+    session.add(
+        BusinessProcess(
+            organization_id=org.id,
+            department_id=departments["Finance"].id,
+            name="Finance close",
+            description="Simulated month-end close supported by FIN-APP-01.",
+        )
+    )
+
+    permissions = {
+        code: Permission(code=code, description=description)
+        for code, description in (
+            ("integration.manage", "Label for integration setup. Not enforced."),
+            ("user.role.manage", "Label for role assignment. Not enforced."),
+            ("risk.accept", "Label for risk acceptance. Not enforced."),
+            ("control.update", "Label for control updates. Not enforced."),
+            ("evidence.download", "Label for evidence download. Not enforced."),
+            ("incident.close", "Label for incident closure. Not enforced."),
+        )
+    }
+    session.add_all(permissions.values())
+    session.flush()
+
+    role_rows = {
+        "Administrator": (
+            "Platform configuration, users, roles, and integrations.",
+            ("integration.manage", "user.role.manage"),
+        ),
+        "CISO": ("Reads executive posture, risks, and major incidents.", ()),
+        "GRC Analyst": (
+            "Works risks, controls, and evidence.",
+            ("risk.accept", "control.update", "evidence.download"),
+        ),
+        "SOC Analyst": ("Triages alerts and incident tasks.", ("incident.close",)),
+        "Auditor": ("Reads evidence and audit history.", ("evidence.download",)),
+        "Read Only": ("Reads records without write labels.", ()),
+    }
+    roles: dict[str, Role] = {}
+    for name, (summary, _codes) in role_rows.items():
+        role = Role(organization_id=org.id, name=name, summary=summary)
+        roles[name] = role
+        session.add(role)
+    session.flush()
+
+    users = {
+        "USR-0001": User(
+            organization_id=org.id,
+            department_id=departments["Security"].id,
+            human_id="USR-0001",
+            email="amara.okonkwo@aegisbridge.example",
+            display_name="Amara Okonkwo",
+            job_title="Security administrator",
+            account_status="active",
+            timezone_name="America/New_York",
+        ),
+        "USR-0003": User(
+            organization_id=org.id,
+            department_id=departments["GRC"].id,
+            human_id="USR-0003",
+            email="priya.shah@aegisbridge.example",
+            display_name="Priya Shah",
+            job_title="GRC analyst",
+            account_status="active",
+            timezone_name="America/New_York",
+        ),
+        "USR-0004": User(
+            organization_id=org.id,
+            department_id=departments["Security"].id,
+            human_id="USR-0004",
+            email="jonah.hale@aegisbridge.example",
+            display_name="Jonah Hale",
+            job_title="SOC analyst",
+            account_status="active",
+            timezone_name="America/New_York",
+        ),
+        "USR-0005": User(
+            organization_id=org.id,
+            department_id=departments["GRC"].id,
+            human_id="USR-0005",
+            email="marcus.reid@aegisbridge.example",
+            display_name="Marcus Reid",
+            job_title="Auditor",
+            account_status="active",
+            timezone_name="America/New_York",
+        ),
+    }
+    session.add_all(users.values())
+    session.flush()
+
+    assignments = {
+        "USR-0001": "Administrator",
+        "USR-0003": "GRC Analyst",
+        "USR-0004": "SOC Analyst",
+        "USR-0005": "Auditor",
+    }
+    for user_code, role_name in assignments.items():
+        session.add(UserRole(user_id=users[user_code].id, role_id=roles[role_name].id))
+        for code in role_rows[role_name][1]:
+            session.add(
+                AccessEntitlement(
+                    user_id=users[user_code].id,
+                    permission_id=permissions[code].id,
+                    grant_source="role_catalog",
+                )
+            )
+
+    review = AccessReview(
+        organization_id=org.id,
+        human_id="ARV-0001",
+        name="October access review",
+        status="in_progress",
+    )
+    session.add(review)
+    session.flush()
+    session.add(
+        AccessReviewFinding(
+            access_review_id=review.id,
+            user_id=users["USR-0005"].id,
+            finding="Simulated review due. No live directory was queried.",
+            status="open",
+        )
+    )
+
+    asset_types = {
+        code: AssetType(code=code, name=name)
+        for code, name in (
+            ("linux_server", "Linux server"),
+            ("windows_endpoint", "Windows endpoint"),
+            ("security_platform", "Security platform"),
+            ("network_device", "Network device"),
+        )
+    }
+    session.add_all(asset_types.values())
+    session.flush()
+
+    seen = datetime(2026, 10, 19, 21, 12, tzinfo=UTC)
+    assets = {
+        "FIN-APP-01": Asset(
+            organization_id=org.id,
+            asset_type_id=asset_types["linux_server"].id,
+            human_id="AST-0007",
+            hostname="FIN-APP-01",
+            name="Finance application",
+            criticality="critical",
+            exposure="internet",
+            lifecycle="active",
+            environment_name="simulated",
+            data_classification="restricted",
+            platform="Linux",
+            os_version="Ubuntu 24.04 LTS",
+            ip_address="10.40.12.21",
+            telemetry_status="reference_only",
+            last_seen_at=seen,
+        ),
+        "WIN-WS-07": Asset(
+            organization_id=org.id,
+            asset_type_id=asset_types["windows_endpoint"].id,
+            human_id="AST-0018",
+            hostname="WIN-WS-07",
+            name="Operations workstation",
+            criticality="high",
+            exposure="internal",
+            lifecycle="active",
+            environment_name="simulated",
+            data_classification="internal",
+            platform="Windows",
+            telemetry_status="reference_only",
+            last_seen_at=seen,
+        ),
+        "WAZUH-01": Asset(
+            organization_id=org.id,
+            asset_type_id=asset_types["security_platform"].id,
+            human_id="AST-0003",
+            hostname="WAZUH-01",
+            name="Wazuh manager reference",
+            criticality="critical",
+            exposure="internal",
+            lifecycle="active",
+            environment_name="simulated",
+            data_classification="restricted",
+            platform="Linux",
+            telemetry_status="not_connected",
+            last_seen_at=seen,
+        ),
+        "LINUX-APP-01": Asset(
+            organization_id=org.id,
+            asset_type_id=asset_types["linux_server"].id,
+            human_id="AST-0061",
+            hostname="LINUX-APP-01",
+            name="Lab application host",
+            criticality="high",
+            exposure="internal",
+            lifecycle="active",
+            environment_name="simulated",
+            data_classification="internal",
+            platform="Linux",
+            telemetry_status="not_connected",
+            last_seen_at=seen,
+        ),
+        "EDGE-FW-01": Asset(
+            organization_id=org.id,
+            asset_type_id=asset_types["network_device"].id,
+            human_id="AST-0031",
+            hostname="EDGE-FW-01",
+            name="Edge firewall",
+            criticality="high",
+            exposure="internet",
+            lifecycle="active",
+            environment_name="simulated",
+            data_classification="restricted",
+            platform="Network",
+            telemetry_status="reference_only",
+            last_seen_at=seen,
+        ),
+    }
+    session.add_all(assets.values())
+    session.flush()
+    session.add(
+        AssetOwner(
+            asset_id=assets["FIN-APP-01"].id,
+            user_id=users["USR-0001"].id,
+            owner_label="Amara Okonkwo",
+            owner_role="business",
+        )
+    )
+    finance_data = DataAsset(
+        organization_id=org.id,
+        name="Finance ledger extract",
+        classification="restricted",
+        description="Simulated data class processed by FIN-APP-01. No records are stored here.",
+    )
+    session.add(finance_data)
+    session.flush()
+    session.add(
+        AssetDataRelationship(
+            asset_id=assets["FIN-APP-01"].id,
+            data_asset_id=finance_data.id,
+            relationship_kind="processes",
+        )
+    )
+
+    risk = Risk(
+        organization_id=org.id,
+        asset_id=assets["FIN-APP-01"].id,
+        owner_user_id=users["USR-0003"].id,
+        human_id="RISK-0021",
+        title="Service exploitation on the finance application",
+        statement=(
+            "Simulated scenario: FIN-APP-01 remains exposed with a known critical "
+            "finding past an internal label."
+        ),
+        status="open",
+        methodology="aegisbridge_likelihood_x_impact",
+    )
+    session.add(risk)
+    session.flush()
+    session.add(
+        RiskAssessment(
+            risk_id=risk.id,
+            likelihood=4,
+            impact=5,
+            is_current=True,
+            notes="Internal methodology only. Likelihood and impact are separate inputs.",
+        )
+    )
+    session.add(
+        RiskTreatment(
+            risk_id=risk.id,
+            strategy="mitigate",
+            status="planned",
+            notes="Simulated treatment. No control change was applied.",
+        )
+    )
+
+    nist = Framework(code="NIST-800-53", name="NIST SP 800-53")
+    session.add(nist)
+    session.flush()
+    nist_rev = FrameworkVersion(framework_id=nist.id, version_label="Rev. 5", is_current=True)
+    session.add(nist_rev)
+    session.flush()
+    control = Control(
+        organization_id=org.id,
+        framework_version_id=nist_rev.id,
+        human_id="CTRL-0002",
+        control_code="AC-2",
+        title="Account management",
+        family="AC",
+    )
+    session.add(control)
+    session.flush()
+    session.add(
+        ControlImplementation(
+            control_id=control.id,
+            owner_user_id=users["USR-0003"].id,
+            status="partial",
+            notes="Simulated implementation label.",
+        )
+    )
+
+    evidence_hash = hashlib.sha256(b"EVID-0041 synthetic development evidence").hexdigest()
+    evidence = Evidence(
+        organization_id=org.id,
+        collected_by_user_id=users["USR-0005"].id,
+        human_id="EVID-0041",
+        title="Privileged account inventory",
+        description="Metadata only. The file bytes are not stored in PostgreSQL.",
+        version_label="1",
+        sha256=evidence_hash,
+        size_bytes=0,
+        mime_type="text/plain",
+        object_uri="s3://aegis-dev-evidence/synthetic/EVID-0041",
+        data_classification="simulated",
+        collected_at=seen,
+    )
+    session.add(evidence)
+    session.flush()
+    session.add(EvidenceControlLink(evidence_id=evidence.id, control_id=control.id))
+    session.add(EvidenceRiskLink(evidence_id=evidence.id, risk_id=risk.id))
+
+    cve = CveRecord(
+        cve_id="CVE-2024-21887",
+        cvss_version="3.1",
+        cvss_base_score=9.8,
+        cvss_vector="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+        summary="Simulated catalog severity for the finance-host finding. Not a live NVD fetch.",
+    )
+    session.add(cve)
+    session.flush()
+    session.add(
+        EpssSnapshot(
+            cve_record_id=cve.id,
+            epss=0.94,
+            percentile=0.99,
+            observed_on=date(2026, 10, 19),
+        )
+    )
+    session.add(
+        KevRecord(
+            cve_record_id=cve.id,
+            date_added=date(2024, 1, 12),
+            vulnerability_name="Simulated KEV catalog entry",
+            known_ransomware_use="unknown",
+        )
+    )
+    finding = Vulnerability(
+        organization_id=org.id,
+        cve_record_id=cve.id,
+        human_id="VULN-0041",
+        title="Known-exploited finding on FIN-APP-01",
+    )
+    session.add(finding)
+    session.flush()
+    asset_finding = AssetVulnerability(
+        vulnerability_id=finding.id,
+        asset_id=assets["FIN-APP-01"].id,
+        exposure="internet",
+        asset_criticality="critical",
+        status="open",
+    )
+    session.add(asset_finding)
+    session.flush()
+    session.add(
+        SsvcAssessment(
+            asset_vulnerability_id=asset_finding.id,
+            decision="act",
+            rationale=(
+                "Simulated decision. CVSS, EPSS, KEV, exposure, and criticality "
+                "stay in their own columns."
+            ),
+        )
+    )
+    session.add(
+        RemediationTask(
+            asset_vulnerability_id=asset_finding.id,
+            owner_user_id=users["USR-0001"].id,
+            title="Patch FIN-APP-01",
+            status="open",
+            due_on=date(2026, 10, 20),
+        )
+    )
+
+    technique = AttackTechnique(
+        technique_id="T1059.001",
+        name="PowerShell",
+        tactic="Execution",
+        attack_version="Enterprise v20.0",
+    )
+    session.add(technique)
+    session.flush()
+    detection = Detection(
+        organization_id=org.id,
+        human_id="DET-0005",
+        name="Suspicious PowerShell child process",
+        status="simulated",
+    )
+    session.add(detection)
+    session.flush()
+    session.add(
+        DetectionVersion(
+            detection_id=detection.id,
+            version_label="1",
+            logic_summary="Reference rule summary only. Not deployed to Wazuh.",
+            is_current=True,
+        )
+    )
+    session.add(DetectionAttackMapping(detection_id=detection.id, attack_technique_id=technique.id))
+
+    alert = AlertReference(
+        organization_id=org.id,
+        asset_id=assets["WIN-WS-07"].id,
+        detection_id=detection.id,
+        human_id="AL-0107",
+        wazuh_alert_id=None,
+        severity="high",
+        status="new",
+        summary="Simulated selected metadata. No raw Wazuh event is stored.",
+        telemetry_source="not_connected",
+        observed_at=seen,
+    )
+    session.add(alert)
+    session.flush()
+    session.add(
+        Investigation(
+            organization_id=org.id,
+            alert_reference_id=alert.id,
+            assignee_user_id=users["USR-0004"].id,
+            human_id="INV-0012",
+            title="Review PowerShell child process",
+            status="open",
+            summary="Simulated investigation. No confirmed compromise.",
+            opened_at=seen,
+        )
+    )
+
+    incident = Incident(
+        organization_id=org.id,
+        owner_user_id=users["USR-0004"].id,
+        human_id="INC-0001",
+        title="Repeated authentication failures",
+        severity="medium",
+        status="investigating",
+        summary="Simulated incident. Severity and status are separate. No confirmed compromise.",
+    )
+    session.add(incident)
+    session.flush()
+    session.add(
+        IncidentEvent(
+            incident_id=incident.id,
+            summary="Opened from simulated authentication failures.",
+            occurred_at=seen,
+        )
+    )
+    session.add(
+        IncidentEvidence(
+            incident_id=incident.id,
+            evidence_id=evidence.id,
+            note="Reference only.",
+        )
+    )
+
+    vendor = Vendor(
+        organization_id=org.id,
+        human_id="VEN-0001",
+        name="Example Identity Provider",
+        status="planned",
+    )
+    session.add(vendor)
+    session.flush()
+    session.add(
+        VendorService(
+            vendor_id=vendor.id,
+            name="Directory import",
+            description="Not connected.",
+        )
+    )
+
+    policy = Policy(
+        organization_id=org.id,
+        owner_user_id=users["USR-0003"].id,
+        human_id="POL-0001",
+        title="Access control policy",
+        status="draft",
+    )
+    session.add(policy)
+    session.flush()
+    version = PolicyVersion(
+        policy_id=policy.id,
+        version_label="0.1",
+        body_summary="Simulated policy summary. Full text is not stored.",
+        is_current=True,
+    )
+    session.add(version)
+    session.flush()
+    session.add(PolicyAcknowledgement(policy_version_id=version.id, user_id=users["USR-0001"].id))
+
+    dataset = Dataset(
+        organization_id=org.id,
+        human_id="DS-0001",
+        name="Smishing IMC25 registry placeholder",
+        status="not_downloaded",
+        notes="Name only. No dataset file is stored.",
+    )
+    session.add(dataset)
+    session.flush()
+    session.add(DatasetVersion(dataset_id=dataset.id, version_label="registry"))
+
+    wazuh = Integration(
+        organization_id=org.id,
+        name="Wazuh",
+        category="siem",
+        status="not_configured",
+        auth_state="No credentials stored",
+        notes="Wazuh remains the system of record. This row is a catalog reference.",
+    )
+    session.add(wazuh)
+    session.flush()
+    session.add(SyncState(integration_id=wazuh.id, freshness="not_connected", cursor_label=None))
+
+    session.add(
+        AuditEvent(
+            organization_id=org.id,
+            actor_user_id=users["USR-0001"].id,
+            human_id="AUD-0001",
+            occurred_at=seen,
+            actor_label="USR-0001",
+            action="Recorded development seed",
+            object_type="organization",
+            object_id=ORG_SLUG,
+            result="simulated",
+            source="seed",
+            environment_name="local",
+            detail="Synthetic development records. No secret material.",
+        )
+    )
+    session.commit()
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Load deterministic development domain seed.")
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Delete domain rows first. Allowed only when APP_ENV is local.",
+    )
+    args = parser.parse_args()
+    with SessionLocal() as session:
+        if args.reset:
+            reset_domain_tables(session)
+        seed_development(session)
+
+
+if __name__ == "__main__":
+    main()

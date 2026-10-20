@@ -1,8 +1,8 @@
 # AegisBridge Project Status
 
 **Last updated:** October 20, 2026  
-**Current phase:** Phase 1 — Repository Bootstrap (infra + API + web Sign-in/Overview complete)  
-**Next:** Phase 1 exit-gate confirmation, then Phase 2 auth (when authorized)
+**Current phase:** Phase 2 — domain schema foundation  
+**Next:** Authentication, when authorized. Frontend remains on local mocks.
 
 ---
 
@@ -14,7 +14,10 @@
 | Design handoff | Present (`DESIGN_HANDOFF.md` v1.0) |
 | Phase 1 plan | Present (`PHASE_1_IMPLEMENTATION_PLAN.md` v1.1) — corrected routes/tooling |
 | Minimal Phase 0 docs | Complete |
-| Application code | API + web Sign-in/Overview foundation |
+| Application code | API domain schema + web UI on local mocks |
+| Domain schema | `20261020_0002` tables, constraints, and development seed |
+| Authentication | Not started |
+| Frontend API connection | Not started |
 | Package installs | API via uv; web via pnpm (`apps/web`) |
 | Cyber range | Not started |
 | Hosting | Not started |

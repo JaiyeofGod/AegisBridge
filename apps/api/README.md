@@ -1,6 +1,6 @@
 # AegisBridge API (`apps/api`)
 
-Phase 1 FastAPI bootstrap: settings, SQLAlchemy session foundation, Alembic baseline, and health endpoints.
+FastAPI service with the Phase 2 domain models. Authentication and domain HTTP routes are not implemented.
 
 ## Commands
 
@@ -22,8 +22,14 @@ Alembic (from repository root, with `apps/api` venv active or `uv run` from `app
 ```bash
 cd ../..
 uv run --project apps/api alembic upgrade head
+uv run --project apps/api alembic downgrade 20261020_0001
+uv run --project apps/api alembic upgrade head
 uv run --project apps/api alembic current
+uv run --project apps/api python -m app.db.seed
+uv run --project apps/api python -m app.db.seed --reset
 ```
+
+The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. Seed data is not in the migration.
 
 ## Health
 

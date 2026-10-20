@@ -104,6 +104,16 @@ uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 
 Health: `/api/v1/health`, `/api/v1/health/live`, `/api/v1/health/ready`
 
+Schema and development seed (from the repository root, with Compose Postgres running):
+
+```bash
+uv run --project apps/api alembic upgrade head
+uv run --project apps/api python -m app.db.seed
+uv run --project apps/api python -m app.db.seed --reset
+```
+
+`--reset` deletes domain rows only when `APP_ENV` is local. It does not drop tables.
+
 **Web (host-run):**
 
 ```bash
@@ -112,11 +122,11 @@ cd apps/web
 pnpm dev
 ```
 
-Routes: `/signin`, `/overview` (other paths are Coming Soon stubs).
+The web app still reads local mock data. It is not connected to the domain schema.
 
-**Not yet created:** Celery worker, CI workflows, remaining product modules.
+**Not yet created:** authentication, external integrations, background jobs, Celery worker, CI workflows.
 
-Next steps (when authorized): Phase 1 exit-gate review, then Phase 2 authentication.
+Next step when authorized: authentication. Do not point the frontend at these tables until that work is requested.
 
 ## Security reminders
 

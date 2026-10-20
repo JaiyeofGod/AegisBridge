@@ -1,8 +1,8 @@
 # AegisBridge Data Architecture
 
-**Document version:** 1.0  
+**Document version:** 1.1  
 **Date:** October 20, 2026  
-**Status:** Phase 0 baseline  
+**Status:** Phase 2 schema foundation applied  
 **Authority:** `MASTER_REQUIREMENTS.md` Part VII
 
 ---
@@ -117,8 +117,10 @@ Do not serve uploads from arbitrary local web paths. Prefer presigned object URL
 ## 8. Schema Evolution
 
 - Alembic for all schema changes (`migrations/` at repo root — ADR-019)
-- Phase 1: empty/baseline migration + connectivity only
-- Domain tables introduced in feature phases with tests
+- Phase 1: empty baseline `20261020_0001` remains history
+- Phase 2: `20261020_0002` creates the domain tables from the SQLAlchemy models
+- Development seed is `python -m app.db.seed` and is not part of a migration
+- Entity relationships: `docs/schema/DOMAIN_MODEL.md`
 
 ---
 
@@ -138,3 +140,13 @@ Application code uses an S3-compatible storage abstraction so SeaweedFS (local) 
 ## 10. Demo and Sanitization
 
 Portfolio/demo data: fictional identities, no real PII, no live credentials, no private lab raw logs. Synthetic seed and fixture data must be labeled. Missing/stale integration data must not appear as healthy zeros.
+
+---
+
+## 11. Phase 2 schema notes
+
+The implemented tables are the domain list in section 3 except these deferred tables: `sessions`, `api_credentials`, `control_findings`, `evidence_objects`, `evidence_incident_links`, `investigation_notes`, `policy_approvals`, and `integration_health`. Authentication, object-byte storage, and integration health stay out of this foundation.
+
+Human IDs are a unique `human_id` string, not the primary key. Operational prefixes use four digits (`RISK-0021`, `CTRL-0002`, `VULN-0041`, `EVID-0041`, `USR-0001`, `AL-0107`). Frontend mocks still show shorter labels such as `R-021` until a later integration.
+
+Closed values use string columns and check constraints. PostgreSQL enum types are not used. Risk `score` and `residual_score` are generated columns (`likelihood * impact`). Evidence and dataset files store SHA-256 metadata and an object URI. File bytes are not a PostgreSQL column. `alert_references` stores selected metadata only. `audit_events` has no `updated_at`. Foreign-key columns are indexed. `ON DELETE` is the default restrict behavior.
