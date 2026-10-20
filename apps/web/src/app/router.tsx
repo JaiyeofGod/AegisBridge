@@ -4,6 +4,7 @@ import { ComingSoonPage } from "@/app/ComingSoonPage";
 import { AssetDetailPage } from "@/features/assets/AssetDetailPage";
 import { AssetInventoryPage } from "@/features/assets/AssetInventoryPage";
 import { GovernancePage } from "@/features/governance/GovernancePage";
+import { IncidentPage } from "@/features/incidents/IncidentPage";
 import { OverviewPage } from "@/features/overview/OverviewPage";
 import { RiskPage } from "@/features/risk/RiskPage";
 import { SignInPage } from "@/features/signin/SignInPage";
@@ -24,7 +25,7 @@ export function AppRouter() {
       <Route path="/assets/:assetId" element={<AssetDetailPage />} />
       <Route path="/vulnerabilities" element={<VulnerabilityPage />} />
       <Route path="/soc" element={<SocPage />} />
-      <Route path="/incidents" element={<ComingSoonPage title="Incidents" />} />
+      <Route path="/incidents" element={<IncidentPage />} />
       <Route path="/threat-intelligence" element={<ComingSoonPage title="Threat Intelligence" />} />
       <Route path="/cyber-range" element={<ComingSoonPage title="Cyber Range" />} />
       <Route path="/reports" element={<ComingSoonPage title="Reports & Analytics" />} />
