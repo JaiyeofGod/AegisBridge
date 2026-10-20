@@ -6,8 +6,8 @@ import { AppRouter } from "@/app/router";
 import { renderWithProviders } from "@/test/render";
 
 describe("Sign-in page", () => {
-  it("renders welcome copy and form controls", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/signin"] });
+  it("renders welcome copy and form controls", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/signin"] });
 
     const page = screen.getByTestId("signin-page");
     expect(page).toBeInTheDocument();
@@ -19,7 +19,7 @@ describe("Sign-in page", () => {
     expect(within(page).getByText(/authentication is not connected/i)).toBeInTheDocument();
   });
 
-  it("uses static scene fallback when reduced motion is preferred", () => {
+  it("uses static scene fallback when reduced motion is preferred", async () => {
     window.matchMedia = ((query: string) => ({
       matches: query.includes("prefers-reduced-motion"),
       media: query,
@@ -31,7 +31,7 @@ describe("Sign-in page", () => {
       dispatchEvent: () => false,
     })) as typeof window.matchMedia;
 
-    renderWithProviders(<AppRouter />, { initialEntries: ["/signin"] });
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/signin"] });
     const visual = screen.getByTestId("signin-visual");
     expect(visual).toHaveAttribute("data-visual-mode", "static-fallback");
     expect(within(visual).getByTestId("signin-scene-fallback")).toBeInTheDocument();
@@ -39,7 +39,7 @@ describe("Sign-in page", () => {
 
   it("explore demo navigates to overview as simulated entry", async () => {
     const user = userEvent.setup();
-    renderWithProviders(<AppRouter />, { initialEntries: ["/signin"] });
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/signin"] });
 
     const page = screen.getByTestId("signin-page");
     await user.click(within(page).getByTestId("explore-demo"));
@@ -48,8 +48,8 @@ describe("Sign-in page", () => {
     expect(within(overview).getByTestId("simulated-data-banner")).toBeInTheDocument();
   });
 
-  it("keeps interactive targets keyboard reachable", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/signin"] });
+  it("keeps interactive targets keyboard reachable", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/signin"] });
     const page = screen.getByTestId("signin-page");
     const email = within(page).getByRole("textbox", { name: /work email/i });
     email.focus();

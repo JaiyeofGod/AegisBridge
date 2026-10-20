@@ -15,8 +15,8 @@ function compromiseClaims(text: string) {
 }
 
 describe("Incident response", () => {
-  it("renders /incidents with simulated labeling and no aggregate score", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/incidents"] });
+  it("renders /incidents with simulated labeling and no aggregate score", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/incidents"] });
     const page = screen.getByTestId("incidents-page");
     expect(
       within(page).getByRole("heading", { level: 1, name: "Incident response" }),
@@ -28,8 +28,8 @@ describe("Incident response", () => {
     expect(page.textContent?.toLowerCase()).toContain("no confirmed compromise");
   });
 
-  it("keeps lifecycle status separate from severity", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/incidents"] });
+  it("keeps lifecycle status separate from severity", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/incidents"] });
     const page = screen.getByTestId("incidents-page");
     expect(within(page).getByRole("columnheader", { name: "Severity" })).toBeInTheDocument();
     expect(within(page).getByRole("columnheader", { name: "Status" })).toBeInTheDocument();
@@ -46,7 +46,7 @@ describe("Incident response", () => {
 
   it("renders timeline, tasks, indicators, and evidence sections", async () => {
     const user = userEvent.setup();
-    renderWithProviders(<AppRouter />, { initialEntries: ["/incidents"] });
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/incidents"] });
     const page = screen.getByTestId("incidents-page");
     expect(within(page).getByRole("tab", { name: "Incidents" })).toHaveAttribute(
       "aria-selected",

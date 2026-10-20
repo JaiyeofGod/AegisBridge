@@ -24,6 +24,7 @@ export function SidebarNavItem({ item, onNavigate }: { item: NavItem; onNavigate
       className={({ isActive }) =>
         cn(
           "flex min-h-11 items-center rounded-[var(--radius-control)] px-3 py-2 text-sm leading-snug font-medium",
+          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",
           isActive
             ? "bg-[var(--raised)] text-[var(--accent)]"
             : "text-[var(--muted)] hover:bg-[var(--raised)] hover:text-[var(--text)]",

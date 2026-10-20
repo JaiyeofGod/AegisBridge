@@ -54,7 +54,7 @@ export const overviewMock: OverviewSnapshot = {
   myWork: [
     {
       id: "work-1",
-      title: "Triage INC-0003 authentication anomaly",
+      title: "Triage INC-001 repeated authentication failures",
       meta: "SOC · Due today",
       statusLabel: "In progress",
       statusTone: "warning",

@@ -6,17 +6,19 @@ import { AppRouter } from "@/app/router";
 import { renderWithProviders } from "@/test/render";
 
 describe("Asset inventory", () => {
-  it("renders /assets with simulated labeling and no aggregate security score", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/assets"] });
+  it("renders /assets with simulated labeling and no aggregate security score", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/assets"] });
     const page = screen.getByTestId("assets-page");
-    expect(within(page).getByRole("heading", { level: 1, name: "Asset inventory" })).toBeInTheDocument();
+    expect(
+      within(page).getByRole("heading", { level: 1, name: "Asset inventory" }),
+    ).toBeInTheDocument();
     expect(within(page).getAllByText(/simulated/i).length).toBeGreaterThan(0);
     expect(within(page).getByText(/There is no aggregate security score/i)).toBeInTheDocument();
     expect(within(page).queryByText(/overall security score/i)).not.toBeInTheDocument();
   });
 
-  it("renders inventory filters and asset id status text", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/assets"] });
+  it("renders inventory filters and asset id status text", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/assets"] });
     const page = screen.getByTestId("assets-page");
     expect(within(page).getByRole("searchbox", { name: /search records/i })).toBeInTheDocument();
     expect(within(page).getByRole("combobox", { name: /asset type/i })).toBeInTheDocument();
@@ -31,7 +33,7 @@ describe("Asset inventory", () => {
 
   it("opens FIN-APP-01 with linked vulnerability, alert, risk, control, and evidence context", async () => {
     const user = userEvent.setup();
-    renderWithProviders(<AppRouter />, { initialEntries: ["/assets"] });
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/assets"] });
     const inventoryLinks = screen.getAllByRole("link", { name: /FIN-APP-01/i });
     await user.click(inventoryLinks[0]);
 
@@ -42,7 +44,7 @@ describe("Asset inventory", () => {
     expect(within(page).getAllByText(/VF-041/).length).toBeGreaterThan(0);
     expect(within(page).getAllByText(/AL-104/).length).toBeGreaterThan(0);
     expect(within(page).getAllByText(/R-021/).length).toBeGreaterThan(0);
-    expect(within(page).getAllByText(/SI-02/).length).toBeGreaterThan(0);
+    expect(within(page).getAllByText(/SI-2/).length).toBeGreaterThan(0);
     expect(within(page).getByTestId("asset-evidence")).toHaveTextContent("EV-041");
     expect(within(page).getByTestId("asset-profile")).toHaveTextContent("AST-0007");
     expect(within(page).getByText(/Internet-exposed/)).toBeInTheDocument();

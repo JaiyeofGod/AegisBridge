@@ -17,8 +17,8 @@ function maliciousClaims(text: string) {
 }
 
 describe("Threat intelligence", () => {
-  it("renders /threat-intelligence with simulated labeling and no aggregate score", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/threat-intelligence"] });
+  it("renders /threat-intelligence with simulated labeling and no aggregate score", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/threat-intelligence"] });
     const page = screen.getByTestId("threat-intel-page");
     expect(
       within(page).getByRole("heading", { level: 1, name: "Threat intelligence" }),
@@ -39,7 +39,7 @@ describe("Threat intelligence", () => {
 
   it("renders indicator confidence and freshness separately from advisories", async () => {
     const user = userEvent.setup();
-    renderWithProviders(<AppRouter />, { initialEntries: ["/threat-intelligence"] });
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/threat-intelligence"] });
     const page = screen.getByTestId("threat-intel-page");
     expect(within(page).getByRole("tab", { name: "Indicators" })).toHaveAttribute(
       "aria-selected",
@@ -67,7 +67,7 @@ describe("Threat intelligence", () => {
 
   it("renders source connection status without a live feed", async () => {
     const user = userEvent.setup();
-    renderWithProviders(<AppRouter />, { initialEntries: ["/threat-intelligence"] });
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/threat-intelligence"] });
     const page = screen.getByTestId("threat-intel-page");
     await user.click(within(page).getByRole("tab", { name: "Sources" }));
     const sources = within(page).getByTestId("intel-sources");

@@ -6,8 +6,8 @@ import { AppRouter } from "@/app/router";
 import { renderWithProviders } from "@/test/render";
 
 describe("Cyber range", () => {
-  it("renders /cyber-range with simulated labeling and no aggregate score", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/cyber-range"] });
+  it("renders /cyber-range with simulated labeling and no aggregate score", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/cyber-range"] });
     const page = screen.getByTestId("cyber-range-page");
     expect(
       within(page).getByRole("heading", { level: 1, name: "Cyber range" }),
@@ -20,8 +20,8 @@ describe("Cyber range", () => {
     expect(within(page).getAllByText(/not observed telemetry/i).length).toBeGreaterThan(0);
   });
 
-  it("renders the five segments and key lab systems", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/cyber-range"] });
+  it("renders the five segments and key lab systems", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/cyber-range"] });
     const page = screen.getByTestId("cyber-range-page");
     for (const cidr of [
       "10.10.10.0/24",
@@ -49,7 +49,7 @@ describe("Cyber range", () => {
 
   it("renders scenarios and runs", async () => {
     const user = userEvent.setup();
-    renderWithProviders(<AppRouter />, { initialEntries: ["/cyber-range"] });
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/cyber-range"] });
     const page = screen.getByTestId("cyber-range-page");
 
     await user.click(within(page).getByRole("tab", { name: "Segments" }));

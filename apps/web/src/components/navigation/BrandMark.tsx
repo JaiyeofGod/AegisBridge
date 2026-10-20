@@ -8,6 +8,7 @@ export function BrandMark({ className, to = "/overview" }: { className?: string;
       to={to}
       className={cn(
         "inline-flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-1",
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",
         className,
       )}
       aria-label="AegisBridge home"

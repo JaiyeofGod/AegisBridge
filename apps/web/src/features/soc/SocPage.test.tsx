@@ -15,8 +15,8 @@ function compromiseClaims(text: string) {
 }
 
 describe("SOC operations", () => {
-  it("renders /soc with simulated labeling and no aggregate score", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/soc"] });
+  it("renders /soc with simulated labeling and no aggregate score", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/soc"] });
     const page = screen.getByTestId("soc-page");
     expect(
       within(page).getByRole("heading", { level: 1, name: "SOC operations" }),
@@ -28,8 +28,8 @@ describe("SOC operations", () => {
     expect(page.textContent?.toLowerCase()).toContain("no confirmed compromise");
   });
 
-  it("renders alerts with separate severity and status", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/soc"] });
+  it("renders alerts with separate severity and status", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/soc"] });
     const page = screen.getByTestId("soc-page");
     expect(within(page).getByRole("columnheader", { name: "Severity" })).toBeInTheDocument();
     expect(within(page).getByRole("columnheader", { name: "Status" })).toBeInTheDocument();
@@ -44,7 +44,7 @@ describe("SOC operations", () => {
 
   it("renders investigations, detection rules, and ATT&CK coverage tabs", async () => {
     const user = userEvent.setup();
-    renderWithProviders(<AppRouter />, { initialEntries: ["/soc"] });
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/soc"] });
     const page = screen.getByTestId("soc-page");
     expect(within(page).getByRole("tab", { name: "Alert queue" })).toHaveAttribute(
       "aria-selected",

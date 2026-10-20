@@ -6,8 +6,8 @@ import { AppRouter } from "@/app/router";
 import { renderWithProviders } from "@/test/render";
 
 describe("Governance & Compliance page", () => {
-  it("renders /governance with simulated labeling and no aggregate score", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/governance"] });
+  it("renders /governance with simulated labeling and no aggregate score", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/governance"] });
 
     const page = screen.getByTestId("governance-page");
     expect(page).toBeInTheDocument();
@@ -20,8 +20,8 @@ describe("Governance & Compliance page", () => {
     expect(within(page).queryByText(/composite score/i)).not.toBeInTheDocument();
   });
 
-  it("renders summary metrics and assessment work", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/governance"] });
+  it("renders summary metrics and assessment work", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/governance"] });
     const page = screen.getByTestId("governance-page");
 
     expect(within(page).getByText("Controls passing")).toBeInTheDocument();
@@ -36,7 +36,7 @@ describe("Governance & Compliance page", () => {
 
   it("renders framework sections with required framework scope", async () => {
     const user = userEvent.setup();
-    renderWithProviders(<AppRouter />, { initialEntries: ["/governance"] });
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/governance"] });
 
     await user.click(screen.getByRole("tab", { name: "Frameworks" }));
     const page = screen.getByTestId("governance-page");
@@ -54,7 +54,7 @@ describe("Governance & Compliance page", () => {
 
   it("exposes control and evidence status as text semantics", async () => {
     const user = userEvent.setup();
-    renderWithProviders(<AppRouter />, { initialEntries: ["/governance"] });
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/governance"] });
     const page = screen.getByTestId("governance-page");
 
     await user.click(screen.getByRole("tab", { name: "Controls" }));
@@ -71,8 +71,8 @@ describe("Governance & Compliance page", () => {
     expect(within(evidence).getByText("Updating")).toBeInTheDocument();
   });
 
-  it("keeps governance navigable from the sidebar", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/overview"] });
+  it("keeps governance navigable from the sidebar", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/overview"] });
     const link = screen.getByRole("link", { name: "Governance & Compliance" });
     expect(link).toHaveAttribute("href", "/governance");
   });

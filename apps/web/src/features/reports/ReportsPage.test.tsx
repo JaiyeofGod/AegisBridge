@@ -6,8 +6,8 @@ import { AppRouter } from "@/app/router";
 import { renderWithProviders } from "@/test/render";
 
 describe("Reports and analytics", () => {
-  it("renders /reports with simulated labeling and no scores", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/reports"] });
+  it("renders /reports with simulated labeling and no scores", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/reports"] });
     const page = screen.getByTestId("reports-page");
     expect(
       within(page).getByRole("heading", { level: 1, name: "Reports & analytics" }),
@@ -25,7 +25,7 @@ describe("Reports and analytics", () => {
 
   it("renders report and export status separately from datasets and research", async () => {
     const user = userEvent.setup();
-    renderWithProviders(<AppRouter />, { initialEntries: ["/reports"] });
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/reports"] });
     const page = screen.getByTestId("reports-page");
     expect(within(page).getAllByText("Ready").length).toBeGreaterThan(0);
     expect(within(page).getAllByText("Review").length).toBeGreaterThan(0);

@@ -6,8 +6,8 @@ import { riskBand, riskScore } from "@/features/risk/risk-model";
 import { renderWithProviders } from "@/test/render";
 
 describe("Risk page", () => {
-  it("renders /risks with simulated labeling and no aggregate security score", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/risks"] });
+  it("renders /risks with simulated labeling and no aggregate security score", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/risks"] });
     const page = screen.getByTestId("risks-page");
     expect(within(page).getByRole("heading", { name: "Risk register" })).toBeInTheDocument();
     expect(within(page).getAllByText(/simulated/i).length).toBeGreaterThan(0);
@@ -16,7 +16,7 @@ describe("Risk page", () => {
     expect(within(page).queryByText(/enterprise security score/i)).not.toBeInTheDocument();
   });
 
-  it("shows likelihood, impact, and likelihood × impact semantics", () => {
+  it("shows likelihood, impact, and likelihood × impact semantics", async () => {
     expect(riskScore(3, 4)).toBe(12);
     expect(riskScore(5, 5)).toBe(25);
     expect(riskBand(12).label).toBe("High");
@@ -24,7 +24,7 @@ describe("Risk page", () => {
     expect(riskBand(6).label).toBe("Medium");
     expect(riskBand(4).label).toBe("Low");
 
-    renderWithProviders(<AppRouter />, { initialEntries: ["/risks"] });
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/risks"] });
     const page = screen.getByTestId("risks-page");
     expect(within(page).getByRole("columnheader", { name: "Likelihood" })).toBeInTheDocument();
     expect(within(page).getByRole("columnheader", { name: "Impact" })).toBeInTheDocument();
@@ -34,8 +34,8 @@ describe("Risk page", () => {
     expect(within(page).getAllByText(/likelihood × impact/i).length).toBeGreaterThan(0);
   });
 
-  it("renders search, risk level, treatment status, and owner filters", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/risks"] });
+  it("renders search, risk level, treatment status, and owner filters", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/risks"] });
     const page = screen.getByTestId("risks-page");
     expect(within(page).getByRole("searchbox", { name: /search records/i })).toBeInTheDocument();
     expect(within(page).getByRole("combobox", { name: /risk level/i })).toBeInTheDocument();
@@ -43,8 +43,8 @@ describe("Risk page", () => {
     expect(within(page).getByRole("combobox", { name: /^owner$/i })).toBeInTheDocument();
   });
 
-  it("keeps risk management navigable from the sidebar", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/overview"] });
+  it("keeps risk management navigable from the sidebar", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/overview"] });
     expect(screen.getByRole("link", { name: "Risk Management" })).toHaveAttribute("href", "/risks");
   });
 });

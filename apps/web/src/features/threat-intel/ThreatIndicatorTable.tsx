@@ -103,8 +103,8 @@ export function ThreatIndicatorTable({
       <div className="hidden overflow-x-auto rounded-[var(--radius-control)] border border-[var(--border)] md:block">
         <table className="min-w-full border-collapse text-left text-sm">
           <caption className="sr-only">
-            Simulated indicator queue with type, source, confidence, relevance, freshness, and related
-            records kept separate
+            Simulated indicator queue with type, source, confidence, relevance, freshness, and
+            related records kept separate
           </caption>
           <thead className="bg-[var(--raised)] text-[var(--muted)]">
             <tr>

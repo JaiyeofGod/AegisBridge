@@ -28,13 +28,13 @@ const findings: VulnerabilityFinding[] = [
     overdue: true,
     needsEnrichment: false,
     highEpss: true,
-    mitigatingControls: "WAF rule is partial; SI-02 evidence is still requested.",
+    mitigatingControls: "WAF rule is partial; SI-2 evidence is still requested.",
     whyPrioritized: [
       "CVSS 9.8 is technical severity only.",
       "EPSS 0.94 is a separate exploitation-probability signal.",
       "CISA KEV lists this CVE. KEV is not added into a score.",
       "FIN-APP-01 is a critical, internet-exposed finance service.",
-      "Mitigating control SI-02 is not fully evidenced.",
+      "Mitigating control SI-2 is not fully evidenced.",
       "Action Act is an AegisBridge decision (72-hour internal SLA), not an official CISA outcome.",
     ],
     remediationTask: "Assign patch and collect validation evidence.",
@@ -315,8 +315,7 @@ export const vulnerabilityMock: VulnerabilitySnapshot = {
       secondaryValue: "86",
       tone: "accent",
       freshness: "fresh",
-      semantics:
-        "Open asset-vulnerability pairs in the simulated queue. Dimensions stay separate.",
+      semantics: "Open asset-vulnerability pairs in the simulated queue. Dimensions stay separate.",
     },
     {
       id: "kev-exposure",

@@ -16,8 +16,8 @@ const routes = [
 ] as const;
 
 describe("Account", () => {
-  it.each(routes)("renders %s", (path, title) => {
-    renderWithProviders(<AppRouter />, { initialEntries: [path] });
+  it.each(routes)("renders %s", async (path, title) => {
+    await renderWithProviders(<AppRouter />, { initialEntries: [path] });
     const page = screen.getByTestId("account-page");
     expect(within(page).getByRole("heading", { level: 1, name: title })).toBeInTheDocument();
     expect(within(page).getByRole("navigation", { name: "Account sections" })).toBeInTheDocument();
@@ -27,7 +27,7 @@ describe("Account", () => {
 
   it("moves between account sections from the local navigation", async () => {
     const user = userEvent.setup();
-    renderWithProviders(<AppRouter />, { initialEntries: ["/account/profile"] });
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/account/profile"] });
     const page = screen.getByTestId("account-page");
     const nav = within(page).getByRole("navigation", { name: "Account sections" });
 
@@ -55,8 +55,8 @@ describe("Account", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders profile fields for the simulated current user", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/account/profile"] });
+  it("renders profile fields for the simulated current user", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/account/profile"] });
     const profile = screen.getByTestId("account-profile");
     expect(profile).toHaveTextContent("Amara Okonkwo");
     expect(profile).toHaveTextContent("amara.okonkwo@aegisbridge.example");
@@ -70,8 +70,8 @@ describe("Account", () => {
     expect(screen.getByRole("button", { name: /save changes/i })).toBeDisabled();
   });
 
-  it("renders security status, MFA, and sessions without mutation controls", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/account/security"] });
+  it("renders security status, MFA, and sessions without mutation controls", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/account/security"] });
     const security = screen.getByTestId("account-security");
     expect(security).toHaveTextContent("Organization sign-in");
     expect(security).toHaveTextContent("No password is stored on this screen");
@@ -98,7 +98,7 @@ describe("Account", () => {
 
   it("renders preference controls as a local preview", async () => {
     const user = userEvent.setup();
-    renderWithProviders(<AppRouter />, { initialEntries: ["/account/preferences"] });
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/account/preferences"] });
     const preferences = screen.getByTestId("account-preferences");
 
     expect(within(preferences).getByRole("radio", { name: "Dark selected" })).toHaveAttribute(
@@ -130,8 +130,8 @@ describe("Account", () => {
     expect(email).toBeDisabled();
   });
 
-  it("renders the current user's workspace without administration controls", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/account/workspace"] });
+  it("renders the current user's workspace without administration controls", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/account/workspace"] });
     const workspace = screen.getByTestId("account-workspace");
     expect(workspace).toHaveTextContent("AegisBridge Technologies");
     expect(workspace).toHaveTextContent("AegisBridge Labs");

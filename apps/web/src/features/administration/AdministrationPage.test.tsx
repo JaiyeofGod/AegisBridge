@@ -9,8 +9,8 @@ const secretPattern =
   /sk_live|AKIA[0-9A-Z]{8,}|api[_-]?key\s*[:=]\s*\S+|password\s*[:=]\s*\S+|BEGIN (RSA |OPENSSH )?PRIVATE KEY|eyJ[A-Za-z0-9_-]{10,}/i;
 
 describe("Administration", () => {
-  it("renders /administration with simulated labeling and no score or secrets", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/administration"] });
+  it("renders /administration with simulated labeling and no score or secrets", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/administration"] });
     const page = screen.getByTestId("administration-page");
     expect(
       within(page).getByRole("heading", { level: 1, name: "Administration" }),
@@ -28,7 +28,7 @@ describe("Administration", () => {
 
   it("renders integration status, roles, audit history, and workspace", async () => {
     const user = userEvent.setup();
-    renderWithProviders(<AppRouter />, { initialEntries: ["/administration"] });
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/administration"] });
     const page = screen.getByTestId("administration-page");
     expect(within(page).getAllByText("Not configured").length).toBeGreaterThan(0);
     expect(within(page).getAllByText("Simulated").length).toBeGreaterThan(0);

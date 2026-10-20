@@ -22,7 +22,7 @@ describe("Overview page", () => {
   });
 
   it("renders overview metrics with simulated labeling", async () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/overview"] });
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/overview"] });
 
     const page = screen.getByTestId("overview-page");
     expect(within(page).getByRole("heading", { name: "Overview" })).toBeInTheDocument();
@@ -39,8 +39,8 @@ describe("Overview page", () => {
     expect(within(page).getByText(/no aggregate security score/i)).toBeInTheDocument();
   });
 
-  it("renders my work, security overview, and executive sections", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/overview"] });
+  it("renders my work, security overview, and executive sections", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/overview"] });
     const page = screen.getByTestId("overview-page");
 
     expect(within(page).getByRole("heading", { name: "Security Overview" })).toBeInTheDocument();
@@ -48,8 +48,8 @@ describe("Overview page", () => {
     expect(within(page).getByRole("heading", { name: "Executive" })).toBeInTheDocument();
   });
 
-  it("exposes open navigation control for compact layouts", () => {
-    renderWithProviders(<AppRouter />, { initialEntries: ["/overview"] });
+  it("exposes open navigation control for compact layouts", async () => {
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/overview"] });
     expect(screen.getByRole("button", { name: /open navigation/i })).toBeInTheDocument();
   });
 });

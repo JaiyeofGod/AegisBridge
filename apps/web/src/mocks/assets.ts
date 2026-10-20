@@ -25,7 +25,7 @@ const finApp: AssetRecord = {
   softwareSummary: ["Finance web service", "Nightly extract job", "Local Wazuh agent"],
   businessContext: "Critical · Finance application",
   securityContext: "4 KEV findings · 3 related alerts",
-  linkedRecordSummary: "R-021 · AC-02 · SI-02 · EV-041",
+  linkedRecordSummary: "R-021 · AC-2 · SI-2 · EV-041",
   unassignedOwner: false,
   relationships: [
     {
@@ -91,7 +91,7 @@ const finApp: AssetRecord = {
     {
       id: "rel-si-02",
       kind: "control",
-      recordId: "SI-02",
+      recordId: "SI-2",
       title: "Flaw remediation",
       context: "Addresses this exposure",
       owner: "Control owner",
@@ -101,7 +101,7 @@ const finApp: AssetRecord = {
     {
       id: "rel-ac-02",
       kind: "control",
-      recordId: "AC-02",
+      recordId: "AC-2",
       title: "Account management",
       context: "Privileged access to FIN-APP-01",
       owner: "Identity team",
