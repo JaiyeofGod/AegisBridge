@@ -6,7 +6,7 @@ export const primaryNav: NavItem[] = [
   { label: "Risk Management", to: "/risks", implemented: true },
   { label: "Assets", to: "/assets", implemented: true },
   { label: "Vulnerabilities", to: "/vulnerabilities", implemented: true },
-  { label: "SOC Operations", to: "/soc", implemented: false },
+  { label: "SOC Operations", to: "/soc", implemented: true },
   { label: "Incidents", to: "/incidents", implemented: false },
   { label: "Threat Intelligence", to: "/threat-intelligence", implemented: false },
   { label: "Cyber Range", to: "/cyber-range", implemented: false },
