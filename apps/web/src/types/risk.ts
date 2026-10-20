@@ -1,11 +1,10 @@
 import type { OverviewMetric } from "@/types/overview";
-import type { Impact, Likelihood } from "@/features/risk/risk-model";
 
 export type RiskSectionId = "register" | "treatments" | "exceptions" | "vendors";
 
-export type TreatmentDecision = "Mitigate" | "Accept" | "Transfer" | "Avoid";
+export type TreatmentDecision = string;
 
-export type TreatmentStatus = "In progress" | "Overdue" | "Planned" | "Complete" | "Accepted";
+export type TreatmentStatus = string;
 
 export type RiskRecord = {
   id: string;
@@ -18,12 +17,16 @@ export type RiskRecord = {
   scenario: string;
   businessImpact: string;
   linkedRecords: string;
-  likelihood: Likelihood;
-  impact: Impact;
-  residualLikelihood: Likelihood;
-  residualImpact: Impact;
-  treatment: TreatmentDecision;
-  treatmentStatus: TreatmentStatus;
+  likelihood: number | null;
+  impact: number | null;
+  score?: number | null;
+  residualLikelihood: number | null;
+  residualImpact: number | null;
+  residualScore?: number | null;
+  riskLevel?: string | null;
+  methodologyLabel?: string;
+  treatment: string;
+  treatmentStatus: string;
   treatmentDetail: string;
   reviewDueLabel: string;
   reviewDueSoon: boolean;

@@ -1,47 +1,38 @@
-import { useMemo, useState } from "react";
-
 import { StatusBadge } from "@/components/status/StatusBadge";
-import { impactLabel, likelihoodLabel, riskBand, riskScore } from "@/features/risk/risk-model";
+import { impactLabel, likelihoodLabel, riskBand } from "@/features/risk/risk-model";
 import type { RiskRecord } from "@/types/risk";
+
+export type RiskTableFilters = {
+  search: string;
+  riskLevel: string;
+  treatmentStatus: string;
+  owner: string;
+};
+
+export type RiskFilterOption = { value: string; label: string };
 
 const selectClass =
   "min-h-11 min-w-[160px] rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]";
 
 export function RiskRegisterTable({
   risks,
+  total,
   selectedId,
   onSelect,
+  filters,
+  onFiltersChange,
+  statusOptions,
+  ownerOptions,
 }: {
   risks: RiskRecord[];
+  total: number;
   selectedId: string;
   onSelect: (id: string) => void;
+  filters: RiskTableFilters;
+  onFiltersChange: (filters: RiskTableFilters) => void;
+  statusOptions: RiskFilterOption[];
+  ownerOptions: RiskFilterOption[];
 }) {
-  const [query, setQuery] = useState("");
-  const [level, setLevel] = useState("all");
-  const [treatmentStatus, setTreatmentStatus] = useState("all");
-  const [owner, setOwner] = useState("all");
-
-  const owners = useMemo(
-    () => Array.from(new Set(risks.map((risk) => risk.owner))).sort(),
-    [risks],
-  );
-  const statuses = useMemo(
-    () => Array.from(new Set(risks.map((risk) => risk.treatmentStatus))).sort(),
-    [risks],
-  );
-
-  const filtered = risks.filter((risk) => {
-    const residual = riskScore(risk.residualLikelihood, risk.residualImpact);
-    const band = riskBand(residual).label;
-    const haystack =
-      `${risk.riskId} ${risk.title} ${risk.affectedService} ${risk.owner} ${risk.treatment} ${band}`.toLowerCase();
-    const matchesQuery = query.trim().length === 0 || haystack.includes(query.trim().toLowerCase());
-    const matchesLevel = level === "all" || band === level;
-    const matchesStatus = treatmentStatus === "all" || risk.treatmentStatus === treatmentStatus;
-    const matchesOwner = owner === "all" || risk.owner === owner;
-    return matchesQuery && matchesLevel && matchesStatus && matchesOwner;
-  });
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
@@ -55,8 +46,8 @@ export function RiskRegisterTable({
           <input
             id="risk-search"
             type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            value={filters.search}
+            onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
             placeholder="Search records…"
             className="min-h-11 w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 text-[var(--text)] placeholder:text-[var(--muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
           />
@@ -68,14 +59,14 @@ export function RiskRegisterTable({
           <select
             id="risk-level"
             className={selectClass}
-            value={level}
-            onChange={(event) => setLevel(event.target.value)}
+            value={filters.riskLevel}
+            onChange={(event) => onFiltersChange({ ...filters, riskLevel: event.target.value })}
           >
             <option value="all">All</option>
-            <option value="Critical">Critical</option>
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
           </select>
         </div>
         <div>
@@ -88,13 +79,15 @@ export function RiskRegisterTable({
           <select
             id="risk-treatment"
             className={selectClass}
-            value={treatmentStatus}
-            onChange={(event) => setTreatmentStatus(event.target.value)}
+            value={filters.treatmentStatus}
+            onChange={(event) =>
+              onFiltersChange({ ...filters, treatmentStatus: event.target.value })
+            }
           >
             <option value="all">All</option>
-            {statuses.map((status) => (
-              <option key={status} value={status}>
-                {status}
+            {statusOptions.map((status) => (
+              <option key={status.value} value={status.value}>
+                {status.label}
               </option>
             ))}
           </select>
@@ -106,13 +99,13 @@ export function RiskRegisterTable({
           <select
             id="risk-owner"
             className={selectClass}
-            value={owner}
-            onChange={(event) => setOwner(event.target.value)}
+            value={filters.owner}
+            onChange={(event) => onFiltersChange({ ...filters, owner: event.target.value })}
           >
             <option value="all">All</option>
-            {owners.map((name) => (
-              <option key={name} value={name}>
-                {name}
+            {ownerOptions.map((name) => (
+              <option key={name.value} value={name.value}>
+                {name.label}
               </option>
             ))}
           </select>
@@ -120,14 +113,14 @@ export function RiskRegisterTable({
       </div>
 
       <div className="space-y-3 md:hidden">
-        {filtered.length === 0 ? (
+        {risks.length === 0 ? (
           <p className="rounded-[var(--radius-control)] border border-[var(--border)] px-4 py-6 text-sm text-[var(--muted)]">
-            No risks match the current filters. Clear filters to see the sample register.
+            No risks are stored for the current request.
           </p>
         ) : (
-          filtered.map((risk) => {
-            const score = riskScore(risk.residualLikelihood, risk.residualImpact);
-            const band = riskBand(score);
+          risks.map((risk) => {
+            const shown = shownAssessment(risk);
+            const band = shown.score == null ? null : riskBand(shown.score);
             return (
               <button
                 key={risk.id}
@@ -143,12 +136,14 @@ export function RiskRegisterTable({
                   {risk.affectedService} · {risk.owner}
                 </span>
                 <span className="text-sm text-[var(--text)]">
-                  Likelihood {risk.residualLikelihood} ({likelihoodLabel(risk.residualLikelihood)})
-                  · Impact {risk.residualImpact} ({impactLabel(risk.residualImpact)}) · Score{" "}
-                  {score}
+                  {shown.kind} likelihood {factorText(shown.likelihood, likelihoodLabel)} · Impact{" "}
+                  {factorText(shown.impact, impactLabel)} · Score {shown.score ?? "Not recorded"}
                 </span>
                 <span className="flex flex-wrap gap-2">
-                  <StatusBadge label={band.label} tone={band.tone} />
+                  <StatusBadge
+                    label={band?.label ?? "Not recorded"}
+                    tone={band?.tone ?? "neutral"}
+                  />
                   <StatusBadge
                     label={risk.treatmentStatus}
                     tone={risk.overdue ? "critical" : "neutral"}
@@ -166,8 +161,8 @@ export function RiskRegisterTable({
       <div className="hidden overflow-x-auto rounded-[var(--radius-control)] border border-[var(--border)] md:block">
         <table className="min-w-full border-collapse text-left text-sm">
           <caption className="sr-only">
-            Open risks with residual likelihood, impact, score, treatment, and review date. Score is
-            likelihood times impact.
+            Open risks with likelihood, impact, and score kept separate. Residual values appear when
+            stored; otherwise the inherent assessment is shown.
           </caption>
           <thead className="bg-[var(--raised)] text-[var(--muted)]">
             <tr>
@@ -198,16 +193,16 @@ export function RiskRegisterTable({
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {risks.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-4 py-8 text-[var(--muted)]">
-                  No risks match the current filters. Clear filters to see the sample register.
+                  No risks are stored for the current request.
                 </td>
               </tr>
             ) : (
-              filtered.map((risk) => {
-                const score = riskScore(risk.residualLikelihood, risk.residualImpact);
-                const band = riskBand(score);
+              risks.map((risk) => {
+                const shown = shownAssessment(risk);
+                const band = shown.score == null ? null : riskBand(shown.score);
                 const selected = selectedId === risk.id;
                 return (
                   <tr
@@ -231,19 +226,25 @@ export function RiskRegisterTable({
                     <td className="px-4 py-3 text-[var(--muted)]">{risk.affectedService}</td>
                     <td className="px-4 py-3 text-[var(--muted)]">{risk.owner}</td>
                     <td className="px-4 py-3 text-[var(--text)]">
-                      {risk.residualLikelihood} · {likelihoodLabel(risk.residualLikelihood)}
+                      {factorText(shown.likelihood, likelihoodLabel)}
                     </td>
                     <td className="px-4 py-3 text-[var(--text)]">
-                      {risk.residualImpact} · {impactLabel(risk.residualImpact)}
+                      {factorText(shown.impact, impactLabel)}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="mr-2 font-semibold text-[var(--text)]">{score}</span>
-                      <StatusBadge label={band.label} tone={band.tone} />
+                      <span className="mr-2 font-semibold text-[var(--text)]">
+                        {shown.score ?? "—"}
+                      </span>
+                      <StatusBadge
+                        label={band?.label ?? "Not recorded"}
+                        tone={band?.tone ?? "neutral"}
+                      />
+                      <span className="mt-1 block text-xs text-[var(--muted)]">{shown.kind}</span>
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge
-                        label={`${band.label} · ${risk.treatment}`}
-                        tone={risk.overdue ? "critical" : band.tone}
+                        label={`${band?.label ?? "Not recorded"} · ${risk.treatment}`}
+                        tone={risk.overdue ? "critical" : (band?.tone ?? "neutral")}
                       />
                       <span className="mt-1 block text-xs text-[var(--muted)]">
                         {risk.treatmentStatus}
@@ -259,9 +260,32 @@ export function RiskRegisterTable({
       </div>
 
       <p className="text-xs text-[var(--muted)]">
-        Showing {filtered.length} of {risks.length} sample records · Row selection opens record
-        details
+        Showing {risks.length} of {total} development records · Row selection opens record details
       </p>
     </div>
   );
+}
+
+function shownAssessment(risk: RiskRecord) {
+  const residual =
+    risk.residualLikelihood != null && risk.residualImpact != null && risk.residualScore != null;
+  if (residual) {
+    return {
+      kind: "Residual" as const,
+      likelihood: risk.residualLikelihood,
+      impact: risk.residualImpact,
+      score: risk.residualScore ?? null,
+    };
+  }
+  return {
+    kind: "Inherent" as const,
+    likelihood: risk.likelihood,
+    impact: risk.impact,
+    score: risk.score ?? null,
+  };
+}
+
+function factorText(value: number | null, label: (value: number) => string) {
+  if (value == null) return "Not recorded";
+  return `${value} · ${label(value)}`;
 }

@@ -39,10 +39,10 @@ export function riskBand(score: number): RiskBand {
   return { label: "Low", tone: "success" };
 }
 
-export function likelihoodLabel(value: Likelihood): string {
-  return LIKELIHOOD_LABELS[value - 1];
+export function likelihoodLabel(value: number): string {
+  return LIKELIHOOD_LABELS[value - 1] ?? "Not recorded";
 }
 
-export function impactLabel(value: Impact): string {
-  return IMPACT_LABELS[value - 1];
+export function impactLabel(value: number): string {
+  return IMPACT_LABELS[value - 1] ?? "Not recorded";
 }

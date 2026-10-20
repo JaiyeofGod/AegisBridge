@@ -1,6 +1,14 @@
 import { vi } from "vitest";
 
-import type { AssetDetailResponse, AssetListItem, OverviewResponse } from "@/services/api-types";
+import type {
+  AssetDetailResponse,
+  AssetListItem,
+  OverviewResponse,
+  RiskDetailResponse,
+  RiskListItem,
+  VulnerabilityDetailResponse,
+  VulnerabilityListItem,
+} from "@/services/api-types";
 
 export function jsonResponse(body: unknown, status = 200) {
   return {
@@ -113,9 +121,130 @@ export const finAppDetail: AssetDetailResponse = {
   evidence: [{ id: "EVID-0041", title: "Finding evidence", status: "collected", summary: null }],
 };
 
-export function assetPage(items: AssetListItem[]) {
+export function assetPage<T>(items: T[]) {
   return { page: 1, page_size: 100, total: items.length, items };
 }
+
+const priya = { id: "USR-0003", display_name: "Priya Shah" };
+
+export const riskCritical: RiskListItem = {
+  id: "RISK-0021",
+  title: "Service exploitation on the finance application",
+  status: "open",
+  methodology: "aegisbridge_likelihood_x_impact",
+  methodology_label:
+    "AegisBridge internal methodology: score = likelihood × impact. This is not a NIST-mandated formula.",
+  likelihood: 4,
+  impact: 5,
+  score: 20,
+  residual_likelihood: null,
+  residual_impact: null,
+  residual_score: null,
+  risk_level: "critical",
+  treatment_strategy: "mitigate",
+  treatment_status: "planned",
+  owner: priya,
+  asset_id: "AST-0007",
+  asset_hostname: "FIN-APP-01",
+};
+
+export const riskLow: RiskListItem = {
+  ...riskCritical,
+  id: "RISK-0002",
+  title: "Low stored risk",
+  likelihood: 1,
+  impact: 2,
+  score: 2,
+  risk_level: "low",
+  treatment_strategy: "mitigate",
+  treatment_status: "planned",
+  owner: { id: "USR-0004", display_name: "Jonah Hale" },
+  asset_hostname: "EDGE-FW-01",
+  asset_id: "AST-0031",
+};
+
+export const riskItems = [riskCritical, riskLow];
+
+export const riskDetail: RiskDetailResponse = {
+  ...riskCritical,
+  statement: "FIN-APP-01 remains exposed with a known critical finding.",
+  treatment_notes: "No control change was applied.",
+  evidence: [
+    {
+      id: "EVID-0041",
+      title: "Privileged account inventory",
+      status: null,
+      summary: null,
+    },
+  ],
+  reviews: [],
+};
+
+const finAsset = {
+  asset_id: "AST-0007",
+  hostname: "FIN-APP-01",
+  exposure: "internet",
+  asset_criticality: "critical",
+  status: "open",
+  action_decision: "act",
+  action_rationale: "CVSS, EPSS, KEV, exposure, and criticality stay in their own columns.",
+  action_assessed_at: "2026-10-20T12:00:00Z",
+  remediation_status: "open",
+  remediation_title: "Patch FIN-APP-01",
+  due_on: "2026-10-20",
+  owner,
+  mitigating_controls: [
+    { id: "CTRL-0002", title: "AC-2 Account management", status: null, summary: null },
+  ],
+};
+
+export const vulnCritical: VulnerabilityListItem = {
+  id: "VULN-0041",
+  title: "Known-exploited finding on FIN-APP-01",
+  cve_id: "CVE-2024-21887",
+  cvss_version: "3.1",
+  cvss_base_score: 9.8,
+  cvss_vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+  cvss_severity: "critical",
+  epss: 0.94,
+  epss_percentile: 0.99,
+  epss_observed_on: "2026-10-19",
+  kev_listed: true,
+  kev_date_added: "2024-01-12",
+  known_ransomware_use: "unknown",
+  assets: [finAsset],
+};
+
+export const vulnMedium: VulnerabilityListItem = {
+  ...vulnCritical,
+  id: "VULN-0099",
+  title: "Medium finding without KEV",
+  cve_id: "CVE-2024-0001",
+  cvss_base_score: 5.3,
+  cvss_severity: "medium",
+  epss: 0.02,
+  kev_listed: false,
+  kev_date_added: null,
+  assets: [
+    {
+      ...finAsset,
+      asset_id: "AST-0061",
+      hostname: "LINUX-APP-01",
+      exposure: "internal",
+      asset_criticality: "high",
+      action_decision: "track",
+      remediation_status: "open",
+      mitigating_controls: [],
+    },
+  ],
+};
+
+export const vulnItems = [vulnCritical, vulnMedium];
+
+export const vulnDetail: VulnerabilityDetailResponse = {
+  ...vulnCritical,
+  cve_summary: "Stored catalog summary. Not a live NVD fetch.",
+};
 
 export function installApiFetch(resolve?: (url: string) => unknown) {
   const calls: string[] = [];
@@ -131,6 +260,16 @@ export function installApiFetch(resolve?: (url: string) => unknown) {
     if (url.includes("/api/v1/assets")) {
       if (url.includes("criticality=critical")) return jsonResponse(assetPage([finAppListItem]));
       return jsonResponse(assetPage(assetListItems));
+    }
+    if (/\/api\/v1\/risks\/[^?]+/.test(url)) return jsonResponse(riskDetail);
+    if (url.includes("/api/v1/risks")) {
+      if (url.includes("risk_level=critical")) return jsonResponse(assetPage([riskCritical]));
+      return jsonResponse(assetPage(riskItems));
+    }
+    if (/\/api\/v1\/vulnerabilities\/[^?]+/.test(url)) return jsonResponse(vulnDetail);
+    if (url.includes("/api/v1/vulnerabilities")) {
+      if (url.includes("severity=critical")) return jsonResponse(assetPage([vulnCritical]));
+      return jsonResponse(assetPage(vulnItems));
     }
     return jsonResponse({});
   });

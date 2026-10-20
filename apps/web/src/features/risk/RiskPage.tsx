@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 
 import { Button } from "@/components/buttons/Button";
 import { Panel } from "@/components/cards/Panel";
@@ -10,24 +10,60 @@ import { AppShell } from "@/components/navigation/AppShell";
 import { PageContainer } from "@/components/navigation/PageContainer";
 import { PageHeader } from "@/components/navigation/PageHeader";
 import { StatusBadge } from "@/components/status/StatusBadge";
-import { impactLabel, likelihoodLabel, riskBand, riskScore } from "@/features/risk/risk-model";
-import { RiskRegisterTable } from "@/features/risk/RiskRegisterTable";
+import { StaleDataIndicator } from "@/components/status/StaleDataIndicator";
+import { SEEDED_DATA_LABEL, SEEDED_DATA_NOTE } from "@/features/data-origin";
+import { mapRiskInventory } from "@/features/risk/mapRisk";
+import { impactLabel, likelihoodLabel, riskBand } from "@/features/risk/risk-model";
+import { RiskRegisterTable, type RiskTableFilters } from "@/features/risk/RiskRegisterTable";
 import { RiskSectionNav } from "@/features/risk/RiskSectionNav";
-import { useRiskData } from "@/features/risk/useRiskData";
+import { useRiskCatalog, useRiskDetail, useRiskList } from "@/features/risk/useRiskData";
+import { formatTimestamp } from "@/lib/format";
+import type { RiskQuery } from "@/services/api-types";
+import type { OverviewMetric } from "@/types/overview";
 import type { RiskRecord, RiskSectionId } from "@/types/risk";
 
+const emptyFilters: RiskTableFilters = {
+  search: "",
+  riskLevel: "all",
+  treatmentStatus: "all",
+  owner: "all",
+};
+
 export function RiskPage() {
-  const risk = useRiskData();
+  const catalog = useRiskCatalog();
   const [section, setSection] = useState<RiskSectionId>("register");
-  const openRisks = risk.data.risks.filter((item) => item.open);
-  const [selectedId, setSelectedId] = useState(
-    openRisks.find((item) => item.riskId === "R-021")?.id ?? openRisks[0]?.id ?? "",
+  const [selectedId, setSelectedId] = useState("");
+  const [filters, setFilters] = useState<RiskTableFilters>(emptyFilters);
+  const deferredSearch = useDeferredValue(filters.search.trim());
+  const query = useMemo(
+    () => toRiskQuery({ ...filters, search: deferredSearch }),
+    [filters, deferredSearch],
+  );
+  const hasServerFilters = Object.values(query).length > 0;
+  const filtered = useRiskList(query, hasServerFilters);
+  const generatedAt = catalog.dataUpdatedAt
+    ? new Date(catalog.dataUpdatedAt).toISOString()
+    : new Date().toISOString();
+  const sourceItems = hasServerFilters ? (filtered.data?.items ?? []) : (catalog.data?.items ?? []);
+  const snapshot = catalog.data ? mapRiskInventory(catalog.data.items, generatedAt) : null;
+  const visible = catalog.data ? mapRiskInventory(sourceItems, generatedAt).risks : [];
+  const openRisks = visible.filter((item) => item.open);
+  const selectedRow = visible.find((item) => item.id === selectedId) ?? visible[0];
+  const detail = useRiskDetail(selectedRow?.riskId ?? "");
+  const selected = detail.data ?? selectedRow;
+  const statusOptions = uniqueOptions(
+    catalog.data?.items
+      .map((item) => item.treatment_status)
+      .filter((value): value is string => Boolean(value)) ?? [],
+  );
+  const ownerOptions = uniqueOptions(
+    catalog.data?.items
+      .map((item) => item.owner?.display_name)
+      .filter((value): value is string => Boolean(value)) ?? [],
   );
 
-  const selected = risk.data.risks.find((item) => item.id === selectedId) ?? openRisks[0];
-
   return (
-    <AppShell environmentLabel={risk.data.environmentLabel}>
+    <AppShell environmentLabel="Development · Seeded">
       <PageContainer data-testid="risks-page">
         <PageHeader
           title="Risk register"
@@ -42,7 +78,12 @@ export function RiskPage() {
               >
                 Create risk
               </Button>
-              <SimulatedDataBanner message={risk.data.snapshotLabel} />
+              <SimulatedDataBanner message={SEEDED_DATA_NOTE} />
+              {catalog.dataUpdatedAt ? (
+                <p className="text-xs text-[var(--muted)]" data-testid="last-successful-fetch">
+                  Last successful update: {formatTimestamp(generatedAt)}
+                </p>
+              ) : null}
             </div>
           }
         />
@@ -51,17 +92,31 @@ export function RiskPage() {
           <RiskSectionNav active={section} onChange={setSection} />
         </div>
 
-        {risk.state === "loading" ? <LoadingState label="Updating" rows={4} /> : null}
-        {risk.state === "error" ? (
+        {catalog.isPending ? <LoadingState label="Updating" rows={4} /> : null}
+        {catalog.isError ? (
           <ErrorState
             title="Risk data unavailable"
-            description="The simulated risk source failed to load. Retry to restore the last known demo snapshot."
-            lastSuccessfulAt={risk.data.lastSuccessfulFetchAt}
-            onRetry={risk.reload}
+            description="The development risk API did not respond. Retry to load the seeded register. Fixture counts are not substituted."
+            onRetry={() => void catalog.refetch()}
           />
         ) : null}
+        {filtered.isError ? (
+          <ErrorState
+            title="Filtered risk register unavailable"
+            description="The risk filter request failed. Fixture rows are not added."
+            onRetry={() => void filtered.refetch()}
+          />
+        ) : null}
+        {catalog.isSuccess && (catalog.isFetching || filtered.isFetching || detail.isFetching) ? (
+          <div className="mb-6">
+            <StaleDataIndicator
+              message="Refreshing development risk register"
+              lastSuccessfulAt={generatedAt}
+            />
+          </div>
+        ) : null}
 
-        {risk.state === "ready" ? (
+        {catalog.isSuccess && snapshot ? (
           <div
             role="tabpanel"
             id={`risk-panel-${section}`}
@@ -70,22 +125,31 @@ export function RiskPage() {
           >
             {section === "register" ? (
               <RegisterSection
-                metrics={risk.data.metrics}
+                metrics={snapshot.metrics}
                 openRisks={openRisks}
+                total={
+                  hasServerFilters ? (filtered.data?.total ?? openRisks.length) : catalog.data.total
+                }
                 selected={selected}
-                selectedId={selectedId}
+                selectedId={selected?.id ?? ""}
                 onSelect={setSelectedId}
-                notes={risk.data.interpretationNotes}
+                notes={snapshot.interpretationNotes}
+                filters={filters}
+                onFiltersChange={setFilters}
+                statusOptions={statusOptions}
+                ownerOptions={ownerOptions}
               />
             ) : null}
             {section === "treatments" ? (
-              <TreatmentsSection risks={risk.data.risks.filter((item) => item.open)} />
+              <TreatmentsSection
+                risks={visible.filter((item) => item.treatment !== "Not recorded")}
+              />
             ) : null}
             {section === "exceptions" ? (
-              <ExceptionsSection risks={risk.data.risks.filter((item) => item.acceptedException)} />
+              <ExceptionsSection risks={visible.filter((item) => item.acceptedException)} />
             ) : null}
             {section === "vendors" ? (
-              <VendorsSection risks={risk.data.risks.filter((item) => Boolean(item.vendorName))} />
+              <VendorsSection risks={visible.filter((item) => Boolean(item.vendorName))} />
             ) : null}
           </div>
         ) : null}
@@ -97,17 +161,27 @@ export function RiskPage() {
 function RegisterSection({
   metrics,
   openRisks,
+  total,
   selected,
   selectedId,
   onSelect,
   notes,
+  filters,
+  onFiltersChange,
+  statusOptions,
+  ownerOptions,
 }: {
-  metrics: ReturnType<typeof useRiskData>["data"]["metrics"];
+  metrics: OverviewMetric[];
   openRisks: RiskRecord[];
+  total: number;
   selected: RiskRecord | undefined;
   selectedId: string;
   onSelect: (id: string) => void;
   notes: string[];
+  filters: RiskTableFilters;
+  onFiltersChange: (filters: RiskTableFilters) => void;
+  statusOptions: { value: string; label: string }[];
+  ownerOptions: { value: string; label: string }[];
 }) {
   return (
     <>
@@ -119,7 +193,7 @@ function RegisterSection({
           >
             Open-risk summary
           </h2>
-          <StatusBadge label="SIMULATED" tone="warning" />
+          <StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {metrics.map((metric) => (
@@ -131,24 +205,30 @@ function RegisterSection({
         </p>
       </section>
 
-      <Panel
-        title="Open risks"
-        description="Residual ratings for the simulated AegisBridge Technologies register."
-      >
-        <RiskRegisterTable risks={openRisks} selectedId={selectedId} onSelect={onSelect} />
+      <Panel title="Open risks" description="Development records returned by the risk API.">
+        <RiskRegisterTable
+          risks={openRisks}
+          total={total}
+          selectedId={selectedId}
+          onSelect={onSelect}
+          filters={filters}
+          onFiltersChange={onFiltersChange}
+          statusOptions={statusOptions}
+          ownerOptions={ownerOptions}
+        />
       </Panel>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-stretch">
         <Panel
           title={selected ? `Selected risk · ${selected.riskId}` : "Selected risk"}
-          description="Local selection only — record pages are not connected yet."
+          description="Stored likelihood, impact, and score. Related modules stay closed."
           className="h-full"
         >
           {selected ? <SelectedRisk risk={selected} /> : null}
         </Panel>
         <Panel
           title="Workflow & interpretation"
-          description="How to read this simulated risk view."
+          description="How to read this development risk view."
           className="h-full"
         >
           <ul className="space-y-3">
@@ -168,9 +248,13 @@ function RegisterSection({
 }
 
 function SelectedRisk({ risk }: { risk: RiskRecord }) {
-  const residual = riskScore(risk.residualLikelihood, risk.residualImpact);
-  const inherent = riskScore(risk.likelihood, risk.impact);
-  const band = riskBand(residual);
+  const inherent =
+    risk.likelihood != null && risk.impact != null ? risk.likelihood * risk.impact : risk.score;
+  const residual =
+    risk.residualLikelihood != null && risk.residualImpact != null
+      ? risk.residualLikelihood * risk.residualImpact
+      : risk.residualScore;
+  const band = inherent == null ? null : riskBand(inherent);
   return (
     <dl className="space-y-4 text-sm">
       <div>
@@ -178,15 +262,21 @@ function SelectedRisk({ risk }: { risk: RiskRecord }) {
         <dd className="mt-1 text-[var(--text)]">{risk.scenario}</dd>
       </div>
       <div>
-        <dt className="text-[var(--muted)]">Business impact</dt>
-        <dd className="mt-1 text-[var(--text)]">{risk.businessImpact}</dd>
+        <dt className="text-[var(--muted)]">Methodology</dt>
+        <dd className="mt-1 text-[var(--text)]">
+          {risk.methodologyLabel ??
+            "Score is likelihood × impact. This is an AegisBridge internal method, not a NIST formula."}
+        </dd>
       </div>
       <div>
         <dt className="text-[var(--muted)]">Likelihood and impact</dt>
         <dd className="mt-1 text-[var(--text)]">
-          Residual likelihood {risk.residualLikelihood} ({likelihoodLabel(risk.residualLikelihood)})
-          · Residual impact {risk.residualImpact} ({impactLabel(risk.residualImpact)}) · Score{" "}
-          {residual} ({band.label}). Inherent score {inherent}.
+          Inherent likelihood {factorText(risk.likelihood, likelihoodLabel)} · Inherent impact{" "}
+          {factorText(risk.impact, impactLabel)} · Score {inherent ?? "Not recorded"}
+          {band ? ` (${band.label})` : ""}. Residual likelihood{" "}
+          {factorText(risk.residualLikelihood, likelihoodLabel)} · Residual impact{" "}
+          {factorText(risk.residualImpact, impactLabel)} · Residual score{" "}
+          {residual ?? "Not recorded"}.
         </dd>
       </div>
       <div>
@@ -196,12 +286,35 @@ function SelectedRisk({ risk }: { risk: RiskRecord }) {
       <div>
         <dt className="text-[var(--muted)]">Treatment</dt>
         <dd className="mt-1 text-[var(--text)]">
-          {risk.treatment} · {risk.treatmentStatus}. {risk.treatmentDetail} Review due{" "}
+          {risk.treatment} · {risk.treatmentStatus}. {risk.treatmentDetail} Review{" "}
           {risk.reviewDueLabel}.
         </dd>
       </div>
     </dl>
   );
+}
+
+function factorText(value: number | null, label: (value: number) => string) {
+  if (value == null) return "Not recorded";
+  return `${value} (${label(value)})`;
+}
+
+function toRiskQuery(filters: RiskTableFilters): RiskQuery {
+  return {
+    ...(filters.search ? { search: filters.search } : {}),
+    ...(filters.riskLevel !== "all" ? { riskLevel: filters.riskLevel } : {}),
+    ...(filters.treatmentStatus !== "all" ? { treatmentStatus: filters.treatmentStatus } : {}),
+    ...(filters.owner !== "all" ? { owner: filters.owner } : {}),
+  };
+}
+
+function uniqueOptions(values: string[]) {
+  return Array.from(new Set(values))
+    .sort((left, right) => left.localeCompare(right))
+    .map((value) => ({
+      value,
+      label: value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()),
+    }));
 }
 
 function TreatmentsSection({ risks }: { risks: RiskRecord[] }) {
@@ -210,9 +323,15 @@ function TreatmentsSection({ risks }: { risks: RiskRecord[] }) {
     <Panel
       title="Treatment plans"
       description="Mitigate, avoid, transfer, or accept. Overdue items stay visible as text."
-      action={<StatusBadge label="SIMULATED" tone="warning" />}
+      action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
     >
-      <p className="mb-4 text-sm text-[var(--muted)]">{overdue.length} treatments are overdue.</p>
+      <p className="mb-4 text-sm text-[var(--muted)]">
+        Treatment due dates are not stored, so overdue treatments are not counted.
+        {overdue.length > 0 ? ` ${overdue.length} stored records are marked overdue.` : ""}
+      </p>
+      {risks.length === 0 ? (
+        <p className="text-sm text-[var(--muted)]">No treatment records are stored.</p>
+      ) : null}
       <ul className="space-y-3" data-testid="treatments-list">
         {risks.map((item) => (
           <li
@@ -246,7 +365,12 @@ function ExceptionsSection({ risks }: { risks: RiskRecord[] }) {
       description="Time-boxed acceptances with rationale. These are excluded from the open-risk count."
       action={<StatusBadge label={`${risks.length} accepted`} tone="warning" />}
     >
-      <ul className="space-y-3" data-testid="exceptions-list">
+      {risks.length === 0 ? (
+        <p className="text-sm text-[var(--muted)]" data-testid="exceptions-list">
+          No accepted exceptions are stored.
+        </p>
+      ) : null}
+      <ul className="space-y-3">
         {risks.map((item) => (
           <li
             key={item.id}
@@ -275,10 +399,15 @@ function VendorsSection({ risks }: { risks: RiskRecord[] }) {
   return (
     <Panel
       title="Vendor-linked risks"
-      description="Fictional vendors only. No public vendor dossiers are stored here."
-      action={<StatusBadge label="SIMULATED" tone="warning" />}
+      description="Vendor links are shown only when the risk API returns them."
+      action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
     >
-      <ul className="space-y-3" data-testid="vendor-risks-list">
+      {risks.length === 0 ? (
+        <p className="text-sm text-[var(--muted)]" data-testid="vendor-risks-list">
+          No vendor links are stored.
+        </p>
+      ) : null}
+      <ul className="space-y-3">
         {risks.map((item) => (
           <li
             key={item.id}
