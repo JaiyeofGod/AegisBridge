@@ -3,7 +3,7 @@ import type { NavItem } from "@/types/navigation";
 export const primaryNav: NavItem[] = [
   { label: "Overview", to: "/overview", implemented: true },
   { label: "Governance & Compliance", to: "/governance", implemented: true },
-  { label: "Risk Management", to: "/risks", implemented: false },
+  { label: "Risk Management", to: "/risks", implemented: true },
   { label: "Assets", to: "/assets", implemented: false },
   { label: "Vulnerabilities", to: "/vulnerabilities", implemented: false },
   { label: "SOC Operations", to: "/soc", implemented: false },
