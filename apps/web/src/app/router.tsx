@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { ComingSoonPage } from "@/app/ComingSoonPage";
+import { AdministrationPage } from "@/features/administration/AdministrationPage";
 import { AssetDetailPage } from "@/features/assets/AssetDetailPage";
 import { AssetInventoryPage } from "@/features/assets/AssetInventoryPage";
 import { CyberRangePage } from "@/features/cyber-range/CyberRangePage";
@@ -32,7 +33,7 @@ export function AppRouter() {
       <Route path="/threat-intelligence" element={<ThreatIntelPage />} />
       <Route path="/cyber-range" element={<CyberRangePage />} />
       <Route path="/reports" element={<ReportsPage />} />
-      <Route path="/administration" element={<ComingSoonPage title="Administration" />} />
+      <Route path="/administration" element={<AdministrationPage />} />
       <Route path="/account/profile" element={<ComingSoonPage title="My Profile" />} />
       <Route path="/account/security" element={<ComingSoonPage title="Account Security" />} />
       <Route path="/account/preferences" element={<ComingSoonPage title="Preferences" />} />

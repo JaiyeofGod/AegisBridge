@@ -5,11 +5,13 @@ import { Sidebar } from "@/components/navigation/Sidebar";
 import { renderWithProviders } from "@/test/render";
 
 describe("Sidebar", () => {
-  it("marks unimplemented modules without navigation", () => {
+  it("links every primary module, including administration", () => {
     renderWithProviders(<Sidebar />);
-    expect(screen.getByText("Governance & Compliance")).toBeInTheDocument();
-    expect(screen.getAllByText("Soon").length).toBeGreaterThan(0);
-    const overview = screen.getByRole("link", { name: "Overview" });
-    expect(overview).toHaveAttribute("href", "/overview");
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("href", "/overview");
+    expect(screen.getByRole("link", { name: "Administration" })).toHaveAttribute(
+      "href",
+      "/administration",
+    );
+    expect(screen.queryByText("Soon")).not.toBeInTheDocument();
   });
 });
