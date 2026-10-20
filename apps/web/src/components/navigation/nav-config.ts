@@ -10,6 +10,6 @@ export const primaryNav: NavItem[] = [
   { label: "Incidents", to: "/incidents", implemented: true },
   { label: "Threat Intelligence", to: "/threat-intelligence", implemented: true },
   { label: "Cyber Range", to: "/cyber-range", implemented: true },
-  { label: "Reports & Analytics", to: "/reports", implemented: false },
+  { label: "Reports & Analytics", to: "/reports", implemented: true },
   { label: "Administration", to: "/administration", implemented: false },
 ];

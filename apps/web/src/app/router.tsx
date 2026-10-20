@@ -7,6 +7,7 @@ import { CyberRangePage } from "@/features/cyber-range/CyberRangePage";
 import { GovernancePage } from "@/features/governance/GovernancePage";
 import { IncidentPage } from "@/features/incidents/IncidentPage";
 import { OverviewPage } from "@/features/overview/OverviewPage";
+import { ReportsPage } from "@/features/reports/ReportsPage";
 import { RiskPage } from "@/features/risk/RiskPage";
 import { SignInPage } from "@/features/signin/SignInPage";
 import { SocPage } from "@/features/soc/SocPage";
@@ -30,7 +31,7 @@ export function AppRouter() {
       <Route path="/incidents" element={<IncidentPage />} />
       <Route path="/threat-intelligence" element={<ThreatIntelPage />} />
       <Route path="/cyber-range" element={<CyberRangePage />} />
-      <Route path="/reports" element={<ComingSoonPage title="Reports & Analytics" />} />
+      <Route path="/reports" element={<ReportsPage />} />
       <Route path="/administration" element={<ComingSoonPage title="Administration" />} />
       <Route path="/account/profile" element={<ComingSoonPage title="My Profile" />} />
       <Route path="/account/security" element={<ComingSoonPage title="Account Security" />} />
