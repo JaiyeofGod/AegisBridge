@@ -122,11 +122,13 @@ cd apps/web
 pnpm dev
 ```
 
-The web app still reads local mock data. It is not connected to the domain schema.
+The web app still reads local mock data. It is not connected to the API.
 
-**Not yet created:** authentication, external integrations, background jobs, Celery worker, CI workflows.
+Read-only domain routes are documented in `docs/api/API_CONTRACTS.md`. They require the migration and development seed above.
 
-Next step when authorized: authentication. Do not point the frontend at these tables until that work is requested.
+**Not yet created:** authentication, write endpoints, external integrations, background jobs, Celery worker, CI workflows.
+
+Next step when authorized: authentication. Do not point the frontend at these routes until that work is requested.
 
 ## Security reminders
 

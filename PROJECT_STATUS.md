@@ -1,7 +1,7 @@
 # AegisBridge Project Status
 
 **Last updated:** October 20, 2026  
-**Current phase:** Phase 2 — domain schema foundation  
+**Current phase:** Phase 2 — read-only API contracts  
 **Next:** Authentication, when authorized. Frontend remains on local mocks.
 
 ---
@@ -16,7 +16,9 @@
 | Minimal Phase 0 docs | Complete |
 | Application code | API domain schema + web UI on local mocks |
 | Domain schema | `20261020_0002` tables, constraints, and development seed |
+| Read API | `/api/v1` overview, assets, risks, vulnerabilities, alerts, incidents, governance |
 | Authentication | Not started |
+| Write API | Not started |
 | Frontend API connection | Not started |
 | Package installs | API via uv; web via pnpm (`apps/web`) |
 | Cyber range | Not started |
