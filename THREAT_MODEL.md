@@ -1,0 +1,110 @@
+# AegisBridge Threat Model
+
+**Document version:** 1.0  
+**Date:** October 20, 2026  
+**Status:** Phase 0 baseline (living document)  
+**Method aid:** STRIDE where helpful  
+**Authority:** `MASTER_REQUIREMENTS.md` §108
+
+---
+
+## 1. Scope
+
+In scope: AegisBridge web UI, API, workers, PostgreSQL, object storage, CI/CD, hosted Render deployment, outbound lab bridge, and integrations with public intelligence APIs.
+
+Out of scope for this document’s deep detail: full cyber-range host hardening (tracked in lab docs later), but lab exposure to the internet is explicitly in scope as a critical risk.
+
+---
+
+## 2. Assets
+
+| Asset | Sensitivity |
+|---|---|
+| User credentials and sessions | High |
+| RBAC configuration | High |
+| Evidence objects and hashes | High |
+| Integration credentials (R2, NVD, lab bridge) | Critical |
+| Vulnerability / risk / incident records | Medium–High |
+| Synthetic demo data | Low (still integrity-sensitive) |
+| Audit log integrity | High |
+| Build pipeline and lockfiles | High |
+
+---
+
+## 3. Trust Boundaries
+
+```text
+Public browser  <->  Frontend (static)
+Frontend        <->  API (REST/JSON)
+API             <->  PostgreSQL
+API / worker    <->  Object storage (SeaweedFS S3 local / R2 hosted)
+Worker          <->  External intelligence APIs
+Lab bridge      <->  Hosted API (/api/v1/lab-sync)
+Lab bridge      <->  Local Wazuh API
+```
+
+---
+
+## 4. Actors
+
+| Actor | Intent |
+|---|---|
+| Anonymous internet user | Probe demo / attack hosted surface |
+| Authenticated user (any role) | Legitimate use; possible privilege abuse |
+| Malicious insider / stolen session | Escalate, exfiltrate evidence |
+| Compromised dependency / CI | Supply-chain implant |
+| Lab attacker (ATTACK zone) | Should not reach MGMT/Wazuh admin by default |
+| External intel source | Availability/integrity issues; poisoned data |
+
+---
+
+## 5. STRIDE Summary
+
+| Boundary | Spoofing | Tampering | Repudiation | Info disclosure | DoS | Elevation |
+|---|---|---|---|---|---|---|
+| Browser ↔ Frontend | XSS / fake UI | Client-only checks | Weak client logs | Sensitive data in JS bundles | Resource abuse | N/A (client) |
+| Frontend ↔ API | Session theft, CSRF | Request tampering | Missing audit | Verbose errors, IDOR | Auth flooding | Broken RBAC |
+| API ↔ DB | Stolen DB creds | SQL injection / mass assignment | Missing audit | Over-fetch | Query bombs | Role table abuse |
+| API/worker ↔ R2 | Stolen keys | Object overwrite | Weak object audit | Public bucket misconfig | Large uploads | Presign misuse |
+| Worker ↔ intel | Fake sources | Poisoned CVE/IOC data | — | Key leakage in logs | Rate-limit exhaustion | — |
+| Lab bridge ↔ API | Replay / stolen token | Mutated sync payloads | Weak sync audit | Raw log leakage | Sync floods | Over-privileged sync |
+| Lab bridge ↔ Wazuh | Stolen Wazuh JWT | Rule/config abuse | — | Full event exfil | API abuse | Admin API exposure |
+
+---
+
+## 6. Priority Threats and Mitigations
+
+| ID | Threat | Mitigation |
+|---|---|---|
+| T-01 | Credential theft / session hijack | Argon2id, HTTP-only Secure cookies, short sessions, HTTPS, rate limits |
+| T-02 | Broken access control / IDOR | Server RBAC on every sensitive route; authz tests |
+| T-03 | Injection | Pydantic validation, ORM parameterization |
+| T-04 | Malicious uploads | Type/size checks, hashing, object-store isolation, later scanning |
+| T-05 | SSRF via integrations | Allowlisted endpoints, no user-controlled raw URLs to internal nets |
+| T-06 | Secret leakage | `.env` gitignore, Gitleaks, no secrets in images/logs |
+| T-07 | CSRF | SameSite + CSRF tokens for cookie sessions |
+| T-08 | XSS | React defaults, CSP later, sanitize rich text if introduced |
+| T-09 | Dependency compromise | Lockfiles, Trivy/OSV, SBOM, minimize deps |
+| T-10 | Poisoned intelligence | Schema validation, provenance, human review for critical decisions |
+| T-11 | Replayed lab-sync | Timestamp + replay resistance + dedicated credential + TLS |
+| T-12 | Audit tampering | Append-oriented events; restrict DB roles later |
+| T-13 | Object-storage ACL mistakes | Private buckets, presigned URLs, least-privilege keys |
+| T-14 | Exposing home lab publicly | Outbound-only bridge; no public Wazuh/RDP/SSH |
+| T-15 | Demo auth bypass | No production bypass; Demo Mode rules for synthetic data |
+
+---
+
+## 7. Assumptions
+
+- Mac developer machine is trusted relative to production
+- Lenovo lab network is private
+- Render and Cloudflare provide baseline platform controls
+- Public demo uses only synthetic data
+
+---
+
+## 8. Open Threat-Model Work
+
+- Deep-dive data-flow diagrams for evidence download and lab-sync (Phase 2 / Phase 15)
+- Formal abuse cases per role after RBAC lands
+- Update after first Render staging deploy

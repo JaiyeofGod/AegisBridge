@@ -1,0 +1,80 @@
+# AegisBridge local data plane (Phase 1)
+# Host-run React/FastAPI connect via localhost. No application services here.
+# Local object storage: SeaweedFS S3-compatible weed mini (production remains Cloudflare R2).
+
+name: aegisbridge
+
+services:
+  postgres:
+    image: postgres:18
+    container_name: aegis-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aegis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aegis}
+      POSTGRES_DB: ${POSTGRES_DB:-aegis}
+    ports:
+      # Local host development only (Mac host-run API)
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # Postgres 18 image persists under /var/lib/postgresql (PGDATA defaults to .../18/docker)
+      - aegis_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-aegis} -d ${POSTGRES_DB:-aegis}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  valkey:
+    image: valkey/valkey:8
+    container_name: aegis-valkey
+    restart: unless-stopped
+    command: ["valkey-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - aegis_valkey_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  # SeaweedFS single-node S3 (weed mini). Default image CMD is mini -dir=/data.
+  # AWS_* + S3_BUCKET seed credentials and create the dev bucket on start.
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.48
+    container_name: aegis-seaweedfs
+    restart: unless-stopped
+    command: ["mini", "-dir=/data", "-s3.port=8333"]
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-aegislocal}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-aegislocalchangeme}
+      S3_BUCKET: ${S3_BUCKET:-aegis-dev-evidence}
+    ports:
+      # S3-compatible API only (bound to loopback on the Mac host)
+      - "127.0.0.1:8333:8333"
+    volumes:
+      - aegis_seaweedfs_data:/data
+    healthcheck:
+      # Master UI is internal to weed mini; confirms the mini stack is up.
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q --spider http://127.0.0.1:9333/cluster/status || wget -q --spider http://127.0.0.1:9333/ || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  aegis_postgres_data:
+  aegis_valkey_data:
+  aegis_seaweedfs_data:

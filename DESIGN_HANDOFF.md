@@ -144,7 +144,7 @@ not an existing backend API contract.
 
 | Screen | Proposed route |
 |---|---|
-| Welcome / Sign-in | `/sign-in` |
+| Welcome / Sign-in | `/signin` |
 | Overview | `/overview` |
 | Governance & Compliance | `/governance` |
 | Risk Management | `/risks` |
@@ -160,7 +160,7 @@ not an existing backend API contract.
 | My Profile | `/account/profile` |
 | Account Security | `/account/security` |
 | Preferences | `/account/preferences` |
-| Workspace | `/workspace` |
+| Workspace | `/account/workspace` |
 
 Preserve these navigation behaviors:
 

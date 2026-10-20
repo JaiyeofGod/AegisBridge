@@ -1,0 +1,106 @@
+# AegisBridge
+
+Enterprise cybersecurity operations and GRC platform with a separate, isolated cyber range.
+
+This repository is in **Phase 1 — Repository Bootstrap**. Application scaffolding and package installs are not complete yet.
+
+## Authority
+
+| Document | Role |
+|---|---|
+| `MASTER_REQUIREMENTS.md` | Product, architecture, security, phases |
+| `DESIGN_HANDOFF.md` | Frontend visual and routing guidance |
+| `ARCHITECTURE.md` and other Phase 0 docs | Implementation architecture baseline |
+| `PHASE_1_IMPLEMENTATION_PLAN.md` | Phase 1 bootstrap plan |
+| `docs/decisions/` | Architecture Decision Records |
+
+## Local development topology (approved)
+
+```text
+Mac (primary development machine)
+  ├── Cursor IDE, Git, React (Vite), FastAPI (host processes)
+  └── Docker Compose → PostgreSQL 18, Redis/Valkey, SeaweedFS (S3)
+
+Lenovo (later)
+  └── Cyber range VMs (Wazuh, Windows, Linux, gateway/Suricata, Kali)
+```
+
+- **Mac** is the primary coding workstation.
+- During early development, **React** and **FastAPI** run **on the Mac host** for hot reload.
+- **PostgreSQL**, **Redis/Valkey**, and **SeaweedFS** (`weed mini` S3 mode) run through **Docker Compose** (`compose.yaml`).
+- Production object storage remains **Cloudflare R2**. The API must use an **S3-compatible** storage abstraction (not SeaweedFS-specific APIs).
+- Apps stay container-ready for later full Docker / Render deployment.
+- The **Lenovo** hosts the heavier cyber range later; it is not required for Phase 1 bootstrap.
+
+## Local infrastructure (Docker Compose)
+
+Requires Docker Desktop (or equivalent) and a local `.env` copied from `.env.example`.
+
+```bash
+# Validate configuration
+docker compose config
+
+# Start data-plane services (Postgres, Valkey, SeaweedFS)
+docker compose up -d
+
+# Status / logs
+docker compose ps
+docker compose logs -f
+
+# Stop (keeps named volumes)
+docker compose stop
+
+# Stop and remove containers (keeps named volumes)
+docker compose down
+
+# Stop and remove containers + named volumes (destructive to local data)
+docker compose down -v
+```
+
+Published only on loopback for local Mac host access:
+
+| Service | Ports |
+|---|---|
+| PostgreSQL 18 | `127.0.0.1:5432` |
+| Valkey | `127.0.0.1:6379` |
+| SeaweedFS S3 API | `127.0.0.1:8333` |
+
+SeaweedFS image: `chrislusf/seaweedfs:4.48` (`weed mini`, creates `S3_BUCKET` from env).
+
+## Tooling baselines
+
+| Concern | Choice |
+|---|---|
+| Frontend package manager | pnpm |
+| Python environments / locks | uv |
+| Python types | Pyright |
+| Frontend format | Prettier |
+| Python lint/format | Ruff |
+| Node | 24 LTS |
+| Python | 3.14.x |
+| PostgreSQL | 18 |
+| Local object storage | SeaweedFS 4.48 (S3) |
+| Hosted object storage | Cloudflare R2 |
+
+See `VERSIONS.md` and ADRs in `docs/decisions/`.
+
+## Environment variables
+
+1. Copy `.env.example` to `.env`.
+2. Replace placeholder values locally (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, etc.).
+3. Never commit `.env` or real secrets (API keys, passwords, session secrets, lab credentials).
+
+## Current status
+
+Root hygiene and local Compose infrastructure are in place (Postgres, Valkey, SeaweedFS).
+
+**Not yet created:** React app, FastAPI app, package installs, CI workflows.
+
+Next Phase 1 steps (when authorized): API/web/worker skeletons, Alembic, health checks, and CI.
+
+## Security reminders
+
+- Do not fabricate evidence, SIEM alerts, or vulnerability scan results.
+- Label synthetic / demo data clearly.
+- Do not expose lab management ports to the public internet.
+- Prefer outbound lab-bridge sync when the lab is connected later.

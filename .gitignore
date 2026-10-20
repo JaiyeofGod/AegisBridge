@@ -1,0 +1,73 @@
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# Node / frontend
+node_modules/
+.pnpm-store/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# uv / Python tooling
+.python-version
+uv.lock.bak
+
+# Local data, evidence, and research artifacts
+data/raw/
+data/cache/
+data/evidence/private/
+*.pcap
+*.pcapng
+*.evtx
+*.memory
+*.dmp
+
+# Virtualization and lab disks (never commit)
+*.vmdk
+*.vdi
+*.qcow2
+*.ova
+*.ovf
+*.iso
+
+# Docker / Compose persistent volumes (local)
+docker-data/
+.seaweedfs/
+postgres-data/
+redis-data/
+
+# IDE and OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Cursor / agent local caches (if present)
+.cursor/cache/
+
+# Logs and temp
+*.log
+tmp/
+temp/
+.cache/
