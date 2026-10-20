@@ -1,16 +1,27 @@
 import { vi } from "vitest";
 
 import type {
+  AccessReviewListItem,
+  AdministrationSummary,
+  AdminRoleListItem,
+  AdminUserListItem,
+  AdvisoryListItem,
   AlertDetailResponse,
   AlertListItem,
   AssetDetailResponse,
   AssetListItem,
+  AuditEventListItem,
+  GovernanceSummary,
   IncidentDetailResponse,
   IncidentListItem,
+  IndicatorDetailResponse,
+  IndicatorListItem,
+  IntegrationListItem,
   OverviewResponse,
   RiskDetailResponse,
   RiskListItem,
-  GovernanceSummary,
+  ThreatIntelSummary,
+  ThreatSourceItem,
   VulnerabilityDetailResponse,
   VulnerabilityListItem,
 } from "@/services/api-types";
@@ -429,6 +440,359 @@ export const emptyGovernanceSummary: GovernanceSummary = {
   access_reviews: [],
 };
 
+const internalSource = {
+  id: "SRC-0006",
+  name: "Internal simulated set",
+  connection_status: "reference_only",
+};
+
+export const threatIntelSummary: ThreatIntelSummary = {
+  active_indicator_count: 2,
+  internal_match_count: 1,
+  advisory_count: 1,
+  source_health: { reference_only: 2, not_connected: 4 },
+  data_origin: "simulated",
+  semantics:
+    "Counts are stored development records. reference_only and not_connected mean the named feed is not connected. Reserved example addresses are simulated indicators, not live threat intelligence.",
+};
+
+export const emptyThreatIntelSummary: ThreatIntelSummary = {
+  active_indicator_count: 0,
+  internal_match_count: 0,
+  advisory_count: 0,
+  source_health: {},
+  data_origin: "simulated",
+  semantics: "No threat-intelligence rows are stored.",
+};
+
+export const indicatorItems: IndicatorListItem[] = [
+  {
+    id: "IOC-0001",
+    indicator_type: "ip",
+    value: "203.0.113.50",
+    confidence: "low",
+    severity: "low",
+    source: internalSource,
+    first_seen: "2026-10-19T21:12:00Z",
+    last_seen: "2026-10-19T21:12:00Z",
+    status: "active",
+    internal_match: false,
+    attack_technique_id: null,
+    matched_asset_id: null,
+  },
+  {
+    id: "IOC-0002",
+    indicator_type: "domain",
+    value: "dev-watch.example",
+    confidence: "medium",
+    severity: "medium",
+    source: internalSource,
+    first_seen: "2026-10-19T21:12:00Z",
+    last_seen: "2026-10-19T21:12:00Z",
+    status: "active",
+    internal_match: true,
+    attack_technique_id: "T1059.001",
+    matched_asset_id: "AST-0007",
+  },
+  {
+    id: "IOC-0003",
+    indicator_type: "file_hash",
+    value: "83819ede6bb30a3d75f82ffea90ccb8e3e9603347985f706c55cac517ae5f69a",
+    confidence: "low",
+    severity: null,
+    source: internalSource,
+    first_seen: "2026-10-19T21:12:00Z",
+    last_seen: "2026-10-19T21:12:00Z",
+    status: "expired",
+    internal_match: false,
+    attack_technique_id: null,
+    matched_asset_id: null,
+  },
+];
+
+export function indicatorDetail(id: string): IndicatorDetailResponse {
+  const row = indicatorItems.find((item) => item.id === id) ?? indicatorItems[0];
+  return {
+    ...row,
+    summary:
+      row.id === "IOC-0002"
+        ? "Stored simulated internal-match label for AST-0007 and ATT&CK T1059.001. Not a live correlation and not a confirmed compromise."
+        : "Simulated development indicator. External feeds were not queried.",
+    attack:
+      row.id === "IOC-0002"
+        ? { technique_id: "T1059.001", name: "PowerShell", tactic: "Execution" }
+        : null,
+    matched_asset:
+      row.id === "IOC-0002"
+        ? {
+            id: "AST-0007",
+            title: "FIN-APP-01",
+            status: null,
+            summary: "Simulated internal-match label. Not a confirmed compromise.",
+          }
+        : null,
+    data_origin: "simulated",
+  };
+}
+
+export function filteredIndicators(url: string) {
+  const params = new URL(url, "http://localhost").searchParams;
+  let items = indicatorItems;
+  const type = params.get("indicator_type");
+  const status = params.get("status");
+  const source = params.get("source");
+  const search = params.get("search")?.toLowerCase();
+  const match = params.get("internal_match");
+  if (type) items = items.filter((item) => item.indicator_type === type);
+  if (status) items = items.filter((item) => item.status === status);
+  if (source) {
+    const token = source.toLowerCase();
+    items = items.filter(
+      (item) => item.source.id.toLowerCase() === token || item.source.name.toLowerCase() === token,
+    );
+  }
+  if (search) {
+    items = items.filter(
+      (item) => item.value.toLowerCase().includes(search) || item.id.toLowerCase().includes(search),
+    );
+  }
+  if (match === "true") items = items.filter((item) => item.internal_match);
+  if (match === "false") items = items.filter((item) => !item.internal_match);
+  return assetPage(items);
+}
+
+export const advisoryItems: AdvisoryListItem[] = [
+  {
+    id: "ADV-0001",
+    title: "Simulated development advisory",
+    summary:
+      "Stored metadata naming CVE-2024-21887. NVD was not queried and this is not a live advisory.",
+    status: "reference",
+    confidence: "low",
+    related_cve: "CVE-2024-21887",
+    published_at: "2026-10-19T21:12:00Z",
+    source: internalSource,
+  },
+];
+
+export const threatSources: ThreatSourceItem[] = [
+  {
+    id: "SRC-0001",
+    name: "CISA KEV",
+    provider: "cisa",
+    purpose: "Known exploited vulnerabilities catalog name.",
+    connection_status: "reference_only",
+    notes: "Catalog name only. The KEV feed is not connected.",
+  },
+  {
+    id: "SRC-0002",
+    name: "NVD",
+    provider: "nvd",
+    purpose: "National Vulnerability Database catalog name.",
+    connection_status: "not_connected",
+    notes: "Catalog name only. The NVD feed is not connected.",
+  },
+  {
+    id: "SRC-0003",
+    name: "EPSS",
+    provider: "first",
+    purpose: "Exploit prediction score catalog name.",
+    connection_status: "not_connected",
+    notes: "Catalog name only. The EPSS feed is not connected.",
+  },
+  {
+    id: "SRC-0004",
+    name: "ThreatFox",
+    provider: "abuse.ch",
+    purpose: "Indicator catalog name.",
+    connection_status: "not_connected",
+    notes: "Catalog name only. The ThreatFox feed is not connected.",
+  },
+  {
+    id: "SRC-0005",
+    name: "URLhaus",
+    provider: "abuse.ch",
+    purpose: "Malicious URL catalog name.",
+    connection_status: "not_connected",
+    notes: "Catalog name only. The URLhaus feed is not connected.",
+  },
+  {
+    id: "SRC-0006",
+    name: "Internal simulated set",
+    provider: "internal",
+    purpose: "Development indicators stored in PostgreSQL.",
+    connection_status: "reference_only",
+    notes: "Development indicators stored in PostgreSQL. Not a live feed.",
+  },
+];
+
+export const administrationSummary: AdministrationSummary = {
+  configured_integration_count: 0,
+  integration_status: { not_configured: 1, reference_only: 1 },
+  integration_freshness: { not_connected: 2 },
+  active_user_count: 5,
+  privileged_user_count: 2,
+  recent_audit_event_count: 2,
+  pending_access_review_count: 1,
+  privileged_roles: ["Administrator", "Security Engineer"],
+  semantics:
+    "Privileged users are those assigned Administrator or Security Engineer. configured counts only integrations whose stored status is configured. not_connected freshness means the connector is absent. Credentials are not stored.",
+};
+
+export const emptyAdministrationSummary: AdministrationSummary = {
+  configured_integration_count: 0,
+  integration_status: {},
+  integration_freshness: {},
+  active_user_count: 0,
+  privileged_user_count: 0,
+  recent_audit_event_count: 0,
+  pending_access_review_count: 0,
+  privileged_roles: [],
+  semantics: "No administration rows are stored. Credentials are not stored.",
+};
+
+export const integrationItems: IntegrationListItem[] = [
+  {
+    id: "INT-0001",
+    name: "Wazuh",
+    provider: "siem",
+    status: "not_configured",
+    freshness: "not_connected",
+    last_sync_at: null,
+    last_success_at: null,
+    credential_state: "No credentials stored",
+    notes: "Wazuh remains the system of record. This row is a catalog reference.",
+  },
+  {
+    id: "INT-0002",
+    name: "Example identity provider",
+    provider: "identity",
+    status: "reference_only",
+    freshness: "not_connected",
+    last_sync_at: null,
+    last_success_at: null,
+    credential_state: "No credentials stored",
+    notes:
+      "Catalog reference only. The identity provider is not connected and no credentials are stored.",
+  },
+];
+
+export const adminUsers: AdminUserListItem[] = [
+  {
+    id: "USR-0001",
+    display_name: "Amara Okonkwo",
+    email: "amara.okonkwo@aegisbridge.example",
+    status: "active",
+    department: "Security",
+    roles: ["Administrator"],
+    privileged: true,
+  },
+  {
+    id: "USR-0002",
+    display_name: "Nia Okeke",
+    email: "nia.okeke@aegisbridge.example",
+    status: "active",
+    department: "Security",
+    roles: ["Security Engineer"],
+    privileged: true,
+  },
+  {
+    id: "USR-0004",
+    display_name: "Jonah Hale",
+    email: "jonah.hale@aegisbridge.example",
+    status: "active",
+    department: "Security",
+    roles: ["SOC Analyst"],
+    privileged: false,
+  },
+];
+
+export const adminRoles: AdminRoleListItem[] = [
+  {
+    id: "Administrator",
+    name: "Administrator",
+    summary: "Platform configuration, users, roles, and integrations.",
+    permissions: ["integration.manage", "user.role.manage"],
+  },
+  {
+    id: "Auditor",
+    name: "Auditor",
+    summary: "Reads evidence and audit history.",
+    permissions: ["evidence.download"],
+  },
+  {
+    id: "CISO",
+    name: "CISO",
+    summary: "Reads executive posture, risks, and major incidents.",
+    permissions: [],
+  },
+  {
+    id: "GRC Analyst",
+    name: "GRC Analyst",
+    summary: "Works risks, controls, and evidence.",
+    permissions: ["risk.accept", "control.update", "evidence.download"],
+  },
+  {
+    id: "Read Only",
+    name: "Read Only",
+    summary: "Reads records without write labels.",
+    permissions: [],
+  },
+  {
+    id: "SOC Analyst",
+    name: "SOC Analyst",
+    summary: "Triages alerts and incident tasks.",
+    permissions: ["incident.close"],
+  },
+  {
+    id: "Security Engineer",
+    name: "Security Engineer",
+    summary: "Manages detections, integrations, and technical evidence.",
+    permissions: ["detection.manage", "integration.manage"],
+  },
+];
+
+export const auditEvents: AuditEventListItem[] = [
+  {
+    id: "AUD-0002",
+    occurred_at: "2026-10-19T21:13:00Z",
+    actor: { id: "USR-0001", display_name: "Amara Okonkwo" },
+    actor_label: "USR-0001",
+    action: "Recorded Security Engineer catalog role",
+    object_type: "role",
+    object_id: "Security Engineer",
+    result: "simulated",
+    source: "seed",
+    environment_name: "local",
+    detail: "Role catalog alignment with master requirements. No secret material.",
+  },
+  {
+    id: "AUD-0001",
+    occurred_at: "2026-10-19T21:12:00Z",
+    actor: { id: "USR-0001", display_name: "Amara Okonkwo" },
+    actor_label: "USR-0001",
+    action: "Recorded development seed",
+    object_type: "organization",
+    object_id: "aegisbridge-technologies",
+    result: "simulated",
+    source: "seed",
+    environment_name: "local",
+    detail: "Synthetic development records. No secret material.",
+  },
+];
+
+export const accessReviewItems: AccessReviewListItem[] = [
+  {
+    id: "ARV-0001",
+    name: "October access review",
+    status: "in_progress",
+    owner: null,
+    open_finding_count: 1,
+    total_finding_count: 1,
+    due_at: null,
+  },
+];
+
 export function installApiFetch(resolve?: (url: string) => unknown) {
   const calls: string[] = [];
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -467,6 +831,34 @@ export function installApiFetch(resolve?: (url: string) => unknown) {
     }
     if (/\/api\/v1\/incidents\/[^?]+/.test(url)) return jsonResponse(incidentDetail);
     if (url.includes("/api/v1/governance/summary")) return jsonResponse(governanceSummary);
+    if (/\/api\/v1\/threat-intelligence\/indicators\/[^/?]+/.test(url)) {
+      const id = url.split("/indicators/")[1]?.split("?")[0] ?? "";
+      return jsonResponse(indicatorDetail(decodeURIComponent(id)));
+    }
+    if (url.includes("/api/v1/threat-intelligence/summary")) {
+      return jsonResponse(threatIntelSummary);
+    }
+    if (url.includes("/api/v1/threat-intelligence/indicators")) {
+      return jsonResponse(filteredIndicators(url));
+    }
+    if (url.includes("/api/v1/threat-intelligence/advisories")) {
+      return jsonResponse(assetPage(advisoryItems));
+    }
+    if (url.includes("/api/v1/threat-intelligence/sources")) {
+      return jsonResponse(assetPage(threatSources));
+    }
+    if (url.includes("/api/v1/administration/summary")) return jsonResponse(administrationSummary);
+    if (url.includes("/api/v1/administration/integrations")) {
+      return jsonResponse(assetPage(integrationItems));
+    }
+    if (url.includes("/api/v1/administration/users")) return jsonResponse(assetPage(adminUsers));
+    if (url.includes("/api/v1/administration/roles")) return jsonResponse(assetPage(adminRoles));
+    if (url.includes("/api/v1/administration/audit-events")) {
+      return jsonResponse(assetPage(auditEvents));
+    }
+    if (url.includes("/api/v1/administration/access-reviews")) {
+      return jsonResponse(assetPage(accessReviewItems));
+    }
     if (url.includes("/api/v1/incidents")) {
       if (url.includes("containment_state=")) return jsonResponse(assetPage([]));
       if (url.includes("severity=medium") || url.includes("owner=Jonah")) {

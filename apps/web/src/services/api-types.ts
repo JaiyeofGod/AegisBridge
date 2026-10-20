@@ -323,3 +323,141 @@ export type GovernanceSummary = {
   policies: PolicyStatusItem[];
   access_reviews: AccessReviewStatusItem[];
 };
+
+export type ThreatSourceRef = {
+  id: string;
+  name: string;
+  connection_status: string;
+};
+
+export type AttackRef = {
+  technique_id: string;
+  name: string;
+  tactic: string;
+};
+
+export type ThreatIntelSummary = {
+  active_indicator_count: number;
+  internal_match_count: number;
+  advisory_count: number;
+  source_health: Record<string, number>;
+  data_origin: string;
+  semantics: string;
+};
+
+export type IndicatorListItem = {
+  id: string;
+  indicator_type: string;
+  value: string;
+  confidence: string;
+  severity: string | null;
+  source: ThreatSourceRef;
+  first_seen: string;
+  last_seen: string;
+  status: string;
+  internal_match: boolean;
+  attack_technique_id: string | null;
+  matched_asset_id: string | null;
+};
+
+export type IndicatorDetailResponse = IndicatorListItem & {
+  summary: string;
+  attack: AttackRef | null;
+  matched_asset: RelatedRecord | null;
+  data_origin: string;
+};
+
+export type IndicatorQuery = {
+  search?: string;
+  indicatorType?: string;
+  source?: string;
+  status?: string;
+  internalMatch?: boolean;
+  page?: number;
+  pageSize?: number;
+};
+
+export type AdvisoryListItem = {
+  id: string;
+  title: string;
+  summary: string;
+  status: string;
+  confidence: string | null;
+  related_cve: string | null;
+  published_at: string | null;
+  source: ThreatSourceRef;
+};
+
+export type ThreatSourceItem = {
+  id: string;
+  name: string;
+  provider: string;
+  purpose: string;
+  connection_status: string;
+  notes: string | null;
+};
+
+export type AdministrationSummary = {
+  configured_integration_count: number;
+  integration_status: Record<string, number>;
+  integration_freshness: Record<string, number>;
+  active_user_count: number;
+  privileged_user_count: number;
+  recent_audit_event_count: number;
+  pending_access_review_count: number;
+  privileged_roles: string[];
+  semantics: string;
+};
+
+export type IntegrationListItem = {
+  id: string;
+  name: string;
+  provider: string;
+  status: string;
+  freshness: string | null;
+  last_sync_at: string | null;
+  last_success_at: string | null;
+  credential_state: string;
+  notes: string | null;
+};
+
+export type AdminUserListItem = {
+  id: string;
+  display_name: string;
+  email: string;
+  status: string;
+  department: string | null;
+  roles: string[];
+  privileged: boolean;
+};
+
+export type AdminRoleListItem = {
+  id: string;
+  name: string;
+  summary: string;
+  permissions: string[];
+};
+
+export type AuditEventListItem = {
+  id: string;
+  occurred_at: string;
+  actor: PersonRef | null;
+  actor_label: string;
+  action: string;
+  object_type: string;
+  object_id: string;
+  result: string;
+  source: string;
+  environment_name: string;
+  detail: string | null;
+};
+
+export type AccessReviewListItem = {
+  id: string;
+  name: string;
+  status: string;
+  owner: PersonRef | null;
+  open_finding_count: number;
+  total_finding_count: number;
+  due_at: string | null;
+};

@@ -1,18 +1,43 @@
-import { useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { Button } from "@/components/buttons/Button";
 import { Panel } from "@/components/cards/Panel";
 import { SummaryMetric } from "@/components/cards/SummaryMetric";
+import { ErrorState } from "@/components/feedback/ErrorState";
+import { LoadingState } from "@/components/feedback/LoadingState";
 import { SimulatedDataBanner } from "@/components/feedback/SimulatedDataBanner";
 import { AppShell } from "@/components/navigation/AppShell";
 import { PageContainer } from "@/components/navigation/PageContainer";
 import { PageHeader } from "@/components/navigation/PageHeader";
 import { StatusBadge } from "@/components/status/StatusBadge";
-import { ThreatIndicatorTable } from "@/features/threat-intel/ThreatIndicatorTable";
-import { useThreatIntelData } from "@/features/threat-intel/useThreatIntelData";
+import { StaleDataIndicator } from "@/components/status/StaleDataIndicator";
+import { SEEDED_DATA_LABEL, SEEDED_DATA_NOTE } from "@/features/data-origin";
+import {
+  mapAdvisory,
+  mapIndicator,
+  mapIndicatorDetail,
+  mapThreatIntelSummary,
+  mapThreatSource,
+  type IndicatorDetailView,
+  type IndicatorView,
+} from "@/features/threat-intel/mapThreatIntel";
+import {
+  ThreatIndicatorTable,
+  type IndicatorTableFilters,
+} from "@/features/threat-intel/ThreatIndicatorTable";
+import {
+  useAdvisories,
+  useIndicatorCatalog,
+  useIndicatorDetail,
+  useIndicatorList,
+  useThreatIntelSummary,
+  useThreatSources,
+} from "@/features/threat-intel/useThreatIntelData";
 import { cn } from "@/lib/cn";
-import type { IntelSectionId, ThreatIndicator } from "@/types/threat-intel";
+import { formatTimestamp } from "@/lib/format";
+import type { IndicatorQuery } from "@/services/api-types";
+import type { IntelSectionId } from "@/types/threat-intel";
 
 const sections: { id: IntelSectionId; label: string }[] = [
   { id: "indicators", label: "Indicators" },
@@ -21,15 +46,53 @@ const sections: { id: IntelSectionId; label: string }[] = [
   { id: "sources", label: "Sources" },
 ];
 
+const emptyFilters: IndicatorTableFilters = {
+  search: "",
+  indicatorType: "all",
+  source: "all",
+  status: "all",
+  internalMatch: "all",
+};
+
 export function ThreatIntelPage() {
-  const queue = useThreatIntelData();
+  const summary = useThreatIntelSummary();
+  const catalog = useIndicatorCatalog();
+  const advisories = useAdvisories();
+  const sources = useThreatSources();
   const [section, setSection] = useState<IntelSectionId>("indicators");
-  const [selectedId, setSelectedId] = useState("ioc-401");
+  const [selectedId, setSelectedId] = useState("");
+  const [filters, setFilters] = useState<IndicatorTableFilters>(emptyFilters);
+  const deferredSearch = useDeferredValue(filters.search.trim());
+  const query = useMemo(
+    () => toIndicatorQuery({ ...filters, search: deferredSearch }),
+    [filters, deferredSearch],
+  );
+  const hasServerFilters = Object.keys(query).length > 0;
+  const filtered = useIndicatorList(query, hasServerFilters);
+  const generatedAt = summary.dataUpdatedAt
+    ? new Date(summary.dataUpdatedAt).toISOString()
+    : new Date().toISOString();
+  const sourceItems = hasServerFilters ? (filtered.data?.items ?? []) : (catalog.data?.items ?? []);
+  const listed = sourceItems.map(mapIndicator);
+  const selectedRow = listed.find((item) => item.id === selectedId) ?? listed[0];
+  const detail = useIndicatorDetail(selectedRow?.id ?? "");
   const selected =
-    queue.data.indicators.find((item) => item.id === selectedId) ?? queue.data.indicators[0];
+    detail.data && detail.data.id === selectedRow?.id
+      ? mapIndicatorDetail(detail.data)
+      : selectedRow;
+  const metrics = summary.data ? mapThreatIntelSummary(summary.data) : null;
+  const advisoryItems = advisories.data?.items.map(mapAdvisory) ?? [];
+  const sourceViews = sources.data?.items.map(mapThreatSource) ?? [];
+  const refreshing =
+    summary.isFetching ||
+    catalog.isFetching ||
+    filtered.isFetching ||
+    detail.isFetching ||
+    advisories.isFetching ||
+    sources.isFetching;
 
   return (
-    <AppShell environmentLabel={queue.data.environmentLabel}>
+    <AppShell environmentLabel="Development · Seeded">
       <PageContainer data-testid="threat-intel-page">
         <PageHeader
           title="Threat intelligence"
@@ -44,7 +107,12 @@ export function ThreatIntelPage() {
               >
                 Add indicator
               </Button>
-              <SimulatedDataBanner message={queue.data.snapshotLabel} />
+              <SimulatedDataBanner message={SEEDED_DATA_NOTE} />
+              {summary.dataUpdatedAt ? (
+                <p className="text-xs text-[var(--muted)]" data-testid="last-successful-fetch">
+                  Last successful update: {formatTimestamp(generatedAt)}
+                </p>
+              ) : null}
             </div>
           }
         />
@@ -76,178 +144,281 @@ export function ThreatIntelPage() {
           })}
         </div>
 
-        <div className="space-y-8">
-          {section === "indicators" && selected ? (
-            <>
-              <section aria-labelledby="intel-summary-heading">
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                  <h2
-                    id="intel-summary-heading"
-                    className="font-heading text-xl font-bold text-[var(--text)]"
-                  >
-                    Intelligence snapshot
-                  </h2>
-                  <StatusBadge label="SIMULATED" tone="warning" />
-                </div>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  {queue.data.metrics.map((metric) => (
-                    <SummaryMetric key={metric.id} metric={metric} />
-                  ))}
-                </div>
-                <p className="mt-4 text-xs text-[var(--muted)]">
-                  Confidence and freshness stay separate. There is no aggregate threat or security
-                  score.
-                </p>
-              </section>
+        {summary.isPending ? <LoadingState label="Updating" rows={4} /> : null}
+        {summary.isError ? (
+          <ErrorState
+            title="Threat intelligence data unavailable"
+            description="The development threat-intelligence API did not respond. Retry to load the seeded summary. Fixture rows are not substituted."
+            lastSuccessfulAt={summary.dataUpdatedAt ? generatedAt : undefined}
+            onRetry={() => void summary.refetch()}
+          />
+        ) : null}
+        {catalog.isError ? (
+          <ErrorState
+            title="Indicator list unavailable"
+            description="The indicator request failed. Fixture indicators are not substituted."
+            onRetry={() => void catalog.refetch()}
+          />
+        ) : null}
+        {filtered.isError ? (
+          <ErrorState
+            title="Filtered indicators unavailable"
+            description="The indicator filter request failed. Fixture rows are not added."
+            onRetry={() => void filtered.refetch()}
+          />
+        ) : null}
+        {detail.isError ? (
+          <ErrorState
+            title="Indicator record unavailable"
+            description="The indicator detail request failed. Related records are not invented."
+            onRetry={() => void detail.refetch()}
+          />
+        ) : null}
+        {summary.isSuccess && refreshing ? (
+          <div className="mb-6">
+            <StaleDataIndicator
+              message="Refreshing development threat intelligence"
+              lastSuccessfulAt={generatedAt}
+            />
+          </div>
+        ) : null}
 
-              <Panel
-                title="Indicator workspace"
-                description="Sample indicators from the simulated lab. Reserved example addresses and domains."
-              >
-                <ThreatIndicatorTable
-                  indicators={queue.data.indicators}
-                  selectedId={selectedId}
-                  onSelect={setSelectedId}
-                />
-              </Panel>
+        {summary.isSuccess && metrics ? (
+          <div className="space-y-8">
+            {section === "indicators" && catalog.isPending ? (
+              <LoadingState label="Updating" rows={3} />
+            ) : null}
+            {section === "indicators" && catalog.isSuccess ? (
+              <>
+                <section aria-labelledby="intel-summary-heading">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <h2
+                      id="intel-summary-heading"
+                      className="font-heading text-xl font-bold text-[var(--text)]"
+                    >
+                      Intelligence snapshot
+                    </h2>
+                    <StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    {metrics.metrics.map((metric) => (
+                      <SummaryMetric key={metric.id} metric={metric} />
+                    ))}
+                  </div>
+                  <p className="mt-4 text-xs text-[var(--muted)]">
+                    Confidence and status stay separate. There is no aggregate threat or security
+                    score.
+                  </p>
+                </section>
 
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-stretch">
-                <Panel title="Indicator context" className="h-full">
-                  <IndicatorContext indicator={selected} />
+                <Panel
+                  title="Indicator workspace"
+                  description="Development indicators stored in PostgreSQL. Reserved example addresses and domains."
+                >
+                  <ThreatIndicatorTable
+                    indicators={listed}
+                    total={
+                      hasServerFilters
+                        ? (filtered.data?.total ?? listed.length)
+                        : catalog.data.total
+                    }
+                    selectedId={selected?.id ?? ""}
+                    onSelect={setSelectedId}
+                    filters={filters}
+                    onFiltersChange={setFilters}
+                    sourceOptions={sourceViews.map((item) => ({
+                      value: item.id,
+                      label: `${item.name} (${item.id})`,
+                    }))}
+                    emptyLabel={
+                      hasServerFilters && filtered.isPending
+                        ? "Updating indicator filters."
+                        : hasServerFilters
+                          ? "No indicators match the current filters."
+                          : "No indicators are stored."
+                    }
+                  />
                 </Panel>
-                <Panel title="Workflow & interpretation" className="h-full">
-                  <ul className="space-y-3">
-                    {queue.data.workflowNotes.map((note) => (
+
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-stretch">
+                  <Panel title="Indicator context" className="h-full">
+                    {selected ? (
+                      <IndicatorContext indicator={selected} />
+                    ) : (
+                      <p className="text-sm text-[var(--muted)]">No indicator is selected.</p>
+                    )}
+                  </Panel>
+                  <Panel title="Workflow & interpretation" className="h-full">
+                    <ul className="space-y-3">
+                      {metrics.notes.map((note) => (
+                        <li
+                          key={note}
+                          className="rounded-[var(--radius-control)] bg-[var(--raised)] px-3 py-3 text-sm leading-relaxed text-[var(--muted)]"
+                        >
+                          {note}
+                        </li>
+                      ))}
+                    </ul>
+                  </Panel>
+                </div>
+              </>
+            ) : null}
+
+            {section === "advisories" ? (
+              <Panel
+                title="Advisories"
+                description="Stored advisory metadata. External advisory feeds are not queried."
+                action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
+              >
+                {advisories.isPending ? <LoadingState label="Updating" rows={2} /> : null}
+                {advisories.isError ? (
+                  <ErrorState
+                    title="Advisories unavailable"
+                    description="The advisory request failed. Fixture advisories are not substituted."
+                    onRetry={() => void advisories.refetch()}
+                  />
+                ) : null}
+                {advisories.isSuccess && advisoryItems.length === 0 ? (
+                  <p className="text-sm text-[var(--muted)]">No advisories are stored.</p>
+                ) : null}
+                {advisories.isSuccess && advisoryItems.length > 0 ? (
+                  <ul className="space-y-3" data-testid="intel-advisories">
+                    {advisoryItems.map((item) => (
                       <li
-                        key={note}
-                        className="rounded-[var(--radius-control)] bg-[var(--raised)] px-3 py-3 text-sm leading-relaxed text-[var(--muted)]"
+                        key={item.id}
+                        className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
                       >
-                        {note}
+                        <p className="font-medium text-[var(--text)]">
+                          {item.id} · {item.title}
+                        </p>
+                        <p className="mt-1 text-sm text-[var(--muted)]">
+                          {item.sourceName} · {item.sourceId} · {item.sourceStatus} ·{" "}
+                          {item.confidence} confidence · {item.status}
+                        </p>
+                        <p className="mt-1 text-sm text-[var(--text)]">{item.summary}</p>
+                        <p className="mt-1 text-xs text-[var(--muted)]">
+                          {item.relatedCve} · Published {item.publishedAt}
+                        </p>
                       </li>
                     ))}
                   </ul>
-                </Panel>
-              </div>
-            </>
-          ) : null}
+                ) : null}
+              </Panel>
+            ) : null}
 
-          {section === "advisories" ? (
-            <Panel
-              title="Advisories"
-              description="Catalog and campaign notes for review. Not live feed results."
-              action={<StatusBadge label="SIMULATED" tone="warning" />}
-            >
-              <ul className="space-y-3" data-testid="intel-advisories">
-                {queue.data.advisories.map((item) => (
-                  <li
-                    key={item.id}
-                    className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
-                  >
-                    <p className="font-medium text-[var(--text)]">
-                      {item.advisoryId} · {item.title}
-                    </p>
-                    <p className="mt-1 text-sm text-[var(--muted)]">
-                      {item.intelId} · {item.source} · {item.confidence} confidence ·{" "}
-                      {item.freshness} · {item.status}
-                    </p>
-                    <p className="mt-1 text-sm text-[var(--text)]">{item.analystContext}</p>
-                    <p className="mt-1 text-xs text-[var(--muted)]">
-                      {item.relatedCve ?? "No CVE"} · {item.relatedAsset ?? "No asset"} ·{" "}
-                      {item.relatedRecord ?? "No related record"}
-                      {item.attackMapping ? ` · ${item.attackMapping}` : ""}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
-          ) : null}
+            {section === "enrichment" ? (
+              <Panel
+                title="Enrichment history"
+                description="Enrichment links are not stored on this screen."
+                action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
+              >
+                <p className="text-sm text-[var(--muted)]" data-testid="intel-enrichment">
+                  No enrichment history is stored. Internal matches and ATT&CK mappings stay on the
+                  indicator records.
+                </p>
+              </Panel>
+            ) : null}
 
-          {section === "enrichment" ? (
-            <Panel
-              title="Enrichment history"
-              description="Contextual links only. Vulnerability, incident, detection, and asset modules are not rebuilt here."
-              action={<StatusBadge label="SIMULATED" tone="warning" />}
-            >
-              <ul className="space-y-3" data-testid="intel-enrichment">
-                {queue.data.enrichment.map((item) => (
-                  <li
-                    key={item.id}
-                    className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
-                  >
-                    <p className="font-medium text-[var(--text)]">{item.intelId}</p>
-                    <p className="mt-1 text-sm text-[var(--text)]">{item.summary}</p>
-                    <p className="mt-1 text-sm text-[var(--muted)]">{item.targets}</p>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
-          ) : null}
-
-          {section === "sources" ? (
-            <Panel
-              title="Sources"
-              description="Planned, simulated, and later connections. No live API calls in this phase."
-              action={<StatusBadge label="SIMULATED" tone="warning" />}
-            >
-              <ul className="space-y-3" data-testid="intel-sources">
-                {queue.data.sources.map((item) => (
-                  <li
-                    key={item.id}
-                    className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
-                  >
-                    <p className="font-medium text-[var(--text)]">{item.name}</p>
-                    <p className="mt-1 text-sm text-[var(--muted)]">{item.purpose}</p>
-                    <p className="mt-1 text-sm text-[var(--text)]">
-                      {item.connection} · {item.freshness}
-                    </p>
-                    <p className="mt-1 text-sm text-[var(--muted)]">{item.note}</p>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
-          ) : null}
-        </div>
+            {section === "sources" ? (
+              <Panel
+                title="Sources"
+                description="Stored source catalog. connection_status says whether a feed is connected."
+                action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
+              >
+                {sources.isPending ? <LoadingState label="Updating" rows={2} /> : null}
+                {sources.isError ? (
+                  <ErrorState
+                    title="Threat sources unavailable"
+                    description="The source request failed. Fixture sources are not substituted."
+                    onRetry={() => void sources.refetch()}
+                  />
+                ) : null}
+                {sources.isSuccess && sourceViews.length === 0 ? (
+                  <p className="text-sm text-[var(--muted)]" data-testid="intel-sources">
+                    No source health records are stored.
+                  </p>
+                ) : null}
+                {sources.isSuccess && sourceViews.length > 0 ? (
+                  <ul className="space-y-3" data-testid="intel-sources">
+                    {sourceViews.map((item) => (
+                      <li
+                        key={item.id}
+                        className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
+                      >
+                        <p className="font-medium text-[var(--text)]">
+                          {item.id} · {item.name}
+                        </p>
+                        <p className="mt-1 text-sm text-[var(--muted)]">
+                          {item.provider} · {item.purpose}
+                        </p>
+                        <p className="mt-1 text-sm text-[var(--text)]">
+                          {item.connectionLabel} · {item.connectionStatus}
+                        </p>
+                        <p className="mt-1 text-sm text-[var(--muted)]">{item.notes}</p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </Panel>
+            ) : null}
+          </div>
+        ) : null}
       </PageContainer>
     </AppShell>
   );
 }
 
-function IndicatorContext({ indicator }: { indicator: ThreatIndicator }) {
+function IndicatorContext({ indicator }: { indicator: IndicatorView | IndicatorDetailView }) {
+  const detail = "summary" in indicator ? indicator : null;
   return (
     <div className="space-y-4 text-sm" data-testid="intel-context">
       <div>
         <p className="text-[var(--muted)]">Identity</p>
         <p className="mt-1 text-[var(--text)]">
-          {indicator.indicatorId} · {indicator.intelId} · {indicator.value}
+          {indicator.id} · {indicator.indicatorType} · {indicator.value}
         </p>
       </div>
       <div>
         <p className="text-[var(--muted)]">Data handling</p>
-        <p className="mt-1 text-[var(--text)]">Reserved example addresses and domains.</p>
+        <p className="mt-1 text-[var(--text)]">
+          {detail?.exampleNote ??
+            "Reserved example addresses, example domains, and synthetic hashes are simulated."}
+        </p>
       </div>
       <div>
         <p className="text-[var(--muted)]">Source and confidence</p>
         <p className="mt-1 text-[var(--text)]">
-          {indicator.source} · {indicator.confidence} confidence · {indicator.relevance} relevance
+          {indicator.sourceName} · {indicator.sourceId} · {indicator.sourceStatus} ·{" "}
+          {indicator.confidence} confidence
+          {indicator.severity ? ` · ${indicator.severity} severity` : " · Severity not stored"}
         </p>
       </div>
       <div>
         <p className="text-[var(--muted)]">Validity</p>
         <p className="mt-1 text-[var(--text)]">
-          First seen {indicator.firstSeen}. Last seen {indicator.lastSeen}. {indicator.freshness}.{" "}
-          {indicator.freshnessDetail}.
+          First seen {indicator.firstSeen}. Last seen {indicator.lastSeen}. Status{" "}
+          {indicator.status}.
+        </p>
+      </div>
+      <div>
+        <p className="text-[var(--muted)]">Internal match</p>
+        <p className="mt-1 text-[var(--text)]">
+          {indicator.internalMatch
+            ? "Stored internal match. Not a live correlation and not a confirmed compromise."
+            : "No internal match is stored."}
         </p>
       </div>
       <div>
         <p className="text-[var(--muted)]">Relationships</p>
         <p className="mt-1 text-[var(--text)]">
-          {indicator.relatedCve ?? "No CVE"} · {indicator.relatedAsset ?? "No asset"}
-          {indicator.assetSlug ? (
+          {indicator.matchedAssetId ?? "No asset"}
+          {detail?.matchedAssetTitle ? ` · ${detail.matchedAssetTitle}` : ""}
+          {indicator.matchedAssetId ? (
             <>
               {" "}
               ·{" "}
               <Link
-                to={`/assets/${indicator.assetSlug}`}
+                to={`/assets/${indicator.matchedAssetId}`}
                 className="inline-flex min-h-11 items-center font-semibold text-[var(--accent)]"
               >
                 Open asset
@@ -255,20 +426,34 @@ function IndicatorContext({ indicator }: { indicator: ThreatIndicator }) {
             </>
           ) : null}
           {" · "}
-          {indicator.relatedRecord ?? "No incident or investigation"}
-          {indicator.attackMapping ? ` · ${indicator.attackMapping}` : ""}
+          {indicator.attackTechniqueId
+            ? `${indicator.attackTechniqueId}${detail?.attackName ? ` · ${detail.attackName}` : ""}${detail?.attackTactic ? ` · ${detail.attackTactic}` : ""}`
+            : "No ATT&CK mapping stored"}
         </p>
       </div>
       <div>
-        <p className="text-[var(--muted)]">Analyst context</p>
-        <p className="mt-1 text-[var(--text)]">{indicator.analystContext}</p>
-      </div>
-      <div>
-        <p className="text-[var(--muted)]">Disposition</p>
+        <p className="text-[var(--muted)]">Stored summary</p>
         <p className="mt-1 text-[var(--text)]">
-          {indicator.status}. Validate before blocking or escalation.
+          {detail?.summary ?? "Indicator detail is still loading."}
         </p>
       </div>
+      {detail ? (
+        <div>
+          <p className="text-[var(--muted)]">Data origin</p>
+          <p className="mt-1 text-[var(--text)]">{detail.dataOrigin}</p>
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function toIndicatorQuery(filters: IndicatorTableFilters): IndicatorQuery {
+  const query: IndicatorQuery = {};
+  if (filters.search) query.search = filters.search;
+  if (filters.indicatorType !== "all") query.indicatorType = filters.indicatorType;
+  if (filters.source !== "all") query.source = filters.source;
+  if (filters.status !== "all") query.status = filters.status;
+  if (filters.internalMatch === "true") query.internalMatch = true;
+  if (filters.internalMatch === "false") query.internalMatch = false;
+  return query;
 }

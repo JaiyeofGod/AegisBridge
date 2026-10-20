@@ -1,25 +1,15 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { StatusBadge } from "@/components/status/StatusBadge";
-import type { IntegrationRecord, IntegrationStatus } from "@/types/administration";
+import type { IntegrationView } from "@/features/administration/mapAdministration";
 
 const selectClass =
   "min-h-11 min-w-[160px] rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]";
 
-const statuses: IntegrationStatus[] = [
-  "Not configured",
-  "Configured",
-  "Simulated",
-  "Healthy",
-  "Delayed",
-  "Disabled",
-  "Planned",
-];
-
-function statusTone(status: IntegrationStatus): "success" | "warning" | "accent" | "neutral" {
-  if (status === "Delayed") return "warning";
-  if (status === "Configured" || status === "Simulated") return "accent";
-  if (status === "Healthy") return "success";
+function statusTone(status: string): "success" | "warning" | "accent" | "neutral" {
+  if (status === "delayed") return "warning";
+  if (status === "configured" || status === "reference_only") return "accent";
+  if (status === "healthy") return "success";
   return "neutral";
 }
 
@@ -28,15 +18,21 @@ export function IntegrationTable({
   selectedId,
   onSelect,
 }: {
-  integrations: IntegrationRecord[];
+  integrations: IntegrationView[];
   selectedId: string;
   onSelect: (id: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
-
+  const statuses = useMemo(
+    () =>
+      Array.from(new Set(integrations.map((item) => item.status))).sort((left, right) =>
+        left.localeCompare(right),
+      ),
+    [integrations],
+  );
   const filtered = integrations.filter((item) => {
-    const haystack = `${item.name} ${item.category} ${item.scope}`.toLowerCase();
+    const haystack = `${item.id} ${item.name} ${item.provider} ${item.status}`.toLowerCase();
     const matchesQuery = query.trim().length === 0 || haystack.includes(query.trim().toLowerCase());
     return matchesQuery && (status === "all" || item.status === status);
   });
@@ -76,83 +72,104 @@ export function IntegrationTable({
             <option value="all">All</option>
             {statuses.map((option) => (
               <option key={option} value={option}>
-                {option}
+                {integrations.find((item) => item.status === option)?.statusLabel ?? option}
               </option>
             ))}
           </select>
         </div>
       </div>
 
-      <div className="hidden overflow-x-auto md:block">
-        <table className="min-w-full border-collapse text-left text-sm">
-          <caption className="sr-only">
-            Integration connectors with category, status, last sync, freshness, environment, and
-            configuration state. No stored secrets.
-          </caption>
-          <thead className="text-[var(--muted)]">
-            <tr>
-              {[
-                "Integration",
-                "Category",
-                "Status",
-                "Last sync",
-                "Freshness",
-                "Environment",
-                "Auth state",
-              ].map((heading) => (
-                <th key={heading} scope="col" className="px-3 py-3 font-medium whitespace-nowrap">
-                  {heading}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((item) => (
-              <tr key={item.id} className="border-t border-[var(--border)]">
-                <td className="px-3 py-3">
-                  <button
-                    type="button"
-                    aria-pressed={selectedId === item.id}
-                    onClick={() => onSelect(item.id)}
-                    className="inline-flex min-h-11 items-center font-medium text-[var(--text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-                  >
-                    {item.name}
-                  </button>
-                </td>
-                <td className="px-3 py-3 text-[var(--muted)]">{item.category}</td>
-                <td className="px-3 py-3">
-                  <StatusBadge label={item.status} tone={statusTone(item.status)} />
-                </td>
-                <td className="px-3 py-3 whitespace-nowrap text-[var(--muted)]">{item.lastSync}</td>
-                <td className="px-3 py-3 text-[var(--muted)]">{item.freshness}</td>
-                <td className="px-3 py-3 text-[var(--muted)]">{item.environment}</td>
-                <td className="px-3 py-3 text-[var(--text)]">{item.authState}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {filtered.length === 0 ? (
+        <p className="text-sm text-[var(--muted)]">No integrations match the current filters.</p>
+      ) : (
+        <>
+          <div className="hidden overflow-x-auto md:block">
+            <table className="min-w-full border-collapse text-left text-sm">
+              <caption className="sr-only">
+                Integration catalog with id, provider, status, freshness, sync times, and credential
+                state. No stored secrets.
+              </caption>
+              <thead className="text-[var(--muted)]">
+                <tr>
+                  {[
+                    "Integration",
+                    "Provider",
+                    "Status",
+                    "Freshness",
+                    "Last sync",
+                    "Last success",
+                    "Credential state",
+                  ].map((heading) => (
+                    <th
+                      key={heading}
+                      scope="col"
+                      className="px-3 py-3 font-medium whitespace-nowrap"
+                    >
+                      {heading}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((item) => (
+                  <tr key={item.id} className="border-t border-[var(--border)]">
+                    <td className="px-3 py-3">
+                      <button
+                        type="button"
+                        aria-pressed={selectedId === item.id}
+                        onClick={() => onSelect(item.id)}
+                        className="inline-flex min-h-11 flex-col items-start justify-center text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                      >
+                        <span className="font-medium text-[var(--text)]">{item.name}</span>
+                        <span className="text-xs text-[var(--muted)]">{item.id}</span>
+                      </button>
+                    </td>
+                    <td className="px-3 py-3 text-[var(--muted)]">{item.provider}</td>
+                    <td className="px-3 py-3">
+                      <StatusBadge label={item.statusLabel} tone={statusTone(item.status)} />
+                      <span className="mt-1 block text-xs text-[var(--muted)]">{item.status}</span>
+                    </td>
+                    <td className="px-3 py-3 text-[var(--muted)]">
+                      {item.freshnessLabel}
+                      <span className="mt-1 block text-xs">{item.freshness}</span>
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap text-[var(--muted)]">
+                      {item.lastSyncAt}
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap text-[var(--muted)]">
+                      {item.lastSuccessAt}
+                    </td>
+                    <td className="px-3 py-3 text-[var(--text)]">{item.credentialState}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-      <ul className="space-y-3 md:hidden">
-        {filtered.map((item) => (
-          <li key={item.id}>
-            <button
-              type="button"
-              aria-pressed={selectedId === item.id}
-              onClick={() => onSelect(item.id)}
-              className="flex min-h-11 w-full flex-col gap-1 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-            >
-              <span className="font-medium text-[var(--text)]">{item.name}</span>
-              <span className="text-xs text-[var(--muted)]">
-                {item.status} · {item.freshness}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
+          <ul className="space-y-3 md:hidden">
+            {filtered.map((item) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  aria-pressed={selectedId === item.id}
+                  onClick={() => onSelect(item.id)}
+                  className="flex min-h-11 w-full flex-col gap-1 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                >
+                  <span className="font-medium text-[var(--text)]">
+                    {item.id} · {item.name}
+                  </span>
+                  <span className="text-xs text-[var(--muted)]">
+                    {item.status} · {item.freshness}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       <p className="text-xs text-[var(--muted)]">
-        Showing {filtered.length} of {integrations.length} sample records · Row selection opens
+        Showing {filtered.length} of {integrations.length} stored records · Row selection opens
         record details
       </p>
     </div>

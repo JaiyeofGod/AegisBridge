@@ -3,33 +3,76 @@ import { useState } from "react";
 import { Button } from "@/components/buttons/Button";
 import { Panel } from "@/components/cards/Panel";
 import { SummaryMetric } from "@/components/cards/SummaryMetric";
+import { ErrorState } from "@/components/feedback/ErrorState";
+import { LoadingState } from "@/components/feedback/LoadingState";
 import { SimulatedDataBanner } from "@/components/feedback/SimulatedDataBanner";
 import { AppShell } from "@/components/navigation/AppShell";
 import { PageContainer } from "@/components/navigation/PageContainer";
 import { PageHeader } from "@/components/navigation/PageHeader";
 import { StatusBadge } from "@/components/status/StatusBadge";
+import { StaleDataIndicator } from "@/components/status/StaleDataIndicator";
+import {
+  mapAccessReview,
+  mapAdminRole,
+  mapAdminUser,
+  mapAdministrationSummary,
+  mapAuditEvent,
+  mapIntegration,
+} from "@/features/administration/mapAdministration";
 import { IntegrationTable } from "@/features/administration/IntegrationTable";
-import { useAdministrationData } from "@/features/administration/useAdministrationData";
+import {
+  useAccessReviews,
+  useAdminRoles,
+  useAdminUsers,
+  useAdministrationSummary,
+  useAuditEvents,
+  useIntegrations,
+} from "@/features/administration/useAdministrationData";
+import { SEEDED_DATA_LABEL, SEEDED_DATA_NOTE } from "@/features/data-origin";
 import { cn } from "@/lib/cn";
-import type { AdminSectionId, IntegrationRecord } from "@/types/administration";
+import { formatTimestamp } from "@/lib/format";
+
+type AdminSectionId = "integrations" | "users" | "roles" | "audit" | "access-reviews" | "workspace";
 
 const sections: { id: AdminSectionId; label: string }[] = [
   { id: "integrations", label: "Integrations" },
   { id: "users", label: "Users" },
   { id: "roles", label: "Roles & Permissions" },
   { id: "audit", label: "Audit History" },
+  { id: "access-reviews", label: "Access reviews" },
   { id: "workspace", label: "Workspace" },
 ];
 
 export function AdministrationPage() {
-  const admin = useAdministrationData();
+  const summary = useAdministrationSummary();
+  const integrations = useIntegrations();
+  const users = useAdminUsers();
+  const roles = useAdminRoles();
+  const audits = useAuditEvents();
+  const reviews = useAccessReviews();
   const [section, setSection] = useState<AdminSectionId>("integrations");
-  const [selectedId, setSelectedId] = useState("int-wazuh");
+  const [selectedId, setSelectedId] = useState("");
+  const generatedAt = summary.dataUpdatedAt
+    ? new Date(summary.dataUpdatedAt).toISOString()
+    : new Date().toISOString();
+  const integrationItems = integrations.data?.items.map(mapIntegration) ?? [];
   const selected =
-    admin.data.integrations.find((item) => item.id === selectedId) ?? admin.data.integrations[0];
+    integrationItems.find((item) => item.id === selectedId) ?? integrationItems[0] ?? null;
+  const metrics = summary.data ? mapAdministrationSummary(summary.data) : null;
+  const userItems = users.data?.items.map(mapAdminUser) ?? [];
+  const roleItems = roles.data?.items.map(mapAdminRole) ?? [];
+  const auditItems = audits.data?.items.map(mapAuditEvent) ?? [];
+  const reviewItems = reviews.data?.items.map(mapAccessReview) ?? [];
+  const refreshing =
+    summary.isFetching ||
+    integrations.isFetching ||
+    users.isFetching ||
+    roles.isFetching ||
+    audits.isFetching ||
+    reviews.isFetching;
 
   return (
-    <AppShell environmentLabel={admin.data.environmentLabel}>
+    <AppShell environmentLabel="Development · Seeded">
       <PageContainer data-testid="administration-page">
         <PageHeader
           title="Administration"
@@ -44,7 +87,12 @@ export function AdministrationPage() {
               >
                 Add integration
               </Button>
-              <SimulatedDataBanner message={admin.data.snapshotLabel} />
+              <SimulatedDataBanner message={SEEDED_DATA_NOTE} />
+              {summary.dataUpdatedAt ? (
+                <p className="text-xs text-[var(--muted)]" data-testid="last-successful-fetch">
+                  Last successful update: {formatTimestamp(generatedAt)}
+                </p>
+              ) : null}
             </div>
           }
         />
@@ -76,258 +124,383 @@ export function AdministrationPage() {
           })}
         </div>
 
-        <div className="space-y-8">
-          {section === "integrations" && selected ? (
-            <>
-              <section aria-labelledby="admin-summary-heading">
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                  <h2
-                    id="admin-summary-heading"
-                    className="font-heading text-xl font-bold text-[var(--text)]"
-                  >
-                    Platform snapshot
-                  </h2>
-                  <StatusBadge label="SIMULATED" tone="warning" />
-                </div>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  {admin.data.metrics.map((metric) => (
-                    <SummaryMetric key={metric.id} metric={metric} />
-                  ))}
-                </div>
-                <p className="mt-4 text-xs text-[var(--muted)]">
-                  Pending access reviews: 2. There is no aggregate security score.
-                </p>
-              </section>
+        {summary.isPending ? <LoadingState label="Updating" rows={4} /> : null}
+        {summary.isError ? (
+          <ErrorState
+            title="Administration data unavailable"
+            description="The development administration API did not respond. Retry to load the seeded summary. Fixture rows are not substituted."
+            lastSuccessfulAt={summary.dataUpdatedAt ? generatedAt : undefined}
+            onRetry={() => void summary.refetch()}
+          />
+        ) : null}
+        {summary.isSuccess && refreshing ? (
+          <div className="mb-6">
+            <StaleDataIndicator
+              message="Refreshing development administration records"
+              lastSuccessfulAt={generatedAt}
+            />
+          </div>
+        ) : null}
 
-              <Panel
-                title="Integration connections"
-                description="Catalog references and planned connectors. None are live."
-              >
-                <IntegrationTable
-                  integrations={admin.data.integrations}
-                  selectedId={selectedId}
-                  onSelect={setSelectedId}
-                />
-              </Panel>
+        {summary.isSuccess && metrics ? (
+          <div className="space-y-8">
+            {section === "integrations" ? (
+              <>
+                <section aria-labelledby="admin-summary-heading">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <h2
+                      id="admin-summary-heading"
+                      className="font-heading text-xl font-bold text-[var(--text)]"
+                    >
+                      Platform snapshot
+                    </h2>
+                    <StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    {metrics.map((metric) => (
+                      <SummaryMetric key={metric.id} metric={metric} />
+                    ))}
+                  </div>
+                  <p className="mt-4 text-xs text-[var(--muted)]">
+                    Pending access reviews: {summary.data.pending_access_review_count}. Recent audit
+                    events: {summary.data.recent_audit_event_count}. There is no aggregate security
+                    score.
+                  </p>
+                </section>
 
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-stretch">
-                <Panel title="Configuration controls" className="h-full">
-                  <IntegrationDetail integration={selected} />
+                <Panel
+                  title="Integration connections"
+                  description="Stored catalog rows. A connector is not live unless its status says configured."
+                >
+                  {integrations.isPending ? <LoadingState label="Updating" rows={2} /> : null}
+                  {integrations.isError ? (
+                    <ErrorState
+                      title="Integrations unavailable"
+                      description="The integration request failed. Fixture connectors are not substituted."
+                      onRetry={() => void integrations.refetch()}
+                    />
+                  ) : null}
+                  {integrations.isSuccess && integrationItems.length === 0 ? (
+                    <p className="text-sm text-[var(--muted)]">No integrations are stored.</p>
+                  ) : null}
+                  {integrations.isSuccess && integrationItems.length > 0 ? (
+                    <IntegrationTable
+                      integrations={integrationItems}
+                      selectedId={selected?.id ?? ""}
+                      onSelect={setSelectedId}
+                    />
+                  ) : null}
                 </Panel>
-                <Panel title="Workflow & interpretation" className="h-full">
-                  <ul className="space-y-3">
-                    {admin.data.workflowNotes.map((note) => (
+
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-stretch">
+                  <Panel title="Configuration controls" className="h-full">
+                    {selected ? (
+                      <IntegrationDetail integration={selected} />
+                    ) : (
+                      <p className="text-sm text-[var(--muted)]">No integration is selected.</p>
+                    )}
+                  </Panel>
+                  <Panel title="Workflow & interpretation" className="h-full">
+                    <ul className="space-y-3">
+                      <li className="rounded-[var(--radius-control)] bg-[var(--raised)] px-3 py-3 text-sm leading-relaxed text-[var(--muted)]">
+                        {summary.data.semantics}
+                      </li>
+                      <li className="rounded-[var(--radius-control)] bg-[var(--raised)] px-3 py-3 text-sm leading-relaxed text-[var(--muted)]">
+                        Development seeded data. This is not live administration data. Wazuh and the
+                        example identity provider are not connected.
+                      </li>
+                      <li className="rounded-[var(--radius-control)] bg-[var(--raised)] px-3 py-3 text-sm leading-relaxed text-[var(--muted)]">
+                        Credentials and secrets are not returned. credential_state is a stored
+                        label.
+                      </li>
+                    </ul>
+                  </Panel>
+                </div>
+              </>
+            ) : null}
+
+            {section === "users" ? (
+              <Panel
+                title="Users"
+                description="Stored accounts. Sign-in and MFA enrollment are not connected."
+                action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
+              >
+                {users.isPending ? <LoadingState label="Updating" rows={2} /> : null}
+                {users.isError ? (
+                  <ErrorState
+                    title="Users unavailable"
+                    description="The user request failed. Fixture accounts are not substituted."
+                    onRetry={() => void users.refetch()}
+                  />
+                ) : null}
+                {users.isSuccess && userItems.length === 0 ? (
+                  <p className="text-sm text-[var(--muted)]" data-testid="admin-users">
+                    No users are stored.
+                  </p>
+                ) : null}
+                {users.isSuccess && userItems.length > 0 ? (
+                  <div className="overflow-x-auto" data-testid="admin-users">
+                    <table className="min-w-full border-collapse text-left text-sm">
+                      <caption className="sr-only">
+                        Stored users with display name, email, status, department, roles, and the
+                        privileged flag returned by the API
+                      </caption>
+                      <thead className="text-[var(--muted)]">
+                        <tr>
+                          {["User", "Email", "Status", "Department", "Roles", "Privileged"].map(
+                            (heading) => (
+                              <th
+                                key={heading}
+                                scope="col"
+                                className="px-3 py-3 font-medium whitespace-nowrap"
+                              >
+                                {heading}
+                              </th>
+                            ),
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {userItems.map((user) => (
+                          <tr key={user.id} className="border-t border-[var(--border)]">
+                            <td className="px-3 py-3 text-[var(--text)]">
+                              {user.id}
+                              <span className="mt-1 block text-xs text-[var(--muted)]">
+                                {user.displayName}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 text-[var(--muted)]">{user.email}</td>
+                            <td className="px-3 py-3 text-[var(--text)]">{user.status}</td>
+                            <td className="px-3 py-3 text-[var(--muted)]">{user.department}</td>
+                            <td className="px-3 py-3 text-[var(--text)]">{user.roles}</td>
+                            <td className="px-3 py-3 text-[var(--text)]">{user.privilegedLabel}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
+              </Panel>
+            ) : null}
+
+            {section === "roles" ? (
+              <Panel
+                title="Roles & Permissions"
+                description="Stored role catalog. Permission labels are not authorization checks."
+                action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
+              >
+                {roles.isPending ? <LoadingState label="Updating" rows={2} /> : null}
+                {roles.isError ? (
+                  <ErrorState
+                    title="Roles unavailable"
+                    description="The role request failed. Fixture roles are not substituted."
+                    onRetry={() => void roles.refetch()}
+                  />
+                ) : null}
+                {roles.isSuccess && roleItems.length === 0 ? (
+                  <p className="text-sm text-[var(--muted)]" data-testid="admin-roles">
+                    No roles are stored.
+                  </p>
+                ) : null}
+                {roles.isSuccess && roleItems.length > 0 ? (
+                  <ul className="space-y-3" data-testid="admin-roles">
+                    {roleItems.map((role) => (
                       <li
-                        key={note}
-                        className="rounded-[var(--radius-control)] bg-[var(--raised)] px-3 py-3 text-sm leading-relaxed text-[var(--muted)]"
+                        key={role.id}
+                        className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
                       >
-                        {note}
+                        <p className="font-medium text-[var(--text)]">{role.name}</p>
+                        <p className="mt-1 text-sm text-[var(--muted)]">{role.summary}</p>
+                        <p className="mt-1 text-sm text-[var(--text)]">
+                          {role.permissions.length > 0
+                            ? role.permissions.join(" · ")
+                            : "No permission labels are stored for this role."}
+                        </p>
                       </li>
                     ))}
                   </ul>
-                </Panel>
-              </div>
-            </>
-          ) : null}
+                ) : null}
+              </Panel>
+            ) : null}
 
-          {section === "users" ? (
-            <Panel
-              title="Users"
-              description="Fictional accounts. Sign-in and MFA enrollment are not connected."
-              action={<StatusBadge label="SIMULATED" tone="warning" />}
-            >
-              <div className="overflow-x-auto" data-testid="admin-users">
-                <table className="min-w-full border-collapse text-left text-sm">
-                  <caption className="sr-only">
-                    Workspace users with role, department, account status, MFA state, last sign-in,
-                    and access review
-                  </caption>
-                  <thead className="text-[var(--muted)]">
-                    <tr>
-                      {[
-                        "User",
-                        "Email",
-                        "Role",
-                        "Department",
-                        "Status",
-                        "MFA",
-                        "Last sign-in",
-                        "Access review",
-                      ].map((heading) => (
-                        <th
-                          key={heading}
-                          scope="col"
-                          className="px-3 py-3 font-medium whitespace-nowrap"
-                        >
-                          {heading}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {admin.data.users.map((user) => (
-                      <tr key={user.id} className="border-t border-[var(--border)]">
-                        <td className="px-3 py-3 text-[var(--text)]">
-                          {user.userId}
-                          <span className="mt-1 block text-xs text-[var(--muted)]">
-                            {user.name}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3 text-[var(--muted)]">{user.email}</td>
-                        <td className="px-3 py-3 text-[var(--text)]">{user.role}</td>
-                        <td className="px-3 py-3 text-[var(--muted)]">{user.department}</td>
-                        <td className="px-3 py-3 text-[var(--text)]">{user.accountStatus}</td>
-                        <td className="px-3 py-3 text-[var(--text)]">{user.mfa}</td>
-                        <td className="px-3 py-3 whitespace-nowrap text-[var(--muted)]">
-                          {user.lastSignIn}
-                        </td>
-                        <td className="px-3 py-3 text-[var(--text)]">{user.accessReview}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Panel>
-          ) : null}
-
-          {section === "roles" ? (
-            <Panel
-              title="Roles & Permissions"
-              description="Role summaries only. The server does not enforce these assignments yet."
-              action={<StatusBadge label="SIMULATED" tone="warning" />}
-            >
-              <ul className="space-y-3" data-testid="admin-roles">
-                {admin.data.roles.map((role) => (
-                  <li
-                    key={role.id}
-                    className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
-                  >
-                    <p className="font-medium text-[var(--text)]">{role.name}</p>
-                    <p className="mt-1 text-sm text-[var(--muted)]">{role.summary}</p>
-                    <p className="mt-1 text-sm text-[var(--text)]">
-                      {role.permissions.join(" · ")}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
-          ) : null}
-
-          {section === "audit" ? (
-            <Panel
-              title="Audit History"
-              description="Simulated events. Not a live audit trail."
-              action={<StatusBadge label="SIMULATED" tone="warning" />}
-            >
-              <div className="overflow-x-auto" data-testid="admin-audit">
-                <table className="min-w-full border-collapse text-left text-sm">
-                  <caption className="sr-only">
-                    Simulated audit events with time, actor, action, object, result, source, and
-                    environment
-                  </caption>
-                  <thead className="text-[var(--muted)]">
-                    <tr>
-                      {[
-                        "Event",
-                        "Time",
-                        "Actor",
-                        "Action",
-                        "Object",
-                        "Result",
-                        "Source",
-                        "Environment",
-                      ].map((heading) => (
-                        <th
-                          key={heading}
-                          scope="col"
-                          className="px-3 py-3 font-medium whitespace-nowrap"
-                        >
-                          {heading}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {admin.data.audit.map((event) => (
-                      <tr key={event.id} className="border-t border-[var(--border)]">
-                        <td className="px-3 py-3 text-[var(--text)]">{event.auditId}</td>
-                        <td className="px-3 py-3 whitespace-nowrap text-[var(--muted)]">
-                          {event.timestamp}
-                        </td>
-                        <td className="px-3 py-3 text-[var(--muted)]">{event.actor}</td>
-                        <td className="px-3 py-3 text-[var(--text)]">{event.action}</td>
-                        <td className="px-3 py-3 text-[var(--muted)]">
-                          {event.objectType} · {event.objectId}
-                        </td>
-                        <td className="px-3 py-3 text-[var(--text)]">{event.result}</td>
-                        <td className="px-3 py-3 text-[var(--muted)]">{event.source}</td>
-                        <td className="px-3 py-3 text-[var(--muted)]">{event.environment}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Panel>
-          ) : null}
-
-          {section === "workspace" ? (
-            <Panel
-              title="Workspace"
-              description="Prototype settings. No secrets are stored on this screen."
-              action={<StatusBadge label="SIMULATED" tone="warning" />}
-            >
-              <dl className="space-y-3" data-testid="admin-workspace">
-                {admin.data.workspace.map((setting) => (
-                  <div
-                    key={setting.id}
-                    className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
-                  >
-                    <dt className="text-sm text-[var(--muted)]">{setting.label}</dt>
-                    <dd className="mt-1 text-sm text-[var(--text)]">{setting.value}</dd>
+            {section === "audit" ? (
+              <Panel
+                title="Audit History"
+                description="Stored audit events. This is not a live audit trail."
+                action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
+              >
+                {audits.isPending ? <LoadingState label="Updating" rows={2} /> : null}
+                {audits.isError ? (
+                  <ErrorState
+                    title="Audit events unavailable"
+                    description="The audit request failed. Fixture events are not substituted."
+                    onRetry={() => void audits.refetch()}
+                  />
+                ) : null}
+                {audits.isSuccess && auditItems.length === 0 ? (
+                  <p className="text-sm text-[var(--muted)]" data-testid="admin-audit">
+                    No audit events are stored.
+                  </p>
+                ) : null}
+                {audits.isSuccess && auditItems.length > 0 ? (
+                  <div className="overflow-x-auto" data-testid="admin-audit">
+                    <table className="min-w-full border-collapse text-left text-sm">
+                      <caption className="sr-only">
+                        Stored audit events with time, actor, action, object, result, source, and
+                        environment
+                      </caption>
+                      <thead className="text-[var(--muted)]">
+                        <tr>
+                          {[
+                            "Event",
+                            "Time",
+                            "Actor",
+                            "Action",
+                            "Object",
+                            "Result",
+                            "Source",
+                            "Environment",
+                          ].map((heading) => (
+                            <th
+                              key={heading}
+                              scope="col"
+                              className="px-3 py-3 font-medium whitespace-nowrap"
+                            >
+                              {heading}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {auditItems.map((event) => (
+                          <tr key={event.id} className="border-t border-[var(--border)]">
+                            <td className="px-3 py-3 text-[var(--text)]">{event.id}</td>
+                            <td className="px-3 py-3 whitespace-nowrap text-[var(--muted)]">
+                              {event.occurredAt}
+                            </td>
+                            <td className="px-3 py-3 text-[var(--muted)]">{event.actor}</td>
+                            <td className="px-3 py-3 text-[var(--text)]">{event.action}</td>
+                            <td className="px-3 py-3 text-[var(--muted)]">
+                              {event.objectType} · {event.objectId}
+                            </td>
+                            <td className="px-3 py-3 text-[var(--text)]">{event.result}</td>
+                            <td className="px-3 py-3 text-[var(--muted)]">{event.source}</td>
+                            <td className="px-3 py-3 text-[var(--muted)]">{event.environment}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                ))}
-              </dl>
-            </Panel>
-          ) : null}
-        </div>
+                ) : null}
+              </Panel>
+            ) : null}
+
+            {section === "access-reviews" ? (
+              <Panel
+                title="Access reviews"
+                description="Stored review records. Owner and due date appear only when the API returns them."
+                action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
+              >
+                {reviews.isPending ? <LoadingState label="Updating" rows={2} /> : null}
+                {reviews.isError ? (
+                  <ErrorState
+                    title="Access reviews unavailable"
+                    description="The access-review request failed. Fixture reviews are not substituted."
+                    onRetry={() => void reviews.refetch()}
+                  />
+                ) : null}
+                {reviews.isSuccess && reviewItems.length === 0 ? (
+                  <p className="text-sm text-[var(--muted)]" data-testid="admin-access-reviews">
+                    No access reviews are stored.
+                  </p>
+                ) : null}
+                {reviews.isSuccess && reviewItems.length > 0 ? (
+                  <ul className="space-y-3" data-testid="admin-access-reviews">
+                    {reviewItems.map((review) => (
+                      <li
+                        key={review.id}
+                        className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
+                      >
+                        <p className="font-medium text-[var(--text)]">
+                          {review.id} · {review.name}
+                        </p>
+                        <p className="mt-1 text-sm text-[var(--muted)]">
+                          {review.status} · {review.owner} · {review.dueAt}
+                        </p>
+                        <p className="mt-1 text-sm text-[var(--text)]">
+                          Open findings {review.openFindingCount} / {review.totalFindingCount}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </Panel>
+            ) : null}
+
+            {section === "workspace" ? (
+              <Panel
+                title="Workspace"
+                description="Workspace writes are not connected. No secrets are stored on this screen."
+                action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
+              >
+                <dl className="space-y-3" data-testid="admin-workspace">
+                  <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3">
+                    <dt className="text-sm text-[var(--muted)]">Privileged roles</dt>
+                    <dd className="mt-1 text-sm text-[var(--text)]">
+                      {summary.data.privileged_roles.join(" · ") || "No privileged roles stored"}
+                    </dd>
+                  </div>
+                  <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3">
+                    <dt className="text-sm text-[var(--muted)]">Stored semantics</dt>
+                    <dd className="mt-1 text-sm text-[var(--text)]">{summary.data.semantics}</dd>
+                  </div>
+                  <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3">
+                    <dt className="text-sm text-[var(--muted)]">Identity provider</dt>
+                    <dd className="mt-1 text-sm text-[var(--text)]">
+                      Not connected. Workspace settings are not stored by this API.
+                    </dd>
+                  </div>
+                </dl>
+              </Panel>
+            ) : null}
+          </div>
+        ) : null}
       </PageContainer>
     </AppShell>
   );
 }
 
-function IntegrationDetail({ integration }: { integration: IntegrationRecord }) {
+function IntegrationDetail({ integration }: { integration: ReturnType<typeof mapIntegration> }) {
   return (
     <div className="space-y-4 text-sm" data-testid="admin-integration-detail">
       <div>
         <p className="text-[var(--muted)]">Integration</p>
         <p className="mt-1 text-[var(--text)]">
-          {integration.name} · {integration.status} · {integration.freshness}
+          {integration.id} · {integration.name} · {integration.provider} · {integration.statusLabel}{" "}
+          · {integration.status}
         </p>
       </div>
       <div>
-        <p className="text-[var(--muted)]">Secrets</p>
+        <p className="text-[var(--muted)]">Freshness</p>
         <p className="mt-1 text-[var(--text)]">
-          Masked values. Stored secrets are not shown. {integration.authState}.
+          {integration.freshnessLabel} · {integration.freshness}
         </p>
       </div>
       <div>
-        <p className="text-[var(--muted)]">Permissions</p>
+        <p className="text-[var(--muted)]">Credential state</p>
         <p className="mt-1 text-[var(--text)]">
-          integration.manage would be required later. Least privilege is not enforced on this
-          screen.
+          Credentials are not stored or displayed. {integration.credentialState}.
         </p>
       </div>
       <div>
-        <p className="text-[var(--muted)]">Changes</p>
+        <p className="text-[var(--muted)]">Sync history</p>
         <p className="mt-1 text-[var(--text)]">
-          Audit actor, timestamp, and changed fields would be recorded. This row is simulated.
+          Last sync {integration.lastSyncAt}. Last success {integration.lastSuccessAt}.
         </p>
       </div>
       <div>
-        <p className="text-[var(--muted)]">Connection</p>
-        <p className="mt-1 text-[var(--text)]">
-          {integration.notes} Last sync {integration.lastSync}. Scope {integration.scope}.
-        </p>
+        <p className="text-[var(--muted)]">Notes</p>
+        <p className="mt-1 text-[var(--text)]">{integration.notes}</p>
       </div>
     </div>
   );
