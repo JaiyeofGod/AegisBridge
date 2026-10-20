@@ -1,14 +1,61 @@
-import { useEffect, useState } from "react";
+import {
+  Component,
+  lazy,
+  Suspense,
+  useEffect,
+  useState,
+  type ErrorInfo,
+  type ReactNode,
+} from "react";
+import type { Application } from "@splinetool/runtime";
 
 import { SignInSceneFallback } from "@/features/signin/SignInSceneFallback";
-import { SPLINE_PUBLIC_SCENE_URL } from "@/features/signin/spline";
+import { SPLINE_SCENE_CODE_URL } from "@/features/signin/spline";
 
 type SceneStatus = "loading" | "ready" | "error";
 
+const Spline = lazy(() => import("@splinetool/react-spline"));
+
+type SceneErrorBoundaryProps = {
+  onError: () => void;
+  children: ReactNode;
+};
+
+type SceneErrorBoundaryState = { failed: boolean };
+
+class SceneErrorBoundary extends Component<SceneErrorBoundaryProps, SceneErrorBoundaryState> {
+  state: SceneErrorBoundaryState = { failed: false };
+
+  static getDerivedStateFromError(): SceneErrorBoundaryState {
+    return { failed: true };
+  }
+
+  componentDidCatch(_error: Error, _info: ErrorInfo) {
+    this.props.onError();
+  }
+
+  render() {
+    if (this.state.failed) return null;
+    return this.props.children;
+  }
+}
+
 /**
- * Lazy-mounted Spline public-preview embed (iframe).
- * Blended into the left panel — no card border. Cross-origin iframe cannot
- * enable transparent BG or remove branding; that requires Play Settings + Code export.
+ * Spline's sandbox HTML overlay is an empty iframe with `color-scheme: normal`,
+ * which paints an opaque white sheet over the canvas. Neutralize it so only
+ * the 3D art remains (over the page panel gradient).
+ */
+function neutralizeHtmlOverlay(root: HTMLElement) {
+  root.querySelectorAll("iframe").forEach((iframe) => {
+    iframe.style.display = "none";
+    iframe.style.pointerEvents = "none";
+    iframe.setAttribute("aria-hidden", "true");
+  });
+}
+
+/**
+ * Lazy-mounted official Spline React runtime.
+ * Transparent canvas so the left-panel gradient shows behind the 3D art.
  */
 export function SignInSplineScene() {
   const [status, setStatus] = useState<SceneStatus>("loading");
@@ -46,67 +93,53 @@ export function SignInSplineScene() {
     };
   }, []);
 
+  const handleLoad = (app: Application) => {
+    // Clear only the scene/canvas fill — 3D art stays unchanged.
+    app.setBackgroundColor("rgba(0,0,0,0)");
+
+    const root = app.canvas.parentElement;
+    if (root) {
+      neutralizeHtmlOverlay(root);
+    }
+
+    setStatus("ready");
+  };
+
+  const showFallback = status !== "ready";
+
   return (
     <div
       className="relative h-full min-h-[280px] w-full overflow-hidden bg-transparent"
       data-testid="signin-spline-scene"
       data-scene-status={status}
-      data-embed-mode="public-iframe"
+      data-embed-mode="react-spline"
     >
-      {/* Soft underlay matching the left-panel gradient (iframe BG is opaque today). */}
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background: "radial-gradient(90% 70% at 50% 55%, #1b3344 0%, #0c1118 58%, #082126 100%)",
-        }}
-        aria-hidden
-      />
-
       <div
         className={`absolute inset-0 transition-opacity duration-500 ${
-          status === "ready" ? "pointer-events-none opacity-0" : "opacity-100"
+          showFallback ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
       >
         <SignInSceneFallback />
       </div>
 
-      {shouldMount ? (
+      {shouldMount && status !== "error" ? (
         <div
-          className={`absolute inset-0 transition-opacity duration-700 ${
+          className={`absolute inset-0 bg-transparent transition-opacity duration-700 [&_iframe]:hidden ${
             status === "ready" ? "opacity-100" : "opacity-0"
           }`}
-          // Feather edges so the opaque iframe reads as part of the panel, not a card.
-          style={{
-            maskImage:
-              "radial-gradient(ellipse 92% 78% at 50% 48%, #000 42%, transparent 78%), linear-gradient(to bottom, transparent 0%, #000 12%, #000 72%, transparent 100%)",
-            WebkitMaskImage:
-              "radial-gradient(ellipse 92% 78% at 50% 48%, #000 42%, transparent 78%), linear-gradient(to bottom, transparent 0%, #000 12%, #000 72%, transparent 100%)",
-          }}
         >
-          <iframe
-            title="AegisBridge cybersecurity scene"
-            src={SPLINE_PUBLIC_SCENE_URL}
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-            className="absolute inset-0 h-full w-full border-0 bg-transparent"
-            tabIndex={-1}
-            aria-hidden
-            onLoad={() => setStatus("ready")}
-            onError={() => setStatus("error")}
-            style={{ pointerEvents: status === "ready" ? "auto" : "none" }}
-          />
+          <SceneErrorBoundary onError={() => setStatus("error")}>
+            <Suspense fallback={null}>
+              <Spline
+                scene={SPLINE_SCENE_CODE_URL}
+                onLoad={handleLoad}
+                className="absolute inset-0 h-full w-full bg-transparent [&_canvas]:bg-transparent"
+                style={{ background: "transparent", width: "100%", height: "100%" }}
+              />
+            </Suspense>
+          </SceneErrorBoundary>
         </div>
       ) : null}
-
-      {/* Top/bottom color washes to further merge with panel chrome */}
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#0c1118] to-transparent"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#082126] via-[#0c1118]/85 to-transparent"
-        aria-hidden
-      />
 
       {status === "loading" ? (
         <p className="sr-only" role="status">

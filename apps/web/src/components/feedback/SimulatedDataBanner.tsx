@@ -5,7 +5,7 @@ export function SimulatedDataBanner({
 }) {
   return (
     <div
-      className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--warning)]"
+      className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-3 py-1.5 text-[11px] font-medium tracking-[0.06em] text-[var(--warning)] uppercase"
       role="note"
       data-testid="simulated-data-banner"
     >
