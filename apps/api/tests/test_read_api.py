@@ -1,6 +1,8 @@
 """Read-only API contracts against the development seed."""
 
 import re
+from datetime import UTC, datetime
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -41,6 +43,17 @@ READ_PATHS = [
     "/api/v1/incidents",
     "/api/v1/incidents/{incident_id}",
     "/api/v1/governance/summary",
+    "/api/v1/threat-intelligence/summary",
+    "/api/v1/threat-intelligence/indicators",
+    "/api/v1/threat-intelligence/indicators/{indicator_id}",
+    "/api/v1/threat-intelligence/advisories",
+    "/api/v1/threat-intelligence/sources",
+    "/api/v1/administration/summary",
+    "/api/v1/administration/integrations",
+    "/api/v1/administration/users",
+    "/api/v1/administration/roles",
+    "/api/v1/administration/audit-events",
+    "/api/v1/administration/access-reviews",
 ]
 
 
@@ -233,6 +246,185 @@ def test_pagination_and_validation_and_not_found(client: TestClient) -> None:
     bad_level = client.get("/api/v1/risks", params={"risk_level": "extreme"})
     assert bad_level.status_code == 422
     assert bad_level.json()["code"] == "validation_error"
+
+
+def test_threat_intelligence_is_simulated_reference_data(client: TestClient) -> None:
+    summary = client.get("/api/v1/threat-intelligence/summary").json()
+    assert summary["active_indicator_count"] == 2
+    assert summary["internal_match_count"] == 1
+    assert summary["advisory_count"] == 1
+    assert summary["source_health"] == {"reference_only": 2, "not_connected": 4}
+    assert summary["data_origin"] == "simulated"
+    assert "not connected" in summary["semantics"]
+    assert_safe(summary)
+
+    listed = client.get(
+        "/api/v1/threat-intelligence/indicators",
+        params={"source": "SRC-0006", "status": "active"},
+    ).json()
+    assert listed["page_size"] == 25
+    assert listed["total"] == 2
+    assert {item["id"] for item in listed["items"]} == {"IOC-0001", "IOC-0002"}
+    reserved = client.get(
+        "/api/v1/threat-intelligence/indicators",
+        params={"search": "203.0.113", "indicator_type": "ip"},
+    ).json()
+    assert reserved["total"] == 1
+    assert reserved["items"][0]["value"] == "203.0.113.50"
+    assert reserved["items"][0]["internal_match"] is False
+    matched = client.get(
+        "/api/v1/threat-intelligence/indicators",
+        params={
+            "indicator_type": "domain",
+            "internal_match": True,
+            "source": "Internal simulated set",
+        },
+    ).json()
+    assert matched["total"] == 1
+    assert matched["items"][0]["id"] == "IOC-0002"
+    expired = client.get(
+        "/api/v1/threat-intelligence/indicators",
+        params={"status": "expired"},
+    ).json()
+    assert expired["total"] == 1
+    assert expired["items"][0]["id"] == "IOC-0003"
+    assert_safe(listed)
+    assert_safe(reserved)
+    assert_safe(matched)
+    assert_safe(expired)
+
+    detail = client.get("/api/v1/threat-intelligence/indicators/IOC-0002").json()
+    assert detail["attack_technique_id"] == "T1059.001"
+    assert detail["attack"]["technique_id"] == "T1059.001"
+    assert detail["matched_asset_id"] == "AST-0007"
+    assert detail["source"]["connection_status"] == "reference_only"
+    assert "not a confirmed compromise" in detail["summary"].lower()
+    assert detail["data_origin"] == "simulated"
+    assert_safe(detail)
+    missing = client.get("/api/v1/threat-intelligence/indicators/IOC-9999")
+    assert missing.status_code == 404
+    assert missing.json()["code"] == "not_found"
+    invalid = client.get(
+        "/api/v1/threat-intelligence/indicators",
+        params={"indicator_type": "email"},
+    )
+    assert invalid.status_code == 422
+    assert invalid.json()["code"] == "validation_error"
+
+    advisories = client.get("/api/v1/threat-intelligence/advisories").json()
+    assert advisories["total"] == 1
+    assert advisories["items"][0]["id"] == "ADV-0001"
+    assert advisories["items"][0]["related_cve"] == "CVE-2024-21887"
+    assert "not queried" in advisories["items"][0]["summary"].lower()
+    assert_safe(advisories)
+
+    sources = client.get("/api/v1/threat-intelligence/sources").json()
+    by_id = {item["id"]: item for item in sources["items"]}
+    assert set(by_id) == {f"SRC-000{index}" for index in range(1, 7)}
+    assert {item["connection_status"] for item in sources["items"]} == {
+        "reference_only",
+        "not_connected",
+    }
+    for item in sources["items"]:
+        assert item["connection_status"] not in {"configured", "healthy", "delayed"}
+        assert (
+            "not connected" in item["notes"].lower() or "not a live feed" in item["notes"].lower()
+        )
+    assert "not connected" in by_id["SRC-0001"]["notes"].lower()
+    assert by_id["SRC-0001"]["name"] == "CISA KEV"
+    assert_safe(sources)
+
+
+def test_administration_catalog_omits_secrets(client: TestClient) -> None:
+    inside_window = datetime(2026, 10, 20, 21, 13, tzinfo=UTC)
+    outside_window = datetime(2026, 11, 18, 21, 14, tzinfo=UTC)
+    with patch("app.services.administration.datetime") as clock:
+        clock.now.return_value = inside_window
+        summary = client.get("/api/v1/administration/summary").json()
+        clock.now.return_value = outside_window
+        aged = client.get("/api/v1/administration/summary").json()
+    assert summary["configured_integration_count"] == 0
+    assert summary["integration_status"]["not_configured"] == 1
+    assert summary["integration_status"]["reference_only"] == 1
+    assert summary["integration_freshness"] == {"not_connected": 2}
+    assert summary["active_user_count"] == 5
+    assert summary["privileged_user_count"] == 2
+    assert summary["recent_audit_event_count"] == 2
+    assert aged["recent_audit_event_count"] == 0
+    assert summary["pending_access_review_count"] == 1
+    assert summary["privileged_roles"] == ["Administrator", "Security Engineer"]
+    assert "not_connected" in summary["semantics"]
+    assert_safe(summary)
+
+    integrations = client.get("/api/v1/administration/integrations").json()
+    by_id = {item["id"]: item for item in integrations["items"]}
+    assert set(by_id) == {"INT-0001", "INT-0002"}
+    assert by_id["INT-0001"]["status"] == "not_configured"
+    assert by_id["INT-0001"]["freshness"] == "not_connected"
+    assert by_id["INT-0001"]["last_sync_at"] is None
+    assert by_id["INT-0001"]["last_success_at"] is None
+    assert by_id["INT-0002"]["status"] == "reference_only"
+    for item in integrations["items"]:
+        assert item["credential_state"] == "No credentials stored"
+    assert_safe(integrations)
+
+    users = client.get("/api/v1/administration/users", params={"page_size": 25}).json()
+    assert users["total"] == 5
+    by_user = {item["id"]: item for item in users["items"]}
+    assert by_user["USR-0001"]["privileged"] is True
+    assert by_user["USR-0001"]["roles"] == ["Administrator"]
+    assert by_user["USR-0002"]["display_name"] == "Nia Okeke"
+    assert by_user["USR-0002"]["email"] == "nia.okeke@aegisbridge.example"
+    assert by_user["USR-0002"]["department"] == "Security"
+    assert by_user["USR-0002"]["roles"] == ["Security Engineer"]
+    assert by_user["USR-0002"]["privileged"] is True
+    assert by_user["USR-0004"]["privileged"] is False
+    assert_safe(users)
+    window = client.get("/api/v1/administration/users", params={"page": 2, "page_size": 1})
+    assert window.status_code == 200
+    assert window.json()["total"] == 5
+    assert len(window.json()["items"]) == 1
+    too_large = client.get("/api/v1/administration/users", params={"page_size": 101})
+    assert too_large.status_code == 422
+
+    roles = client.get("/api/v1/administration/roles").json()
+    by_role = {item["name"]: item for item in roles["items"]}
+    assert set(by_role) == {
+        "Administrator",
+        "CISO",
+        "GRC Analyst",
+        "SOC Analyst",
+        "Security Engineer",
+        "Auditor",
+        "Read Only",
+    }
+    assert by_role["Security Engineer"]["id"] == "Security Engineer"
+    assert by_role["Security Engineer"]["permissions"] == ["detection.manage", "integration.manage"]
+    assert by_role["Administrator"]["permissions"] == ["integration.manage", "user.role.manage"]
+    assert by_role["CISO"]["permissions"] == []
+    assert by_role["Read Only"]["permissions"] == []
+    assert_safe(roles)
+
+    audits = client.get("/api/v1/administration/audit-events").json()
+    by_audit = {item["id"]: item for item in audits["items"]}
+    assert set(by_audit) == {"AUD-0001", "AUD-0002"}
+    assert by_audit["AUD-0002"]["actor"]["id"] == "USR-0001"
+    assert by_audit["AUD-0002"]["action"] == "Recorded Security Engineer catalog role"
+    assert by_audit["AUD-0002"]["object_type"] == "role"
+    assert by_audit["AUD-0002"]["object_id"] == "Security Engineer"
+    assert by_audit["AUD-0002"]["result"] == "simulated"
+    assert_safe(audits)
+
+    reviews = client.get("/api/v1/administration/access-reviews").json()
+    assert reviews["total"] == 1
+    review = reviews["items"][0]
+    assert review["id"] == "ARV-0001"
+    assert review["status"] == "in_progress"
+    assert review["owner"] is None
+    assert review["open_finding_count"] == 1
+    assert review["total_finding_count"] == 1
+    assert review["due_at"] is None
+    assert_safe(reviews)
 
 
 def test_openapi_lists_read_routes(client: TestClient) -> None:

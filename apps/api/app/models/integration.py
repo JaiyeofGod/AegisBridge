@@ -21,6 +21,7 @@ class Integration(UUIDMixin, TimestampMixin, Base):
     organization_id: Mapped[UUID] = mapped_column(
         ForeignKey("organizations.id"), nullable=False, index=True
     )
+    human_id: Mapped[str | None] = mapped_column(String(32), unique=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     category: Mapped[str] = mapped_column(String(64), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)

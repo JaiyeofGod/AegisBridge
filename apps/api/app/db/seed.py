@@ -59,6 +59,9 @@ from app.models import (
     Role,
     SsvcAssessment,
     SyncState,
+    ThreatAdvisory,
+    ThreatIndicator,
+    ThreatIntelSource,
     User,
     UserRole,
     Vendor,
@@ -82,6 +85,8 @@ def reset_domain_tables(session: Session) -> None:
 def seed_development(session: Session) -> None:
     existing = session.scalar(select(Organization).where(Organization.slug == ORG_SLUG))
     if existing is not None:
+        _ensure_contract_records(session, existing)
+        session.commit()
         return
 
     org = Organization(
@@ -634,7 +639,277 @@ def seed_development(session: Session) -> None:
             detail="Synthetic development records. No secret material.",
         )
     )
+    _ensure_contract_records(session, org)
     session.commit()
+
+
+def _ensure_contract_records(session: Session, org: Organization) -> None:
+    """Add contract rows that the first seed omitted. Safe to run more than once."""
+    seen = datetime(2026, 10, 19, 21, 12, tzinfo=UTC)
+    recorded = datetime(2026, 10, 19, 21, 13, tzinfo=UTC)
+    security = session.scalar(
+        select(Department).where(
+            Department.organization_id == org.id,
+            Department.name == "Security",
+        )
+    )
+    detection_permission = session.scalar(
+        select(Permission).where(Permission.code == "detection.manage")
+    )
+    if detection_permission is None:
+        detection_permission = Permission(
+            code="detection.manage",
+            description="Label for detection configuration. Not enforced.",
+        )
+        session.add(detection_permission)
+        session.flush()
+    integration_permission = session.scalar(
+        select(Permission).where(Permission.code == "integration.manage")
+    )
+    engineer = session.scalar(
+        select(Role).where(Role.organization_id == org.id, Role.name == "Security Engineer")
+    )
+    if engineer is None:
+        engineer = Role(
+            organization_id=org.id,
+            name="Security Engineer",
+            summary=(
+                "Manages detections, integrations, endpoint and network control "
+                "configuration, vulnerability remediation, and technical evidence."
+            ),
+        )
+        session.add(engineer)
+        session.flush()
+
+    engineer_user = session.scalar(select(User).where(User.human_id == "USR-0002"))
+    if engineer_user is None and security is not None:
+        engineer_user = User(
+            organization_id=org.id,
+            department_id=security.id,
+            human_id="USR-0002",
+            email="nia.okeke@aegisbridge.example",
+            display_name="Nia Okeke",
+            job_title="Security engineer",
+            account_status="active",
+            timezone_name="America/New_York",
+        )
+        session.add(engineer_user)
+        session.flush()
+        session.add(UserRole(user_id=engineer_user.id, role_id=engineer.id))
+        if integration_permission is not None:
+            session.add(
+                AccessEntitlement(
+                    user_id=engineer_user.id,
+                    permission_id=integration_permission.id,
+                    grant_source="role_catalog",
+                )
+            )
+        session.add(
+            AccessEntitlement(
+                user_id=engineer_user.id,
+                permission_id=detection_permission.id,
+                grant_source="role_catalog",
+            )
+        )
+
+    wazuh = session.scalar(select(Integration).where(Integration.name == "Wazuh"))
+    if wazuh is not None and wazuh.human_id is None:
+        wazuh.human_id = "INT-0001"
+
+    if session.scalar(select(Integration).where(Integration.human_id == "INT-0002")) is None:
+        identity = Integration(
+            organization_id=org.id,
+            human_id="INT-0002",
+            name="Example identity provider",
+            category="identity",
+            status="reference_only",
+            auth_state="No credentials stored",
+            notes=(
+                "Catalog reference only. The identity provider is not connected "
+                "and no credentials are stored."
+            ),
+        )
+        session.add(identity)
+        session.flush()
+        session.add(SyncState(integration_id=identity.id, freshness="not_connected"))
+
+    actor = session.scalar(select(User).where(User.human_id == "USR-0001"))
+    if session.scalar(select(AuditEvent).where(AuditEvent.human_id == "AUD-0002")) is None:
+        session.add(
+            AuditEvent(
+                organization_id=org.id,
+                actor_user_id=None if actor is None else actor.id,
+                human_id="AUD-0002",
+                occurred_at=recorded,
+                actor_label="USR-0001",
+                action="Recorded Security Engineer catalog role",
+                object_type="role",
+                object_id="Security Engineer",
+                result="simulated",
+                source="seed",
+                environment_name="local",
+                detail="Role catalog alignment with master requirements. No secret material.",
+            )
+        )
+
+    sources = _ensure_threat_sources(session, org)
+    _ensure_threat_indicators(session, org, sources, seen)
+    if session.scalar(select(ThreatAdvisory).where(ThreatAdvisory.human_id == "ADV-0001")) is None:
+        session.add(
+            ThreatAdvisory(
+                organization_id=org.id,
+                source_id=sources["SRC-0006"].id,
+                human_id="ADV-0001",
+                title="Simulated development advisory",
+                summary=(
+                    "Stored metadata naming CVE-2024-21887. "
+                    "NVD was not queried and this is not a live advisory."
+                ),
+                status="reference",
+                confidence="low",
+                related_cve="CVE-2024-21887",
+                published_at=seen,
+            )
+        )
+
+
+def _ensure_threat_sources(session: Session, org: Organization) -> dict[str, ThreatIntelSource]:
+    catalog = (
+        (
+            "SRC-0001",
+            "CISA KEV",
+            "cisa",
+            "Known exploited vulnerabilities catalog name.",
+            "reference_only",
+            "Catalog name only. The KEV feed is not connected.",
+        ),
+        (
+            "SRC-0002",
+            "NVD",
+            "nvd",
+            "National Vulnerability Database catalog name.",
+            "not_connected",
+            "Catalog name only. The NVD feed is not connected.",
+        ),
+        (
+            "SRC-0003",
+            "EPSS",
+            "first",
+            "Exploit prediction score catalog name.",
+            "not_connected",
+            "Catalog name only. The EPSS feed is not connected.",
+        ),
+        (
+            "SRC-0004",
+            "ThreatFox",
+            "abuse.ch",
+            "Indicator catalog name.",
+            "not_connected",
+            "Catalog name only. The ThreatFox feed is not connected.",
+        ),
+        (
+            "SRC-0005",
+            "URLhaus",
+            "abuse.ch",
+            "Malicious URL catalog name.",
+            "not_connected",
+            "Catalog name only. The URLhaus feed is not connected.",
+        ),
+        (
+            "SRC-0006",
+            "Internal simulated set",
+            "internal",
+            "Development indicators stored in PostgreSQL.",
+            "reference_only",
+            "Development indicators stored in PostgreSQL. Not a live feed.",
+        ),
+    )
+    sources: dict[str, ThreatIntelSource] = {}
+    for human_id, name, provider, purpose, status, notes in catalog:
+        row = session.scalar(
+            select(ThreatIntelSource).where(ThreatIntelSource.human_id == human_id)
+        )
+        if row is None:
+            row = ThreatIntelSource(
+                organization_id=org.id,
+                human_id=human_id,
+                name=name,
+                provider=provider,
+                purpose=purpose,
+                connection_status=status,
+                notes=notes,
+            )
+            session.add(row)
+            session.flush()
+        sources[human_id] = row
+    return sources
+
+
+def _ensure_threat_indicators(
+    session: Session,
+    org: Organization,
+    sources: dict[str, ThreatIntelSource],
+    seen: datetime,
+) -> None:
+    if session.scalar(select(ThreatIndicator).where(ThreatIndicator.human_id == "IOC-0001")):
+        return
+    asset = session.scalar(select(Asset).where(Asset.human_id == "AST-0007"))
+    technique = session.scalar(
+        select(AttackTechnique).where(AttackTechnique.technique_id == "T1059.001")
+    )
+    digest = hashlib.sha256(b"AegisBridge simulated threat indicator IOC-0003").hexdigest()
+    internal = sources["SRC-0006"]
+    session.add_all(
+        [
+            ThreatIndicator(
+                organization_id=org.id,
+                source_id=internal.id,
+                human_id="IOC-0001",
+                indicator_type="ip",
+                value="203.0.113.50",
+                confidence="low",
+                severity="low",
+                status="active",
+                internal_match=False,
+                first_seen=seen,
+                last_seen=seen,
+                summary="TEST-NET-3 address reserved for documentation. Simulated indicator.",
+            ),
+            ThreatIndicator(
+                organization_id=org.id,
+                source_id=internal.id,
+                matched_asset_id=None if asset is None else asset.id,
+                attack_technique_id=None if technique is None else technique.id,
+                human_id="IOC-0002",
+                indicator_type="domain",
+                value="dev-watch.example",
+                confidence="medium",
+                severity="medium",
+                status="active",
+                internal_match=True,
+                first_seen=seen,
+                last_seen=seen,
+                summary=(
+                    "Stored simulated internal-match label for AST-0007 and ATT&CK T1059.001. "
+                    "Not a live correlation and not a confirmed compromise."
+                ),
+            ),
+            ThreatIndicator(
+                organization_id=org.id,
+                source_id=internal.id,
+                human_id="IOC-0003",
+                indicator_type="file_hash",
+                value=digest,
+                confidence="low",
+                severity=None,
+                status="expired",
+                internal_match=False,
+                first_seen=seen,
+                last_seen=seen,
+                summary="SHA-256 of a labeled synthetic string. Not a file from a live feed.",
+            ),
+        ]
+    )
 
 
 def main() -> None:

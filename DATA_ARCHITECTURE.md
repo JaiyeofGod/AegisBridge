@@ -73,6 +73,11 @@
 ### Integrations
 `integrations`, `sync_jobs`, `sync_states`, `integration_health`
 
+### Threat intelligence
+`threat_intel_sources`, `threat_indicators`, `threat_advisories`
+
+These three tables are the stored catalog for simulated and reference-only records. They are not a connected CISA KEV, NVD, EPSS, ThreatFox, or URLhaus feed. `incident_indicators` stays an incident-scoped table.
+
 ### Audit
 `audit_events` (append-oriented)
 
@@ -83,7 +88,8 @@
 ```text
 AST-0001  RISK-0001  CTRL-0001  EVID-0001
 VULN-0001 DET-0001   INC-0001   POL-0001
-VEN-0001  DS-0001
+VEN-0001  DS-0001    USR-0001   AUD-0001
+INT-0001  SRC-0001   IOC-0001   ADV-0001
 ```
 
 ---
@@ -119,6 +125,7 @@ Do not serve uploads from arbitrary local web paths. Prefer presigned object URL
 - Alembic for all schema changes (`migrations/` at repo root — ADR-019)
 - Phase 1: empty baseline `20261020_0001` remains history
 - Phase 2: `20261020_0002` creates the domain tables from the SQLAlchemy models
+- `20261020_0003` adds threat-intelligence tables and nullable `integrations.human_id`
 - Development seed is `python -m app.db.seed` and is not part of a migration
 - Entity relationships: `docs/schema/DOMAIN_MODEL.md`
 
@@ -145,7 +152,7 @@ Portfolio/demo data: fictional identities, no real PII, no live credentials, no 
 
 ## 11. Phase 2 schema notes
 
-The implemented tables are the domain list in section 3 except these deferred tables: `sessions`, `api_credentials`, `control_findings`, `evidence_objects`, `evidence_incident_links`, `investigation_notes`, `policy_approvals`, and `integration_health`. Authentication, object-byte storage, and integration health stay out of this foundation.
+The implemented tables are the domain list in section 3 except these deferred tables: `sessions`, `api_credentials`, `control_findings`, `evidence_objects`, `evidence_incident_links`, `investigation_notes`, `policy_approvals`, and `integration_health`. Authentication, object-byte storage, and integration health stay out of this foundation. `20261020_0003` adds `threat_intel_sources`, `threat_indicators`, `threat_advisories`, and nullable `integrations.human_id`.
 
 Human IDs are a unique `human_id` string, not the primary key. Operational prefixes use four digits (`RISK-0021`, `CTRL-0002`, `VULN-0041`, `EVID-0041`, `USR-0001`, `AL-0107`). Frontend mocks still show shorter labels such as `R-021` until a later integration.
 

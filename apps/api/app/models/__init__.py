@@ -49,6 +49,7 @@ from app.models.organization import BusinessProcess, Department, Organization
 from app.models.policy import Policy, PolicyAcknowledgement, PolicyVersion
 from app.models.risk import Risk, RiskAssessment, RiskReview, RiskTreatment
 from app.models.soc import AlertReference, Investigation
+from app.models.threat_intel import ThreatAdvisory, ThreatIndicator, ThreatIntelSource
 from app.models.vendor import Vendor, VendorAssessment, VendorFinding, VendorService
 from app.models.vulnerability import (
     AssetVulnerability,
@@ -119,6 +120,9 @@ __all__ = [
     "SsvcAssessment",
     "SyncJob",
     "SyncState",
+    "ThreatAdvisory",
+    "ThreatIndicator",
+    "ThreatIntelSource",
     "User",
     "UserRole",
     "ValidationRun",

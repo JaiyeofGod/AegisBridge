@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    administration,
     alerts,
     assets,
     governance,
@@ -10,6 +11,7 @@ from app.api.v1 import (
     incidents,
     overview,
     risks,
+    threat_intel,
     vulnerabilities,
 )
 
@@ -22,3 +24,5 @@ api_router.include_router(vulnerabilities.router)
 api_router.include_router(alerts.router)
 api_router.include_router(incidents.router)
 api_router.include_router(governance.router)
+api_router.include_router(threat_intel.router)
+api_router.include_router(administration.router)

@@ -101,6 +101,9 @@ REQUIRED_TABLES = {
     "sync_jobs",
     "sync_states",
     "audit_events",
+    "threat_intel_sources",
+    "threat_indicators",
+    "threat_advisories",
 }
 
 SECRET_COLUMN_NAMES = {"password", "secret", "token", "api_key", "credential"}
@@ -204,6 +207,7 @@ def _assert_seed(session: Session) -> None:
         "SOC Analyst",
         "Auditor",
         "Read Only",
+        "Security Engineer",
     } <= roles
     assets = {row.hostname: row.human_id for row in session.scalars(select(Asset)).all()}
     assert assets["FIN-APP-01"] == "AST-0007"

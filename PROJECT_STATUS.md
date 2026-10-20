@@ -2,7 +2,7 @@
 
 **Last updated:** October 20, 2026  
 **Current phase:** Phase 2 — read-only API contracts  
-**Next:** Authentication, when authorized. Frontend remains on local mocks.
+**Next:** Authentication, when authorized. Threat intelligence and administration pages remain on local mocks.
 
 ---
 
@@ -15,8 +15,8 @@
 | Phase 1 plan | Present (`PHASE_1_IMPLEMENTATION_PLAN.md` v1.1) — corrected routes/tooling |
 | Minimal Phase 0 docs | Complete |
 | Application code | API domain schema + web UI on local mocks |
-| Domain schema | `20261020_0002` tables, constraints, and development seed |
-| Read API | `/api/v1` overview, assets, risks, vulnerabilities, alerts, incidents, governance |
+| Domain schema | `20261020_0002` domain tables; `20261020_0003` threat intelligence and integration human IDs |
+| Read API | `/api/v1` overview, assets, risks, vulnerabilities, alerts, incidents, governance, threat intelligence, administration |
 | Authentication | Not started |
 | Write API | Not started |
 | Frontend API connection | Not started |

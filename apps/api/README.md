@@ -29,7 +29,7 @@ uv run --project apps/api python -m app.db.seed
 uv run --project apps/api python -m app.db.seed --reset
 ```
 
-The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. Seed data is not in the migration.
+The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. Threat-intelligence tables and `integrations.human_id` are `20261020_0003`. Seed data is not in the migration. Re-running the seed ensures the threat-intelligence and administration contract rows when the organization already exists.
 
 ## Health
 
@@ -48,5 +48,15 @@ Requires the domain migration and development seed. Contracts are documented in 
 - `GET /api/v1/alerts` and `GET /api/v1/alerts/{alert_id}`
 - `GET /api/v1/incidents` and `GET /api/v1/incidents/{incident_id}`
 - `GET /api/v1/governance/summary`
+- `GET /api/v1/threat-intelligence/summary`
+- `GET /api/v1/threat-intelligence/indicators` and `GET /api/v1/threat-intelligence/indicators/{indicator_id}`
+- `GET /api/v1/threat-intelligence/advisories`
+- `GET /api/v1/threat-intelligence/sources`
+- `GET /api/v1/administration/summary`
+- `GET /api/v1/administration/integrations`
+- `GET /api/v1/administration/users`
+- `GET /api/v1/administration/roles`
+- `GET /api/v1/administration/audit-events`
+- `GET /api/v1/administration/access-reviews`
 
 OpenAPI: `GET /openapi.json` and `/docs`. Path IDs are human-readable (`AST-0007`). List routes use `page` and `page_size`.

@@ -1,6 +1,6 @@
 # Domain model
 
-Phase 2 relational foundation. SQLAlchemy models live in `apps/api/app/models/`. The schema migration is `migrations/versions/20261020_0002_add_domain_schema.py`. Development rows are loaded by `python -m app.db.seed` and are not part of the migration.
+Phase 2 relational foundation. SQLAlchemy models live in `apps/api/app/models/`. Domain tables are `migrations/versions/20261020_0002_add_domain_schema.py`. Threat-intelligence tables and `integrations.human_id` are `migrations/versions/20261020_0003_add_threat_intel.py`. Development rows are loaded by `python -m app.db.seed` and are not part of the migration.
 
 Internal primary keys are UUIDs. Operational records also have a unique `human_id`. Closed value sets are strings with check constraints. There is no combined vulnerability score.
 
@@ -19,11 +19,12 @@ Internal primary keys are UUIDs. Operational records also have a unique `human_i
 | SOC | Selected alert metadata and investigations | A copy of the Wazuh database |
 | Incident | Events, tasks, indicators, evidence links | Confirmed compromise as a stored fact |
 | Vendor / policy / dataset / integration | Their own records and versions | Secrets and live connector state |
+| Threat intelligence | Source catalog, simulated indicators, advisory metadata | A live external feed |
 | Audit | Actor, action, object, result, source, environment, timestamp | Updates, secrets |
 
 ## Relationships
 
-- Organization is the parent of departments, users, assets, risks, controls, evidence, findings, detections, alerts, incidents, vendors, policies, datasets, and integrations.
+- Organization is the parent of departments, users, assets, risks, controls, evidence, findings, detections, alerts, incidents, vendors, policies, datasets, integrations, threat-intelligence sources, indicators, and advisories.
 - A user may belong to one department and many roles. A role may grant many permission labels through `access_entitlements`. Access reviews record findings about users.
 - An asset has one type, many owners, software installs, and data-asset links. Criticality and exposure are columns on the asset, separate from vulnerability facts.
 - A risk may name one affected asset. Assessments store likelihood and impact from 1 to 5. `score` is `likelihood * impact`. Residual score is generated only when both residual inputs exist. Treatment strategy is accept, avoid, mitigate, or transfer.
@@ -34,7 +35,8 @@ Internal primary keys are UUIDs. Operational records also have a unique `human_i
 - An alert reference may point at an asset and a detection. An investigation may point at one alert. Wazuh remains the source system; the row is a reference.
 - An incident has events, tasks, indicators, and evidence links.
 - Vendors have services, assessments, and findings. Policies have versions and acknowledgements. Datasets have versions, file metadata, and experiments.
-- An integration has sync jobs. `sync_states` is one current row per integration. No credential column is stored.
+- An integration has an optional human ID, sync jobs, and one current `sync_states` row. No credential column is stored. `auth_state` is a label such as `No credentials stored`.
+- A threat-intelligence source has `connection_status` of `configured`, `reference_only`, `not_connected`, `delayed`, or `healthy`. Indicators belong to one source and may point at one asset and one ATT&CK technique. Advisories store metadata only. Incident indicators remain a separate table.
 - Audit events reference an optional user and have no `updated_at`.
 
 ## Deferred tables
@@ -43,6 +45,8 @@ Internal primary keys are UUIDs. Operational records also have a unique `human_i
 
 ## Development seed identifiers
 
-The seed is deterministic and skips work when organization slug `aegisbridge-technologies` already exists. `python -m app.db.seed --reset` deletes domain rows only when `APP_ENV` is local, development, dev, or test.
+The seed is deterministic. When organization slug `aegisbridge-technologies` already exists, it still ensures the threat-intelligence and administration contract rows. `python -m app.db.seed --reset` deletes domain rows only when `APP_ENV` is local, development, dev, or test.
 
-Representative IDs include `AST-0007` FIN-APP-01, `AST-0018` WIN-WS-07, `AST-0003` WAZUH-01, `AST-0061` LINUX-APP-01, `AST-0031` EDGE-FW-01, `RISK-0021`, `CTRL-0002`, `EVID-0041`, `VULN-0041`, `DET-0005`, `AL-0107`, and `INC-0001`.
+Representative IDs include `AST-0007` FIN-APP-01, `AST-0018` WIN-WS-07, `AST-0003` WAZUH-01, `AST-0061` LINUX-APP-01, `AST-0031` EDGE-FW-01, `RISK-0021`, `CTRL-0002`, `EVID-0041`, `VULN-0041`, `DET-0005`, `AL-0107`, `INC-0001`, `USR-0002`, `INT-0001`, `INT-0002`, `AUD-0002`, `SRC-0006`, `IOC-0002`, and `ADV-0001`.
+
+The role catalog is Administrator, CISO, GRC Analyst, SOC Analyst, Security Engineer, Auditor, and Read Only. Security Engineer was added because master requirements §6 and `SECURITY_REQUIREMENTS.md` list it as a distinct platform role. The original six roles are unchanged.
