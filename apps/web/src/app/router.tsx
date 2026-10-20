@@ -1,10 +1,13 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { ComingSoonPage } from "@/app/ComingSoonPage";
+import { AssetDetailPage } from "@/features/assets/AssetDetailPage";
+import { AssetInventoryPage } from "@/features/assets/AssetInventoryPage";
 import { GovernancePage } from "@/features/governance/GovernancePage";
 import { OverviewPage } from "@/features/overview/OverviewPage";
 import { RiskPage } from "@/features/risk/RiskPage";
 import { SignInPage } from "@/features/signin/SignInPage";
+import { VulnerabilityPage } from "@/features/vulnerabilities/VulnerabilityPage";
 
 export function AppRouter() {
   return (
@@ -16,9 +19,9 @@ export function AppRouter() {
       <Route path="/risks" element={<RiskPage />} />
 
       {/* Route foundations only — modules not built yet */}
-      <Route path="/assets" element={<ComingSoonPage title="Assets" />} />
-      <Route path="/assets/:assetId" element={<ComingSoonPage title="Asset details" />} />
-      <Route path="/vulnerabilities" element={<ComingSoonPage title="Vulnerabilities" />} />
+      <Route path="/assets" element={<AssetInventoryPage />} />
+      <Route path="/assets/:assetId" element={<AssetDetailPage />} />
+      <Route path="/vulnerabilities" element={<VulnerabilityPage />} />
       <Route path="/soc" element={<ComingSoonPage title="SOC Operations" />} />
       <Route path="/incidents" element={<ComingSoonPage title="Incidents" />} />
       <Route path="/threat-intelligence" element={<ComingSoonPage title="Threat Intelligence" />} />
