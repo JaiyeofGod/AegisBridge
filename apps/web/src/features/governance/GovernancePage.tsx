@@ -10,17 +10,25 @@ import { AppShell } from "@/components/navigation/AppShell";
 import { PageContainer } from "@/components/navigation/PageContainer";
 import { PageHeader } from "@/components/navigation/PageHeader";
 import { StatusBadge } from "@/components/status/StatusBadge";
+import { StaleDataIndicator } from "@/components/status/StaleDataIndicator";
+import { SEEDED_DATA_LABEL, SEEDED_DATA_NOTE } from "@/features/data-origin";
 import { AssessmentWorkTable } from "@/features/governance/AssessmentWorkTable";
 import { GovernanceSectionNav } from "@/features/governance/GovernanceSectionNav";
-import { useGovernanceData } from "@/features/governance/useGovernanceData";
+import { mapGovernanceSummary, type GovernanceView } from "@/features/governance/mapGovernance";
+import { useGovernanceSummary } from "@/features/governance/useGovernanceData";
+import { formatTimestamp } from "@/lib/format";
 import type { GovernanceSectionId } from "@/types/governance";
 
 export function GovernancePage() {
-  const governance = useGovernanceData();
+  const governance = useGovernanceSummary();
   const [section, setSection] = useState<GovernanceSectionId>("summary");
+  const generatedAt = governance.dataUpdatedAt
+    ? new Date(governance.dataUpdatedAt).toISOString()
+    : new Date().toISOString();
+  const view = governance.data ? mapGovernanceSummary(governance.data, generatedAt) : null;
 
   return (
-    <AppShell environmentLabel={governance.data.environmentLabel}>
+    <AppShell environmentLabel="Development · Seeded">
       <PageContainer data-testid="governance-page">
         <PageHeader
           title="Governance & compliance"
@@ -35,7 +43,12 @@ export function GovernancePage() {
               >
                 New assessment
               </Button>
-              <SimulatedDataBanner message={governance.data.snapshotLabel} />
+              <SimulatedDataBanner message={SEEDED_DATA_NOTE} />
+              {governance.dataUpdatedAt ? (
+                <p className="text-xs text-[var(--muted)]" data-testid="last-successful-fetch">
+                  Last successful update: {formatTimestamp(generatedAt)}
+                </p>
+              ) : null}
             </div>
           }
         />
@@ -44,30 +57,39 @@ export function GovernancePage() {
           <GovernanceSectionNav active={section} onChange={setSection} />
         </div>
 
-        {governance.state === "loading" ? <LoadingState label="Updating" rows={4} /> : null}
+        {governance.isPending ? <LoadingState label="Updating" rows={4} /> : null}
 
-        {governance.state === "error" ? (
+        {governance.isError ? (
           <ErrorState
             title="Governance data unavailable"
-            description="The simulated governance source failed to load. Retry to restore the last known demo snapshot."
-            lastSuccessfulAt={governance.data.lastSuccessfulFetchAt}
-            onRetry={governance.reload}
+            description="The development governance API did not respond. Retry to load the seeded summary. Fixture counts are not substituted."
+            lastSuccessfulAt={governance.dataUpdatedAt ? generatedAt : undefined}
+            onRetry={() => void governance.refetch()}
           />
         ) : null}
 
-        {governance.state === "ready" ? (
+        {governance.isSuccess && governance.isFetching ? (
+          <div className="mb-6">
+            <StaleDataIndicator
+              message="Refreshing development governance summary"
+              lastSuccessfulAt={generatedAt}
+            />
+          </div>
+        ) : null}
+
+        {governance.isSuccess && view ? (
           <div
             role="tabpanel"
             id={`governance-panel-${section}`}
             aria-labelledby={`governance-tab-${section}`}
             className="space-y-8"
           >
-            {section === "summary" ? <SummarySection data={governance.data} /> : null}
-            {section === "frameworks" ? <FrameworksSection data={governance.data} /> : null}
-            {section === "controls" ? <ControlsSection data={governance.data} /> : null}
-            {section === "evidence" ? <EvidenceSection data={governance.data} /> : null}
-            {section === "policies" ? <PoliciesSection data={governance.data} /> : null}
-            {section === "access-reviews" ? <AccessReviewsSection data={governance.data} /> : null}
+            {section === "summary" ? <SummarySection data={view} /> : null}
+            {section === "frameworks" ? <FrameworksSection data={view} /> : null}
+            {section === "controls" ? <ControlsSection data={view} /> : null}
+            {section === "evidence" ? <EvidenceSection data={view} /> : null}
+            {section === "policies" ? <PoliciesSection data={view} /> : null}
+            {section === "access-reviews" ? <AccessReviewsSection data={view} /> : null}
           </div>
         ) : null}
       </PageContainer>
@@ -75,7 +97,7 @@ export function GovernancePage() {
   );
 }
 
-function SummarySection({ data }: { data: ReturnType<typeof useGovernanceData>["data"] }) {
+function SummarySection({ data }: { data: GovernanceView }) {
   return (
     <>
       <section aria-labelledby="governance-summary-metrics-heading">
@@ -86,7 +108,7 @@ function SummarySection({ data }: { data: ReturnType<typeof useGovernanceData>["
           >
             Assurance snapshot
           </h2>
-          <StatusBadge label="SIMULATED" tone="warning" />
+          <StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {data.metrics.map((metric) => (
@@ -100,42 +122,27 @@ function SummarySection({ data }: { data: ReturnType<typeof useGovernanceData>["
 
       <Panel
         title="Assessment work"
-        description="Open assessments and control reviews for the simulated AegisBridge Technologies program."
+        description="Control test results returned by the governance summary."
       >
-        <AssessmentWorkTable assessments={data.assessments} />
+        {data.assessments.length === 0 ? (
+          <p className="text-sm text-[var(--muted)]">No control test results stored.</p>
+        ) : (
+          <AssessmentWorkTable assessments={data.assessments} />
+        )}
       </Panel>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-stretch">
         <Panel
           title="Evidence due"
-          description="Collection items with the nearest due dates."
+          description="Due dates are not stored. Freshness uses collected_at and SHA-256 metadata."
           className="h-full"
         >
-          <ul className="space-y-3">
-            {data.evidenceDue.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-start justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-3 py-3"
-              >
-                <div className="min-w-0 space-y-1">
-                  <p className="leading-snug font-medium text-[var(--text)]">
-                    {item.evidenceId} · {item.title}
-                  </p>
-                  <p className="text-xs leading-snug text-[var(--muted)]">
-                    {item.linkedControlId} · {item.dueLabel}
-                  </p>
-                </div>
-                <div className="shrink-0 pt-0.5">
-                  <StatusBadge label={item.freshnessLabel} tone={item.statusTone} />
-                </div>
-              </li>
-            ))}
-          </ul>
+          <p className="text-sm text-[var(--muted)]">No evidence due dates are stored.</p>
         </Panel>
 
         <Panel
           title="Workflow & interpretation"
-          description="How to read this simulated governance view."
+          description="How to read this development governance summary."
           className="h-full"
         >
           <ul className="space-y-3">
@@ -154,19 +161,26 @@ function SummarySection({ data }: { data: ReturnType<typeof useGovernanceData>["
   );
 }
 
-function FrameworksSection({ data }: { data: ReturnType<typeof useGovernanceData>["data"] }) {
+function FrameworksSection({ data }: { data: GovernanceView }) {
   return (
     <section aria-labelledby="frameworks-heading" className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="frameworks-heading" className="font-heading text-xl font-bold text-[var(--text)]">
           Framework coverage
         </h2>
-        <StatusBadge label="SIMULATED" tone="warning" />
+        <StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />
       </div>
       <p className="text-sm text-[var(--muted)]">
         Coverage counts are scoped per framework. Mappings do not imply certification or an
         aggregate security score.
       </p>
+      <p className="text-sm text-[var(--muted)]">
+        NIST CSF 2.0, CIS Controls v8.1, and OWASP ASVS 5.0.0 appear here only when the summary
+        returns them.
+      </p>
+      {data.frameworks.length === 0 ? (
+        <p className="text-sm text-[var(--muted)]">No frameworks are stored.</p>
+      ) : null}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {data.frameworks.map((framework) => (
           <article
@@ -181,8 +195,11 @@ function FrameworksSection({ data }: { data: ReturnType<typeof useGovernanceData
                 </h3>
                 <p className="mt-1 text-sm text-[var(--muted)]">{framework.role}</p>
               </div>
-              <p className="font-heading text-2xl font-bold text-[var(--accent)]">
-                {framework.coveredCount} / {framework.totalInScope}
+              <p className="text-right">
+                <span className="font-heading text-2xl font-bold text-[var(--accent)]">
+                  {framework.storedControlCount}
+                </span>
+                <span className="mt-1 block text-xs text-[var(--muted)]">Stored controls</span>
               </p>
             </div>
             <dl className="mt-4 grid gap-2 text-sm">
@@ -203,134 +220,139 @@ function FrameworksSection({ data }: { data: ReturnType<typeof useGovernanceData
   );
 }
 
-function ControlsSection({ data }: { data: ReturnType<typeof useGovernanceData>["data"] }) {
+function ControlsSection({ data }: { data: GovernanceView }) {
   return (
     <Panel
       title="Control implementation status"
-      description="Identifiers, owners, and fictional implementation summaries. CIS entries store IDs only."
-      action={<StatusBadge label="SIMULATED" tone="warning" />}
+      description="Status counts returned by the summary. CIS entries, when stored, are identifiers and status only."
+      action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
     >
       <ul className="space-y-3" data-testid="controls-list">
-        {data.controls.map((control) => (
-          <li
-            key={control.id}
-            className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0 space-y-1">
-                <p className="font-medium text-[var(--text)]">
-                  <span className="text-[var(--accent)]">{control.controlId}</span> ·{" "}
-                  {control.title}
-                </p>
-                <p className="text-xs text-[var(--muted)]">
-                  {control.framework} · Owner {control.owner} · Evidence {control.evidenceCount} ·{" "}
-                  {control.testFrequency}
-                </p>
-                <p className="text-sm leading-relaxed text-[var(--muted)]">
-                  {control.implementationSummary}
-                </p>
-              </div>
-              <StatusBadge label={control.status} tone={control.statusTone} />
-            </div>
+        {data.statusCounts.length === 0 ? (
+          <li className="text-sm text-[var(--muted)]">
+            No control implementation status is stored.
           </li>
-        ))}
+        ) : (
+          data.statusCounts.map((item) => (
+            <li
+              key={item.status}
+              className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
+            >
+              <p className="font-medium text-[var(--text)]">{item.status}</p>
+              <p className="text-sm text-[var(--muted)]">{item.count}</p>
+            </li>
+          ))
+        )}
+        <li className="text-sm text-[var(--muted)]">
+          {data.testsRecorded === 0
+            ? "No control test results stored."
+            : `${data.testsPassed} passed of ${data.testsRecorded} stored control tests.`}
+        </li>
       </ul>
       <p className="mt-4 text-xs text-[var(--muted)]">
-        Status labels are textual. There is no aggregate security score.
+        {data.assessedApplicable} assessed applicable. Status labels are textual. There is no
+        aggregate security score.
       </p>
     </Panel>
   );
 }
 
-function EvidenceSection({ data }: { data: ReturnType<typeof useGovernanceData>["data"] }) {
+function EvidenceSection({ data }: { data: GovernanceView }) {
+  const freshness = data.evidence;
   return (
     <Panel
       title="Evidence freshness"
-      description="Collection and freshness state for control-linked evidence packages."
-      action={<StatusBadge label="SIMULATED" tone="warning" />}
+      description="Stored evidence metadata. Automated evidence collection is not connected."
+      action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
     >
       <ul className="space-y-3" data-testid="evidence-list">
-        {data.evidence.map((item) => (
-          <li
-            key={item.id}
-            className="flex flex-wrap items-start justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
-          >
-            <div className="min-w-0 space-y-1">
-              <p className="font-medium text-[var(--text)]">
-                {item.evidenceId} · {item.title}
-              </p>
-              <p className="text-xs text-[var(--muted)]">
-                Linked control {item.linkedControlId} · {item.dueLabel}
-              </p>
-            </div>
-            <StatusBadge label={item.freshnessLabel} tone={item.statusTone} />
-          </li>
-        ))}
+        {freshness.recorded === 0 ? (
+          <li className="text-sm text-[var(--muted)]">No evidence freshness data is stored.</li>
+        ) : (
+          <>
+            <li className="text-sm text-[var(--text)]">Recorded evidence: {freshness.recorded}</li>
+            <li className="text-sm text-[var(--text)]">With SHA-256: {freshness.with_sha256}</li>
+            <li className="text-sm text-[var(--text)]">
+              Missing collected_at: {freshness.missing_collected_at}
+            </li>
+            <li className="text-sm text-[var(--muted)]">{freshness.semantics}</li>
+            <li className="text-sm text-[var(--muted)]">No evidence due dates are stored.</li>
+          </>
+        )}
       </ul>
     </Panel>
   );
 }
 
-function PoliciesSection({ data }: { data: ReturnType<typeof useGovernanceData>["data"] }) {
+function PoliciesSection({ data }: { data: GovernanceView }) {
   return (
     <Panel
       title="Policy status"
-      description="Simulated policy catalog for AegisBridge Technologies with review cadence."
-      action={<StatusBadge label="SIMULATED" tone="warning" />}
+      description="Policy records returned by the governance summary. Review dates are not stored."
+      action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
     >
       <ul className="space-y-3" data-testid="policies-list">
-        {data.policies.map((policy) => (
-          <li
-            key={policy.id}
-            className="flex flex-wrap items-start justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
-          >
-            <div className="min-w-0 space-y-1">
-              <p className="font-medium text-[var(--text)]">
-                {policy.name} <span className="text-[var(--muted)]">({policy.version})</span>
-              </p>
-              <p className="text-xs text-[var(--muted)]">
-                Owner {policy.owner} · {policy.nextReviewLabel}
-              </p>
-            </div>
-            <StatusBadge label={policy.reviewState} tone={policy.reviewTone} />
-          </li>
-        ))}
+        {data.policies.length === 0 ? (
+          <li className="text-sm text-[var(--muted)]">No policy records are stored.</li>
+        ) : (
+          data.policies.map((policy) => (
+            <li
+              key={policy.id}
+              className="flex flex-wrap items-start justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
+            >
+              <div className="min-w-0 space-y-1">
+                <p className="font-medium text-[var(--text)]">
+                  {policy.id} · {policy.title}{" "}
+                  <span className="text-[var(--muted)]">({policy.version})</span>
+                </p>
+                <p className="text-xs text-[var(--muted)]">
+                  Owner {policy.owner} · Acknowledgements {policy.acknowledgementCount} · Next
+                  review Not stored
+                </p>
+              </div>
+              <StatusBadge label={policy.statusLabel} tone={policy.statusTone} />
+            </li>
+          ))
+        )}
       </ul>
     </Panel>
   );
 }
 
-function AccessReviewsSection({ data }: { data: ReturnType<typeof useGovernanceData>["data"] }) {
+function AccessReviewsSection({ data }: { data: GovernanceView }) {
   return (
     <Panel
       title="Access review status"
-      description="Campaign progress and fictional findings for the demo identity set."
-      action={<StatusBadge label="SIMULATED" tone="warning" />}
+      description="Review records returned by the summary. A directory connection is not implied."
+      action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
     >
       <ul className="space-y-3" data-testid="access-reviews-list">
-        {data.accessReviews.map((review) => (
-          <li
-            key={review.id}
-            className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0 space-y-1">
-                <p className="font-medium text-[var(--text)]">{review.name}</p>
-                <p className="text-xs text-[var(--muted)]">
-                  {review.scope} · Owner {review.owner} · Decisions {review.decisionsCompleted} /{" "}
-                  {review.decisionsTotal}
-                </p>
-                <p className="text-sm leading-relaxed text-[var(--muted)]">
-                  {review.findingSummary}
-                </p>
+        {data.accessReviews.length === 0 ? (
+          <li className="text-sm text-[var(--muted)]">No access reviews are stored.</li>
+        ) : (
+          data.accessReviews.map((review) => (
+            <li
+              key={review.id}
+              className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 space-y-1">
+                  <p className="font-medium text-[var(--text)]">
+                    {review.id} · {review.name}
+                  </p>
+                  <p className="text-xs text-[var(--muted)]">
+                    Open findings {review.openFindings} / {review.totalFindings}. Scope and owner
+                    are not stored.
+                  </p>
+                </div>
+                <StatusBadge label={review.statusLabel} tone={review.statusTone} />
               </div>
-              <StatusBadge label={review.statusLabel} tone={review.statusTone} />
-            </div>
-          </li>
-        ))}
+            </li>
+          ))
+        )}
       </ul>
       <p className="mt-4 text-xs text-[var(--muted)]">
-        Decision completion rates are campaign metrics only — not an aggregate security score.
+        Finding counts are campaign records only. There is no aggregate security score.
       </p>
     </Panel>
   );

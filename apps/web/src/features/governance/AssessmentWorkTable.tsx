@@ -114,7 +114,7 @@ export function AssessmentWorkTable({ assessments }: { assessments: AssessmentRe
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-4 py-8 text-[var(--muted)]">
-                  No assessments match the current filters. Clear filters to see the sample set.
+                  No control test results are stored for the current request.
                 </td>
               </tr>
             ) : (
@@ -134,7 +134,7 @@ export function AssessmentWorkTable({ assessments }: { assessments: AssessmentRe
       </div>
 
       <p className="text-xs text-[var(--muted)]">
-        Showing {filtered.length} of {assessments.length} sample records · Row selection opens
+        Showing {filtered.length} of {assessments.length} development records · Row selection opens
         record details in a later phase
       </p>
     </div>

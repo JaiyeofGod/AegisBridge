@@ -270,3 +270,56 @@ export type IncidentQuery = {
   page?: number;
   pageSize?: number;
 };
+
+export type FrameworkSummary = {
+  code: string;
+  name: string;
+  version: string | null;
+  control_count: number;
+  licensed_text_included: boolean;
+};
+
+export type ControlImplementationCounts = {
+  by_status: Record<string, number>;
+  tests_passed: number;
+  tests_recorded: number;
+  assessed_applicable: number;
+};
+
+export type EvidenceFreshness = {
+  recorded: number;
+  with_sha256: number;
+  missing_collected_at: number;
+  semantics: string;
+};
+
+export type AssessmentWork = {
+  tests_recorded: number;
+  items: string[];
+};
+
+export type PolicyStatusItem = {
+  id: string;
+  title: string;
+  status: string;
+  current_version: string | null;
+  acknowledgement_count: number;
+  owner: PersonRef | null;
+};
+
+export type AccessReviewStatusItem = {
+  id: string;
+  name: string;
+  status: string;
+  open_findings: number;
+  total_findings: number;
+};
+
+export type GovernanceSummary = {
+  frameworks: FrameworkSummary[];
+  control_implementations: ControlImplementationCounts;
+  evidence_freshness: EvidenceFreshness;
+  assessment_work: AssessmentWork;
+  policies: PolicyStatusItem[];
+  access_reviews: AccessReviewStatusItem[];
+};

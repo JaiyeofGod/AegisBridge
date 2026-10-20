@@ -1,33 +1,12 @@
-import { useCallback, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
-import { governanceMock } from "@/mocks/governance";
-import type { GovernanceSnapshot } from "@/types/governance";
+import { fetchGovernanceSummary } from "@/services/governance";
 
-type LoadState = "ready" | "loading" | "error";
-
-/**
- * Phase 1 uses deterministic mocks. Shape mirrors a future TanStack Query hook
- * so API wiring can replace the source without rewriting the page.
- */
-export function useGovernanceData() {
-  const [state, setState] = useState<LoadState>("ready");
-  const [data, setData] = useState<GovernanceSnapshot>(governanceMock);
-
-  const reload = useCallback(() => {
-    setState("loading");
-    window.setTimeout(() => {
-      setData(governanceMock);
-      setState("ready");
-    }, 350);
-  }, []);
-
-  return useMemo(
-    () => ({
-      state,
-      data,
-      reload,
-      isSimulated: true as const,
-    }),
-    [state, data, reload],
-  );
+export function useGovernanceSummary() {
+  return useQuery({
+    queryKey: ["governance", "summary"],
+    queryFn: fetchGovernanceSummary,
+    retry: false,
+    staleTime: 30_000,
+  });
 }

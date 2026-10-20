@@ -10,6 +10,7 @@ import type {
   OverviewResponse,
   RiskDetailResponse,
   RiskListItem,
+  GovernanceSummary,
   VulnerabilityDetailResponse,
   VulnerabilityListItem,
 } from "@/services/api-types";
@@ -364,6 +365,70 @@ export const emptyIncidentDetail: IncidentDetailResponse = {
   affected_assets: [],
 };
 
+export const governanceSummary: GovernanceSummary = {
+  frameworks: [
+    {
+      code: "NIST-800-53",
+      name: "NIST SP 800-53",
+      version: "Rev. 5",
+      control_count: 1,
+      licensed_text_included: false,
+    },
+  ],
+  control_implementations: {
+    by_status: { partial: 1 },
+    tests_passed: 0,
+    tests_recorded: 0,
+    assessed_applicable: 1,
+  },
+  evidence_freshness: {
+    recorded: 1,
+    with_sha256: 1,
+    missing_collected_at: 0,
+    semantics:
+      "Freshness is collected_at plus SHA-256 presence. No evidence due date is stored, and file bytes are not returned.",
+  },
+  assessment_work: { tests_recorded: 0, items: [] },
+  policies: [
+    {
+      id: "POL-0001",
+      title: "Access control policy",
+      status: "draft",
+      current_version: "0.1",
+      acknowledgement_count: 1,
+      owner: { id: "USR-0003", display_name: "Priya Shah" },
+    },
+  ],
+  access_reviews: [
+    {
+      id: "ARV-0001",
+      name: "October access review",
+      status: "in_progress",
+      open_findings: 1,
+      total_findings: 1,
+    },
+  ],
+};
+
+export const emptyGovernanceSummary: GovernanceSummary = {
+  frameworks: [],
+  control_implementations: {
+    by_status: {},
+    tests_passed: 0,
+    tests_recorded: 0,
+    assessed_applicable: 0,
+  },
+  evidence_freshness: {
+    recorded: 0,
+    with_sha256: 0,
+    missing_collected_at: 0,
+    semantics: "No evidence metadata is stored.",
+  },
+  assessment_work: { tests_recorded: 0, items: [] },
+  policies: [],
+  access_reviews: [],
+};
+
 export function installApiFetch(resolve?: (url: string) => unknown) {
   const calls: string[] = [];
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -401,6 +466,7 @@ export function installApiFetch(resolve?: (url: string) => unknown) {
       return jsonResponse(assetPage(alertItems));
     }
     if (/\/api\/v1\/incidents\/[^?]+/.test(url)) return jsonResponse(incidentDetail);
+    if (url.includes("/api/v1/governance/summary")) return jsonResponse(governanceSummary);
     if (url.includes("/api/v1/incidents")) {
       if (url.includes("containment_state=")) return jsonResponse(assetPage([]));
       if (url.includes("severity=medium") || url.includes("owner=Jonah")) {
