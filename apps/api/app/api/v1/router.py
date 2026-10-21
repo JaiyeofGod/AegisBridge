@@ -6,6 +6,7 @@ from app.api.v1 import (
     administration,
     alerts,
     assets,
+    cyber_range,
     datasets,
     experiments,
     governance,
@@ -32,3 +33,4 @@ api_router.include_router(administration.router)
 api_router.include_router(reports.router)
 api_router.include_router(datasets.router)
 api_router.include_router(experiments.router)
+api_router.include_router(cyber_range.router)

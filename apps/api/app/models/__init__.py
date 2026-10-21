@@ -11,6 +11,14 @@ from app.models.assets import (
 )
 from app.models.audit import AuditEvent
 from app.models.base import Base
+from app.models.cyber_range import (
+    LabScenario,
+    LabScenarioAttackMapping,
+    LabScenarioDetection,
+    LabScenarioSystem,
+    LabSystem,
+    LabZone,
+)
 from app.models.dataset import Dataset, DatasetExperiment, DatasetFile, DatasetVersion
 from app.models.detection import (
     AttackTechnique,
@@ -106,6 +114,12 @@ __all__ = [
     "Integration",
     "Investigation",
     "KevRecord",
+    "LabScenario",
+    "LabScenarioAttackMapping",
+    "LabScenarioDetection",
+    "LabScenarioSystem",
+    "LabSystem",
+    "LabZone",
     "Organization",
     "Permission",
     "Policy",

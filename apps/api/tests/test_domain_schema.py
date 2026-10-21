@@ -105,6 +105,12 @@ REQUIRED_TABLES = {
     "threat_indicators",
     "threat_advisories",
     "report_definitions",
+    "lab_zones",
+    "lab_systems",
+    "lab_scenarios",
+    "lab_scenario_systems",
+    "lab_scenario_detections",
+    "lab_scenario_attack_mappings",
 }
 
 SECRET_COLUMN_NAMES = {"password", "secret", "token", "api_key", "credential"}

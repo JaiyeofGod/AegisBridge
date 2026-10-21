@@ -48,6 +48,12 @@ from app.models import (
     Integration,
     Investigation,
     KevRecord,
+    LabScenario,
+    LabScenarioAttackMapping,
+    LabScenarioDetection,
+    LabScenarioSystem,
+    LabSystem,
+    LabZone,
     Organization,
     Permission,
     Policy,
@@ -777,6 +783,10 @@ def _ensure_contract_records(session: Session, org: Organization) -> None:
     _ensure_report_definitions(session, org)
     datasets = _ensure_datasets(session, org)
     _ensure_dataset_experiments(session, datasets, seen)
+    _ensure_lab_bridge(session, org)
+    detections = _ensure_lab_detections(session, org)
+    systems = _ensure_lab_zones_and_systems(session, org)
+    _ensure_lab_scenarios(session, org, systems, detections)
 
 
 def _ensure_report_definitions(session: Session, org: Organization) -> None:
@@ -1287,6 +1297,565 @@ def _ensure_threat_indicators(
             ),
         ]
     )
+
+
+def _ensure_lab_bridge(session: Session, org: Organization) -> None:
+    if session.scalar(select(Integration).where(Integration.human_id == "INT-0003")) is not None:
+        return
+    bridge = Integration(
+        organization_id=org.id,
+        human_id="INT-0003",
+        name="Lab Bridge",
+        category="lab",
+        status="not_connected",
+        auth_state="No credentials stored",
+        notes=(
+            "Outbound-only future Lab Bridge placeholder. "
+            "Lenovo remains private. No inbound management path and no remote control."
+        ),
+    )
+    session.add(bridge)
+    session.flush()
+    session.add(
+        SyncState(
+            integration_id=bridge.id,
+            freshness="not_connected",
+            cursor_label=None,
+            last_success_at=None,
+        )
+    )
+
+
+def _ensure_attack_technique(
+    session: Session,
+    technique_id: str,
+    name: str,
+    tactic: str,
+) -> AttackTechnique:
+    row = session.scalar(
+        select(AttackTechnique).where(AttackTechnique.technique_id == technique_id)
+    )
+    if row is not None:
+        return row
+    row = AttackTechnique(
+        technique_id=technique_id,
+        name=name,
+        tactic=tactic,
+        attack_version="Enterprise v20.0",
+    )
+    session.add(row)
+    session.flush()
+    return row
+
+
+def _ensure_lab_detections(session: Session, org: Organization) -> dict[str, Detection]:
+    catalog = (
+        (
+            "DET-0001",
+            "Repeated authentication failures",
+            "Catalog entry for repeated authentication failure patterns.",
+            "Windows Security",
+            "detections/sigma/repeated_auth_failures.yml",
+            "T1110",
+            "Brute Force",
+            "Credential Access",
+        ),
+        (
+            "DET-0002",
+            "Suspicious successful login after failures",
+            "Catalog entry for a success following authentication failures.",
+            "Windows Security",
+            "detections/sigma/success_after_failures.yml",
+            "T1078",
+            "Valid Accounts",
+            "Defense Evasion",
+        ),
+        (
+            "DET-0003",
+            "Privileged account creation",
+            "Catalog entry for new privileged account creation.",
+            "Windows Security",
+            "detections/sigma/privileged_account_created.yml",
+            "T1136.001",
+            "Local Account",
+            "Persistence",
+        ),
+        (
+            "DET-0004",
+            "Admin group membership change",
+            "Catalog entry for administrator-group membership changes.",
+            "Windows Security",
+            "detections/sigma/admin_group_change.yml",
+            "T1098",
+            "Account Manipulation",
+            "Persistence",
+        ),
+        (
+            "DET-0005",
+            "Suspicious PowerShell child process",
+            "Catalog entry for suspicious PowerShell child-process creation.",
+            "Sysmon",
+            "detections/sigma/office_powershell_child.yml",
+            "T1059.001",
+            "PowerShell",
+            "Execution",
+        ),
+        (
+            "DET-0006",
+            "Scheduled task creation",
+            "Catalog entry for suspicious scheduled-task creation.",
+            "Windows Security",
+            "detections/sigma/scheduled_task_created.yml",
+            "T1053.005",
+            "Scheduled Task",
+            "Persistence",
+        ),
+        (
+            "DET-0007",
+            "New service installation",
+            "Catalog entry for unexpected service installation.",
+            "Windows System",
+            "detections/sigma/service_install.yml",
+            "T1543.003",
+            "Windows Service",
+            "Persistence",
+        ),
+        (
+            "DET-0008",
+            "Security and logging tampering",
+            "Catalog entry for logging or security-tool tampering.",
+            "Windows Security",
+            "detections/sigma/logging_tamper.yml",
+            "T1562.001",
+            "Disable or Modify Tools",
+            "Defense Evasion",
+        ),
+        (
+            "DET-0009",
+            "Executable from a user directory",
+            "Catalog entry for executables launched from user directories.",
+            "Sysmon",
+            "detections/sigma/user_dir_executable.yml",
+            "T1204.002",
+            "Malicious File",
+            "Execution",
+        ),
+        (
+            "DET-0010",
+            "Unusual outbound network connection",
+            "Catalog entry for unusual outbound network activity.",
+            "Suricata",
+            "detections/sigma/unusual_outbound.yml",
+            "T1071.001",
+            "Web Protocols",
+            "Command and Control",
+        ),
+        (
+            "DET-0011",
+            "Sensitive file modification",
+            "Catalog entry for sensitive-file modification indicators.",
+            "Sysmon",
+            "detections/sigma/sensitive_file_modification.yml",
+            "T1565.001",
+            "Stored Data Manipulation",
+            "Impact",
+        ),
+        (
+            "DET-0012",
+            "Suspicious SSH activity",
+            "Catalog entry for suspicious SSH authentication patterns.",
+            "Linux auth",
+            "detections/sigma/suspicious_ssh.yml",
+            "T1021.004",
+            "SSH",
+            "Lateral Movement",
+        ),
+    )
+    detections: dict[str, Detection] = {}
+    for (
+        human_id,
+        name,
+        description,
+        data_source,
+        sigma,
+        technique_id,
+        technique_name,
+        tactic,
+    ) in catalog:
+        technique = _ensure_attack_technique(session, technique_id, technique_name, tactic)
+        row = session.scalar(select(Detection).where(Detection.human_id == human_id))
+        if row is None:
+            row = Detection(
+                organization_id=org.id,
+                human_id=human_id,
+                name=name,
+                status="draft",
+            )
+            session.add(row)
+            session.flush()
+            session.add(
+                DetectionVersion(
+                    detection_id=row.id,
+                    version_label="1",
+                    logic_summary="Reference rule summary only. Not deployed to Wazuh.",
+                    is_current=True,
+                )
+            )
+        row.name = name
+        row.description = description
+        row.status = "draft"
+        row.data_source = data_source
+        row.sigma_reference = sigma
+        row.wazuh_mapping_status = "not_connected"
+        row.validation_state = "not_validated"
+        row.last_validated_at = None
+        row.notes = (
+            "Development catalog metadata only. No successful validation run is stored. "
+            "Wazuh is not connected."
+        )
+        if (
+            session.scalar(
+                select(DetectionAttackMapping).where(
+                    DetectionAttackMapping.detection_id == row.id,
+                    DetectionAttackMapping.attack_technique_id == technique.id,
+                )
+            )
+            is None
+        ):
+            session.add(
+                DetectionAttackMapping(detection_id=row.id, attack_technique_id=technique.id)
+            )
+        detections[human_id] = row
+    return detections
+
+
+def _ensure_lab_zones_and_systems(session: Session, org: Organization) -> dict[str, LabSystem]:
+    zones = (
+        (
+            "MGMT",
+            "Management",
+            "10.10.10.0/24",
+            "10.10.10.1",
+            "Security management. Wazuh and gateway administration.",
+            "Default deny. ATTACK may not reach MGMT.",
+        ),
+        (
+            "CORP",
+            "Corporate",
+            "10.10.20.0/24",
+            "10.10.20.1",
+            "User endpoints for authorized lab scenarios.",
+            "Wazuh agent flows to MGMT are planned. Other MGMT access is denied.",
+        ),
+        (
+            "SERVER",
+            "Server",
+            "10.10.30.0/24",
+            "10.10.30.1",
+            "Application and server workloads.",
+            "Wazuh agent flows to MGMT are planned. Business paths are explicit.",
+        ),
+        (
+            "DMZ",
+            "DMZ",
+            "10.10.40.0/24",
+            "10.10.40.1",
+            "Intentionally exposed lab services when a scenario places one here.",
+            "No dedicated system in the development catalog. Gateway interface only.",
+        ),
+        (
+            "ATTACK",
+            "Attack",
+            "10.10.50.0/24",
+            "10.10.50.1",
+            "Authorized testing and controlled validation.",
+            "Denied to MGMT. Paths into CORP or SERVER stay off unless a test rule is documented.",
+        ),
+    )
+    zone_rows: dict[str, LabZone] = {}
+    for human_id, name, cidr, gateway, purpose, isolation in zones:
+        row = session.scalar(select(LabZone).where(LabZone.human_id == human_id))
+        if row is None:
+            row = LabZone(
+                organization_id=org.id,
+                human_id=human_id,
+                name=name,
+                cidr=cidr,
+                purpose=purpose,
+                status="defined",
+                observed_state="not_observed",
+            )
+            session.add(row)
+            session.flush()
+        row.name = name
+        row.cidr = cidr
+        row.gateway = gateway
+        row.purpose = purpose
+        row.status = "defined"
+        row.observed_state = "not_observed"
+        row.isolation_notes = isolation
+        row.notes = (
+            "Logical zone plan only. The private Lenovo lab is not connected and is not reachable "
+            "through this API."
+        )
+        zone_rows[human_id] = row
+
+    systems = (
+        (
+            "LAB-GW-01",
+            "MGMT",
+            "10.10.10.1",
+            "Gateway, nftables, Suricata",
+            "Ubuntu",
+            "Suricata eve.json toward Wazuh (planned)",
+            "Ubuntu gateway with an interface on every zone. Suricata sits here in the plan. "
+            "The hosted platform does not reach this host.",
+        ),
+        (
+            "SEC-WAZUH-01",
+            "MGMT",
+            "10.10.10.10",
+            "Wazuh SIEM/XDR",
+            "Linux",
+            "Wazuh manager (planned)",
+            "Planning baseline Wazuh in MGMT. AegisBridge does not replace or connect to it.",
+        ),
+        (
+            "WIN-USER-01",
+            "CORP",
+            "10.10.20.11",
+            "Windows 11 endpoint",
+            "Windows 11",
+            "Wazuh agent, Sysmon, Security log (planned)",
+            "Corporate lab endpoint for identity and PowerShell scenarios. Not observed live.",
+        ),
+        (
+            "LINUX-APP-01",
+            "SERVER",
+            "10.10.30.11",
+            "Ubuntu application server",
+            "Ubuntu",
+            "Wazuh agent, auditd, SSH, nginx (planned)",
+            "Internal application host in the lab plan. Not observed live.",
+        ),
+        (
+            "KALI-RED-01",
+            "ATTACK",
+            "10.10.50.10",
+            "Authorized testing workstation",
+            "Kali Linux",
+            "No current telemetry expectation while stopped",
+            "Authorized testing workstation in the plan. Not observed live. No remote control.",
+        ),
+    )
+    system_rows: dict[str, LabSystem] = {}
+    for human_id, zone_id, ip, role, platform, telemetry_source, notes in systems:
+        zone = zone_rows[zone_id]
+        row = session.scalar(select(LabSystem).where(LabSystem.human_id == human_id))
+        if row is None:
+            row = LabSystem(
+                organization_id=org.id,
+                zone_id=zone.id,
+                human_id=human_id,
+                hostname=human_id,
+                role=role,
+                expected_state="approved",
+                observed_state="not_observed",
+                telemetry_expected=True,
+                telemetry_status="not_connected",
+                source_origin="development_seed",
+            )
+            session.add(row)
+            session.flush()
+        row.zone_id = zone.id
+        row.hostname = human_id
+        row.ip_address = ip
+        row.role = role
+        row.platform = platform
+        row.expected_state = "approved"
+        row.observed_state = "not_observed"
+        row.telemetry_source = telemetry_source
+        row.telemetry_expected = human_id != "KALI-RED-01"
+        row.telemetry_status = "not_connected"
+        row.telemetry_freshness = "not_connected"
+        row.telemetry_semantics = (
+            "Development expectation only. Wazuh and Suricata remain not_connected. "
+            "No live Lenovo telemetry is stored."
+        )
+        row.last_seen_at = None
+        row.source_origin = "development_seed"
+        row.notes = notes
+        if human_id == "KALI-RED-01":
+            row.telemetry_expected = False
+            row.telemetry_status = "not_reporting"
+            row.telemetry_freshness = "not_reporting"
+            row.telemetry_semantics = (
+                "No current telemetry expectation while the workstation is not observed. "
+                "Not a live stop/start control."
+            )
+        system_rows[human_id] = row
+    return system_rows
+
+
+def _ensure_lab_scenarios(
+    session: Session,
+    org: Organization,
+    systems: dict[str, LabSystem],
+    detections: dict[str, Detection],
+) -> None:
+    catalog = (
+        (
+            "SCN-0001",
+            "Repeated authentication failures and suspicious success",
+            "Exercise repeated authentication failures and a later success pattern.",
+            "ready",
+            "Identity",
+            "Windows Security failures, then a success, via the Wazuh agent (planned)",
+            ["WIN-USER-01"],
+            ["DET-0001", "DET-0002"],
+            ["T1110", "T1078"],
+        ),
+        (
+            "SCN-0002",
+            "Unauthorized privileged group change",
+            "Exercise an unauthorized privileged group-membership change.",
+            "ready",
+            "Identity",
+            "Security group-membership event via the Wazuh agent (planned)",
+            ["WIN-USER-01"],
+            ["DET-0004"],
+            ["T1098"],
+        ),
+        (
+            "SCN-0003",
+            "Suspicious PowerShell activity",
+            "Exercise suspicious PowerShell child-process creation.",
+            "ready",
+            "Endpoint",
+            "Sysmon process creation with a PowerShell child (planned)",
+            ["WIN-USER-01"],
+            ["DET-0005"],
+            ["T1059.001"],
+        ),
+        (
+            "SCN-0004",
+            "Malware-test validation",
+            "Exercise an approved lab malware-test sample path.",
+            "validated",
+            "Endpoint",
+            "Sysmon file and process events for the approved lab sample (planned)",
+            ["WIN-USER-01"],
+            ["DET-0009"],
+            ["T1204.002"],
+        ),
+        (
+            "SCN-0005",
+            "Exploitable critical vulnerability",
+            "Plan a controlled vulnerability exposure exercise.",
+            "planned",
+            "Exposure",
+            "Application and nginx logs if a controlled check is later authorized",
+            ["LINUX-APP-01"],
+            [],
+            [],
+        ),
+        (
+            "SCN-0006",
+            "Phishing tabletop",
+            "Tabletop exercise without live endpoint telemetry.",
+            "simulated",
+            "Exercise",
+            "No endpoint telemetry. Exercise notes only.",
+            [],
+            [],
+            [],
+        ),
+    )
+    for (
+        human_id,
+        name,
+        objective,
+        status,
+        category,
+        expected_telemetry,
+        system_ids,
+        detection_ids,
+        technique_ids,
+    ) in catalog:
+        row = session.scalar(select(LabScenario).where(LabScenario.human_id == human_id))
+        if row is None:
+            row = LabScenario(
+                organization_id=org.id,
+                human_id=human_id,
+                name=name,
+                objective=objective,
+                status=status,
+                category=category,
+            )
+            session.add(row)
+            session.flush()
+        row.name = name
+        row.objective = objective
+        row.status = status
+        row.category = category
+        row.expected_telemetry = expected_telemetry
+        row.safety_notes = (
+            "No execute, start, or stop action is available. "
+            "The private Lenovo lab is not connected. Scenario status is catalog metadata only."
+        )
+        row.last_run_at = None
+        row.notes = (
+            "Development scenario catalog. last_run_at stays null because no run record is stored."
+        )
+        for system_id in system_ids:
+            system = systems.get(system_id)
+            if system is None:
+                continue
+            if (
+                session.scalar(
+                    select(LabScenarioSystem).where(
+                        LabScenarioSystem.scenario_id == row.id,
+                        LabScenarioSystem.lab_system_id == system.id,
+                    )
+                )
+                is None
+            ):
+                session.add(LabScenarioSystem(scenario_id=row.id, lab_system_id=system.id))
+        for detection_id in detection_ids:
+            detection = detections.get(detection_id)
+            if detection is None:
+                continue
+            if (
+                session.scalar(
+                    select(LabScenarioDetection).where(
+                        LabScenarioDetection.scenario_id == row.id,
+                        LabScenarioDetection.detection_id == detection.id,
+                    )
+                )
+                is None
+            ):
+                session.add(LabScenarioDetection(scenario_id=row.id, detection_id=detection.id))
+        for technique_id in technique_ids:
+            technique = session.scalar(
+                select(AttackTechnique).where(AttackTechnique.technique_id == technique_id)
+            )
+            if technique is None:
+                continue
+            if (
+                session.scalar(
+                    select(LabScenarioAttackMapping).where(
+                        LabScenarioAttackMapping.scenario_id == row.id,
+                        LabScenarioAttackMapping.attack_technique_id == technique.id,
+                    )
+                )
+                is None
+            ):
+                session.add(
+                    LabScenarioAttackMapping(
+                        scenario_id=row.id,
+                        attack_technique_id=technique.id,
+                    )
+                )
 
 
 def main() -> None:

@@ -17,7 +17,7 @@ Audit date: 20 Oct 2026. Scope is the implemented web client only. No new produc
 | `/incidents` | Renders. Lifecycle status stays separate from severity. |
 | `/threat-intelligence` | Renders. Feeds are labeled simulated or not connected. |
 | `/cyber-range` | Renders. Copy states the hosted app is not connected to a live lab. |
-| `/reports` | Renders. No download or file generation is offered as a completed action. |
+| `/reports` | Renders from the development API (definitions, dataset registry, experiments). No download or file generation is offered as a completed action. |
 | `/administration` | Renders. Secrets are not shown. Connectors are not live. |
 | `/account/profile` | Renders. Header **My Profile** opens this route. |
 | `/account/security` | Renders. Password, MFA, and session actions are disabled. |

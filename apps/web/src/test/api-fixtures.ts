@@ -11,6 +11,10 @@ import type {
   AssetDetailResponse,
   AssetListItem,
   AuditEventListItem,
+  DatasetDetail,
+  DatasetListItem,
+  ExperimentDetail,
+  ExperimentListItem,
   GovernanceSummary,
   IncidentDetailResponse,
   IncidentListItem,
@@ -18,6 +22,9 @@ import type {
   IndicatorListItem,
   IntegrationListItem,
   OverviewResponse,
+  ReportDefinitionDetail,
+  ReportDefinitionListItem,
+  ReportsSummary,
   RiskDetailResponse,
   RiskListItem,
   ThreatIntelSummary,
@@ -793,6 +800,489 @@ export const accessReviewItems: AccessReviewListItem[] = [
   },
 ];
 
+export const reportsSummary: ReportsSummary = {
+  report_definition_count: 5,
+  scheduled_report_count: 3,
+  completed_report_count: 0,
+  failed_report_count: 0,
+  recent_execution_count: 0,
+  dataset_count: 9,
+  dataset_quality_review_count: 2,
+  experiment_count: 4,
+  semantics:
+    "Report definitions are stored catalog rows. schedule_defined means a cadence label is stored; no report scheduler or worker is running. completed_report_count, failed_report_count, and recent_execution_count stay at zero because no report execution or export rows are stored. Datasets are registry metadata only unless files are stored.",
+};
+
+export const emptyReportsSummary: ReportsSummary = {
+  report_definition_count: 0,
+  scheduled_report_count: 0,
+  completed_report_count: 0,
+  failed_report_count: 0,
+  recent_execution_count: 0,
+  dataset_count: 0,
+  dataset_quality_review_count: 0,
+  experiment_count: 0,
+  semantics: "No report, dataset, or experiment rows are stored.",
+};
+
+const reportOwner = { id: "USR-0001", display_name: "Amara Okonkwo" };
+const reportOwnerGrc = { id: "USR-0003", display_name: "Grace Mensah" };
+
+export const reportDefinitions: ReportDefinitionListItem[] = [
+  {
+    id: "RPT-0001",
+    name: "Executive Security Summary",
+    description: "Stored definition for an executive posture summary. No PDF is generated.",
+    report_type: "executive_security_summary",
+    status: "ready",
+    schedule_state: "schedule_defined",
+    schedule_label: "Weekly",
+    format_label: "PDF",
+    owner: reportOwner,
+    created_at: "2026-10-19T20:00:00Z",
+    updated_at: "2026-10-19T20:00:00Z",
+    last_run_at: null,
+    next_run_at: null,
+  },
+  {
+    id: "RPT-0002",
+    name: "Vulnerability Exposure Report",
+    description: "Stored definition for vulnerability exposure columns. No CSV is generated.",
+    report_type: "vulnerability_exposure",
+    status: "ready",
+    schedule_state: "schedule_defined",
+    schedule_label: "Weekly",
+    format_label: "CSV",
+    owner: reportOwner,
+    created_at: "2026-10-19T20:00:00Z",
+    updated_at: "2026-10-19T20:00:00Z",
+    last_run_at: null,
+    next_run_at: null,
+  },
+  {
+    id: "RPT-0003",
+    name: "Risk Register Report",
+    description: "Stored definition for the risk register. No export file is generated.",
+    report_type: "risk_register",
+    status: "ready",
+    schedule_state: "not_scheduled",
+    schedule_label: null,
+    format_label: "PDF",
+    owner: reportOwnerGrc,
+    created_at: "2026-10-19T20:00:00Z",
+    updated_at: "2026-10-19T20:00:00Z",
+    last_run_at: null,
+    next_run_at: null,
+  },
+  {
+    id: "RPT-0004",
+    name: "Control Assessment Report",
+    description:
+      "Stored definition for control assessment summaries. CIS licensed text is omitted.",
+    report_type: "control_assessment",
+    status: "ready",
+    schedule_state: "schedule_defined",
+    schedule_label: "Monthly",
+    format_label: "PDF",
+    owner: reportOwnerGrc,
+    created_at: "2026-10-19T20:00:00Z",
+    updated_at: "2026-10-19T20:00:00Z",
+    last_run_at: null,
+    next_run_at: null,
+  },
+  {
+    id: "RPT-0005",
+    name: "Incident Summary Report",
+    description: "Stored definition for incident summaries. No compromise verdict is invented.",
+    report_type: "incident_summary",
+    status: "review",
+    schedule_state: "not_scheduled",
+    schedule_label: null,
+    format_label: "PDF",
+    owner: reportOwner,
+    created_at: "2026-10-19T20:00:00Z",
+    updated_at: "2026-10-19T20:00:00Z",
+    last_run_at: null,
+    next_run_at: null,
+  },
+];
+
+export function reportDefinitionDetail(id: string): ReportDefinitionDetail {
+  const item = reportDefinitions.find((row) => row.id === id) ?? reportDefinitions[0];
+  return { ...item, generated_files: [] };
+}
+
+export function filteredReportDefinitions(url: string) {
+  let items = [...reportDefinitions];
+  const params = new URL(url, "http://localhost").searchParams;
+  const search = params.get("search")?.toLowerCase();
+  const status = params.get("status");
+  const reportType = params.get("report_type");
+  if (search) {
+    items = items.filter((item) =>
+      `${item.id} ${item.name} ${item.description} ${item.report_type}`
+        .toLowerCase()
+        .includes(search),
+    );
+  }
+  if (status) items = items.filter((item) => item.status === status);
+  if (reportType) items = items.filter((item) => item.report_type === reportType);
+  return assetPage(items);
+}
+
+export const datasetItems: DatasetListItem[] = [
+  {
+    id: "DS-0001",
+    name: "Smishing Dataset – IMC25",
+    description: "Registry entry for the IMC25 smishing dataset. No file is stored.",
+    publisher: "IMC25 project",
+    source_label: "Publisher catalog",
+    source_url: null,
+    publication_year: 2025,
+    domain: "Smishing and social engineering",
+    license_label: "CC BY 4.0",
+    status: "not_downloaded",
+    verification_status: "reviewed",
+    purpose: "Message analytics and explainable reporting",
+    size_label: "Lightweight labeled CSV",
+    row_count: null,
+    feature_count: null,
+    file_count: 0,
+    version_count: 1,
+    experiment_count: 1,
+    created_at: "2026-10-19T20:00:00Z",
+    updated_at: "2026-10-19T20:00:00Z",
+    notes: "Name and license label only. The dataset file is not downloaded.",
+  },
+  {
+    id: "DS-0002",
+    name: "CICAPT-IIoT2024 subset",
+    description: "Registry entry for a selected CICAPT-IIoT2024 subset. No subset file is stored.",
+    publisher: "Canadian Institute for Cybersecurity",
+    source_label: "Publisher catalog",
+    source_url: null,
+    publication_year: 2024,
+    domain: "IIoT APT detection",
+    license_label: "Publisher terms",
+    status: "not_downloaded",
+    verification_status: "reviewed",
+    purpose: "Provenance and ATT&CK-relevant detection research",
+    size_label: "Selected subset only",
+    row_count: null,
+    feature_count: null,
+    file_count: 0,
+    version_count: 1,
+    experiment_count: 1,
+    created_at: "2026-10-19T20:00:00Z",
+    updated_at: "2026-10-19T20:00:00Z",
+    notes: "Registry metadata only. The subset is not in the repository.",
+  },
+  {
+    id: "DS-0003",
+    name: "CICIoT2023",
+    description: "Optional IoT network-attack registry entry. No capture file is stored.",
+    publisher: "Canadian Institute for Cybersecurity",
+    source_label: "Publisher catalog",
+    source_url: null,
+    publication_year: 2023,
+    domain: "IoT network attacks",
+    license_label: "Publisher terms",
+    status: "not_downloaded",
+    verification_status: "not_reviewed",
+    purpose: "IDS analytics experiments",
+    size_label: "Large · subset only",
+    row_count: null,
+    feature_count: null,
+    file_count: 0,
+    version_count: 1,
+    experiment_count: 0,
+    created_at: "2026-10-19T20:00:00Z",
+    updated_at: "2026-10-19T20:00:00Z",
+    notes: "Registry metadata only. Full capture is not downloaded.",
+  },
+  {
+    id: "DS-0004",
+    name: "DataSense CIC IIoT 2025",
+    description: "Optional multi-modal IIoT registry entry. No file is stored.",
+    publisher: "Canadian Institute for Cybersecurity",
+    source_label: "Publisher catalog",
+    source_url: null,
+    publication_year: 2025,
+    domain: "IIoT sensor and network",
+    license_label: "Publisher terms",
+    status: "not_downloaded",
+    verification_status: "not_reviewed",
+    purpose: "Multi-modal anomaly research",
+    size_label: "Large · not downloaded",
+    row_count: null,
+    feature_count: null,
+    file_count: 0,
+    version_count: 1,
+    experiment_count: 0,
+    created_at: "2026-10-19T20:00:00Z",
+    updated_at: "2026-10-19T20:00:00Z",
+    notes: "Do not download the full dataset during initial development.",
+  },
+  {
+    id: "DS-0005",
+    name: "CIC-Trap4Phish 2025",
+    description: "Optional phishing document and URL registry entry. Attachments are not executed.",
+    publisher: "Canadian Institute for Cybersecurity",
+    source_label: "Publisher catalog",
+    source_url: null,
+    publication_year: 2025,
+    domain: "Phishing documents and URLs",
+    license_label: "Publisher terms",
+    status: "not_downloaded",
+    verification_status: "not_reviewed",
+    purpose: "Safe static features. Attachments are not executed.",
+    size_label: "Static feature subset",
+    row_count: null,
+    feature_count: null,
+    file_count: 0,
+    version_count: 1,
+    experiment_count: 1,
+    created_at: "2026-10-19T20:00:00Z",
+    updated_at: "2026-10-19T20:00:00Z",
+    notes: "Registry metadata only. No attachment bytes are stored.",
+  },
+  {
+    id: "DS-0006",
+    name: "PhreshPhish",
+    description: "Optional large-scale phishing registry entry. No sample file is stored.",
+    publisher: "PhreshPhish project",
+    source_label: "Publisher catalog",
+    source_url: null,
+    publication_year: 2025,
+    domain: "Large-scale phishing",
+    license_label: "CC BY 4.0",
+    status: "not_downloaded",
+    verification_status: "verification_required",
+    purpose: "Sampled phishing research",
+    size_label: "About 36.6 GB · sample only",
+    row_count: null,
+    feature_count: null,
+    file_count: 0,
+    version_count: 1,
+    experiment_count: 0,
+    created_at: "2026-10-19T20:00:00Z",
+    updated_at: "2026-10-19T20:00:00Z",
+    notes: "Size label is from published notes. No download and no verification run.",
+  },
+  {
+    id: "DS-0007",
+    name: "CIC-PQC_OAV v1",
+    description: "Optional post-quantum TLS registry entry. No session file is stored.",
+    publisher: "Canadian Institute for Cybersecurity",
+    source_label: "Publisher catalog",
+    source_url: null,
+    publication_year: 2025,
+    domain: "TLS and post-quantum operations",
+    license_label: "Publisher terms",
+    status: "not_downloaded",
+    verification_status: "not_reviewed",
+    purpose: "Later protocol research",
+    size_label: "About 40,010 sessions",
+    row_count: null,
+    feature_count: null,
+    file_count: 0,
+    version_count: 1,
+    experiment_count: 0,
+    created_at: "2026-10-19T20:00:00Z",
+    updated_at: "2026-10-19T20:00:00Z",
+    notes: "Session count is a published label. No file is stored.",
+  },
+  {
+    id: "DS-0008",
+    name: "CIC-YNU-IoTMal 2026",
+    description: "Optional IoT malware behavior registry entry. Raw binaries are not a dependency.",
+    publisher: "Canadian Institute for Cybersecurity",
+    source_label: "Publisher catalog",
+    source_url: null,
+    publication_year: 2026,
+    domain: "IoT malware behavior",
+    license_label: "Publisher terms",
+    status: "not_downloaded",
+    verification_status: "verification_required",
+    purpose: "Derived behavior research. Raw binaries are not a dependency.",
+    size_label: "Processed features only",
+    row_count: null,
+    feature_count: null,
+    file_count: 0,
+    version_count: 1,
+    experiment_count: 0,
+    created_at: "2026-10-19T20:00:00Z",
+    updated_at: "2026-10-19T20:00:00Z",
+    notes: "Registry metadata only. No malware binary is stored.",
+  },
+  {
+    id: "DS-0009",
+    name: "AegisBridge internal telemetry",
+    description: "Local cyber-range telemetry placeholder. The lab host is not connected.",
+    publisher: "AegisBridge Technologies",
+    source_label: "Project-owned",
+    source_url: null,
+    publication_year: 2026,
+    domain: "Lab endpoint and network telemetry",
+    license_label: "Project-owned",
+    status: "not_downloaded",
+    verification_status: "reviewed",
+    purpose: "Local validation records. Kept apart from published datasets.",
+    size_label: "Not collected",
+    row_count: null,
+    feature_count: null,
+    file_count: 0,
+    version_count: 1,
+    experiment_count: 1,
+    created_at: "2026-10-19T20:00:00Z",
+    updated_at: "2026-10-19T20:00:00Z",
+    notes: "No telemetry file is stored. The lab host is not connected.",
+  },
+];
+
+export function datasetDetail(id: string): DatasetDetail {
+  const item = datasetItems.find((row) => row.id === id) ?? datasetItems[0];
+  return {
+    ...item,
+    versions: [
+      {
+        version_label: "registry",
+        file_count: 0,
+        experiment_count: item.experiment_count,
+        created_at: "2026-10-19T20:00:00Z",
+      },
+    ],
+    files: [],
+    experiments: experimentItems
+      .filter((experiment) => experiment.dataset.id === item.id)
+      .map((experiment) => ({
+        id: experiment.id,
+        name: experiment.name,
+        status: experiment.status,
+        experiment_type: experiment.experiment_type,
+      })),
+  };
+}
+
+export function filteredDatasets(url: string) {
+  let items = [...datasetItems];
+  const params = new URL(url, "http://localhost").searchParams;
+  const search = params.get("search")?.toLowerCase();
+  const status = params.get("status");
+  const domain = params.get("domain");
+  const verification = params.get("verification_status");
+  const year = params.get("publication_year");
+  if (search) {
+    items = items.filter((item) =>
+      `${item.id} ${item.name} ${item.publisher ?? ""} ${item.domain ?? ""}`
+        .toLowerCase()
+        .includes(search),
+    );
+  }
+  if (status) items = items.filter((item) => item.status === status);
+  if (domain) items = items.filter((item) => item.domain === domain);
+  if (verification) items = items.filter((item) => item.verification_status === verification);
+  if (year) items = items.filter((item) => String(item.publication_year) === year);
+  return assetPage(items);
+}
+
+export const experimentItems: ExperimentListItem[] = [
+  {
+    id: "RSCH-0001",
+    name: "Smishing lure categories",
+    status: "completed",
+    experiment_type: "classification_summary",
+    approach: "Manual category tabulation",
+    metrics_summary:
+      "Category counts were tabulated from the registry note. No model runtime was used.",
+    started_at: "2026-10-19T20:00:00Z",
+    completed_at: "2026-10-19T20:00:00Z",
+    notes: "Completed metadata only. No model artifact is stored.",
+    dataset: {
+      id: "DS-0001",
+      title: "Smishing Dataset – IMC25",
+      status: "not_downloaded",
+      summary: null,
+    },
+  },
+  {
+    id: "RSCH-0002",
+    name: "IIoT subset provenance check",
+    status: "completed",
+    experiment_type: "manifest_review",
+    approach: "Manifest field review",
+    metrics_summary: "Manifest fields are recorded. The subset is not in the repository.",
+    started_at: "2026-10-19T20:00:00Z",
+    completed_at: "2026-10-19T20:00:00Z",
+    notes: "Completed metadata only. No detection comparison was run.",
+    dataset: {
+      id: "DS-0002",
+      title: "CICAPT-IIoT2024 subset",
+      status: "not_downloaded",
+      summary: null,
+    },
+  },
+  {
+    id: "RSCH-0003",
+    name: "Range telemetry freshness",
+    status: "completed",
+    experiment_type: "telemetry_review",
+    approach: "Simulated validation comparison",
+    metrics_summary: "Three simulated runs are on record. The lab host is not connected.",
+    started_at: "2026-10-19T20:00:00Z",
+    completed_at: "2026-10-19T20:00:00Z",
+    notes: "Completed metadata only. No live range connection exists.",
+    dataset: {
+      id: "DS-0009",
+      title: "AegisBridge internal telemetry",
+      status: "not_downloaded",
+      summary: null,
+    },
+  },
+  {
+    id: "RSCH-0004",
+    name: "Static phishing features",
+    status: "planned",
+    experiment_type: "static_feature_review",
+    approach: "Static-feature plan",
+    metrics_summary: null,
+    started_at: null,
+    completed_at: null,
+    notes: "Not started. No download and no execution.",
+    dataset: {
+      id: "DS-0005",
+      title: "CIC-Trap4Phish 2025",
+      status: "not_downloaded",
+      summary: null,
+    },
+  },
+];
+
+export function experimentDetail(id: string): ExperimentDetail {
+  const item = experimentItems.find((row) => row.id === id) ?? experimentItems[0];
+  return { ...item, dataset_version_label: "registry" };
+}
+
+export function filteredExperiments(url: string) {
+  let items = [...experimentItems];
+  const params = new URL(url, "http://localhost").searchParams;
+  const search = params.get("search")?.toLowerCase();
+  const status = params.get("status");
+  const datasetId = params.get("dataset_id");
+  const experimentType = params.get("experiment_type");
+  if (search) {
+    items = items.filter((item) =>
+      `${item.id} ${item.name} ${item.approach ?? ""} ${item.dataset.id}`
+        .toLowerCase()
+        .includes(search),
+    );
+  }
+  if (status) items = items.filter((item) => item.status === status);
+  if (datasetId) items = items.filter((item) => item.dataset.id === datasetId);
+  if (experimentType) items = items.filter((item) => item.experiment_type === experimentType);
+  return assetPage(items);
+}
+
 export function installApiFetch(resolve?: (url: string) => unknown) {
   const calls: string[] = [];
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -858,6 +1348,26 @@ export function installApiFetch(resolve?: (url: string) => unknown) {
     }
     if (url.includes("/api/v1/administration/access-reviews")) {
       return jsonResponse(assetPage(accessReviewItems));
+    }
+    if (url.includes("/api/v1/reports/summary")) return jsonResponse(reportsSummary);
+    if (/\/api\/v1\/reports\/definitions\/[^/?]+/.test(url)) {
+      const id = url.split("/definitions/")[1]?.split("?")[0] ?? "";
+      return jsonResponse(reportDefinitionDetail(decodeURIComponent(id)));
+    }
+    if (url.includes("/api/v1/reports/definitions")) {
+      return jsonResponse(filteredReportDefinitions(url));
+    }
+    if (/\/api\/v1\/datasets\/[^/?]+/.test(url)) {
+      const id = url.split("/datasets/")[1]?.split("?")[0] ?? "";
+      return jsonResponse(datasetDetail(decodeURIComponent(id)));
+    }
+    if (url.includes("/api/v1/datasets")) return jsonResponse(filteredDatasets(url));
+    if (/\/api\/v1\/dataset-experiments\/[^/?]+/.test(url)) {
+      const id = url.split("/dataset-experiments/")[1]?.split("?")[0] ?? "";
+      return jsonResponse(experimentDetail(decodeURIComponent(id)));
+    }
+    if (url.includes("/api/v1/dataset-experiments")) {
+      return jsonResponse(filteredExperiments(url));
     }
     if (url.includes("/api/v1/incidents")) {
       if (url.includes("containment_state=")) return jsonResponse(assetPage([]));

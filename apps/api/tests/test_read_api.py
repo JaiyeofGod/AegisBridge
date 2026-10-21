@@ -62,6 +62,14 @@ READ_PATHS = [
     "/api/v1/datasets/{dataset_id}",
     "/api/v1/dataset-experiments",
     "/api/v1/dataset-experiments/{experiment_id}",
+    "/api/v1/cyber-range/summary",
+    "/api/v1/cyber-range/zones",
+    "/api/v1/cyber-range/systems",
+    "/api/v1/cyber-range/systems/{system_id}",
+    "/api/v1/cyber-range/scenarios",
+    "/api/v1/cyber-range/scenarios/{scenario_id}",
+    "/api/v1/cyber-range/telemetry",
+    "/api/v1/cyber-range/detections",
 ]
 
 
@@ -354,7 +362,8 @@ def test_administration_catalog_omits_secrets(client: TestClient) -> None:
     assert summary["configured_integration_count"] == 0
     assert summary["integration_status"]["not_configured"] == 1
     assert summary["integration_status"]["reference_only"] == 1
-    assert summary["integration_freshness"] == {"not_connected": 2}
+    assert summary["integration_status"]["not_connected"] == 1
+    assert summary["integration_freshness"] == {"not_connected": 3}
     assert summary["active_user_count"] == 5
     assert summary["privileged_user_count"] == 2
     assert summary["recent_audit_event_count"] == 2
@@ -366,12 +375,15 @@ def test_administration_catalog_omits_secrets(client: TestClient) -> None:
 
     integrations = client.get("/api/v1/administration/integrations").json()
     by_id = {item["id"]: item for item in integrations["items"]}
-    assert set(by_id) == {"INT-0001", "INT-0002"}
+    assert set(by_id) == {"INT-0001", "INT-0002", "INT-0003"}
     assert by_id["INT-0001"]["status"] == "not_configured"
     assert by_id["INT-0001"]["freshness"] == "not_connected"
     assert by_id["INT-0001"]["last_sync_at"] is None
     assert by_id["INT-0001"]["last_success_at"] is None
     assert by_id["INT-0002"]["status"] == "reference_only"
+    assert by_id["INT-0003"]["name"] == "Lab Bridge"
+    assert by_id["INT-0003"]["status"] == "not_connected"
+    assert by_id["INT-0003"]["freshness"] == "not_connected"
     for item in integrations["items"]:
         assert item["credential_state"] == "No credentials stored"
     assert_safe(integrations)
@@ -540,6 +552,145 @@ def test_dataset_registry_and_experiments_are_metadata_only(client: TestClient) 
     assert_safe(experiment)
     missing_experiment = client.get("/api/v1/dataset-experiments/RSCH-9999")
     assert missing_experiment.status_code == 404
+
+
+def test_cyber_range_catalog_keeps_lab_private_and_disconnected(client: TestClient) -> None:
+    summary = client.get("/api/v1/cyber-range/summary").json()
+    assert summary["zone_count"] == 5
+    assert summary["expected_system_count"] == 5
+    assert summary["active_observed_system_count"] == 0
+    assert summary["telemetry_active_count"] == 0
+    assert summary["telemetry_expected_count"] == 4
+    assert summary["scenarios_ready_count"] == 4
+    assert summary["scenarios_total_count"] == 6
+    assert summary["scenarios_running_count"] == 0
+    assert summary["detection_coverage_count"] == 12
+    assert summary["lab_bridge_status"] == "not_connected"
+    assert summary["lab_bridge_freshness"] == "not_connected"
+    assert summary["last_successful_lab_sync_at"] is None
+    assert summary["freshness_state"] == "not_connected"
+    assert summary["data_origin"] == "DEVELOPMENT / SEEDED"
+    semantics = summary["semantics"].lower()
+    assert "outbound-only" in semantics
+    assert "lenovo" in semantics
+    assert "no remote-control" in semantics or "no remote control" in semantics
+    assert "macbook" in semantics
+    assert_safe(summary)
+
+    zones = client.get("/api/v1/cyber-range/zones").json()
+    assert zones["total"] == 5
+    assert {item["id"] for item in zones["items"]} == {
+        "MGMT",
+        "CORP",
+        "SERVER",
+        "DMZ",
+        "ATTACK",
+    }
+    assert {item["cidr"] for item in zones["items"]} == {
+        "10.10.10.0/24",
+        "10.10.20.0/24",
+        "10.10.30.0/24",
+        "10.10.40.0/24",
+        "10.10.50.0/24",
+    }
+    assert all(item["observed_state"] == "not_observed" for item in zones["items"])
+    assert_safe(zones)
+
+    systems = client.get("/api/v1/cyber-range/systems").json()
+    assert systems["total"] == 5
+    by_id = {item["id"]: item for item in systems["items"]}
+    assert set(by_id) == {
+        "LAB-GW-01",
+        "SEC-WAZUH-01",
+        "WIN-USER-01",
+        "LINUX-APP-01",
+        "KALI-RED-01",
+    }
+    assert by_id["LAB-GW-01"]["zone"]["id"] == "MGMT"
+    assert by_id["LAB-GW-01"]["observed_state"] == "not_observed"
+    assert by_id["LAB-GW-01"]["telemetry_status"] == "not_connected"
+    assert by_id["LAB-GW-01"]["last_seen_at"] is None
+    assert by_id["KALI-RED-01"]["telemetry_status"] == "not_reporting"
+    assert_safe(systems)
+
+    filtered = client.get(
+        "/api/v1/cyber-range/systems",
+        params={"zone": "MGMT", "telemetry_status": "not_connected"},
+    ).json()
+    assert filtered["total"] == 2
+    assert {item["id"] for item in filtered["items"]} == {"LAB-GW-01", "SEC-WAZUH-01"}
+
+    detail = client.get("/api/v1/cyber-range/systems/LAB-GW-01").json()
+    assert detail["hostname"] == "LAB-GW-01"
+    assert detail["telemetry_status"] == "not_connected"
+    assert "not_connected" in (detail["telemetry_semantics"] or "").lower()
+    assert_safe(detail)
+    missing = client.get("/api/v1/cyber-range/systems/LAB-MISSING")
+    assert missing.status_code == 404
+
+    scenarios = client.get("/api/v1/cyber-range/scenarios").json()
+    assert scenarios["total"] == 6
+    ready = client.get("/api/v1/cyber-range/scenarios", params={"status": "ready"}).json()
+    assert ready["total"] == 3
+    technique = client.get(
+        "/api/v1/cyber-range/scenarios",
+        params={"attack_technique": "T1059.001"},
+    ).json()
+    assert technique["total"] == 1
+    assert technique["items"][0]["id"] == "SCN-0003"
+    scenario = client.get("/api/v1/cyber-range/scenarios/SCN-0001").json()
+    assert scenario["last_run_at"] is None
+    assert "DET-0001" in scenario["expected_detection_ids"]
+    assert "WIN-USER-01" in scenario["expected_system_ids"]
+    assert any(item["id"] == "T1110" for item in scenario["attack_techniques"])
+    assert "no execute" in (scenario["safety_notes"] or "").lower()
+    assert_safe(scenario)
+    missing_scenario = client.get("/api/v1/cyber-range/scenarios/SCN-9999")
+    assert missing_scenario.status_code == 404
+
+    telemetry = client.get("/api/v1/cyber-range/telemetry").json()
+    assert telemetry["total"] == 5
+    assert all(item["status"] in {"not_connected", "not_reporting"} for item in telemetry["items"])
+    assert all(item["last_seen_at"] is None for item in telemetry["items"])
+    assert_safe(telemetry)
+
+    detections = client.get("/api/v1/cyber-range/detections").json()
+    assert detections["total"] == 12
+    assert {item["id"] for item in detections["items"]} == {
+        f"DET-{index:04d}" for index in range(1, 13)
+    }
+    assert all(item["validation_state"] == "not_validated" for item in detections["items"])
+    assert all(item["last_validated_at"] is None for item in detections["items"])
+    assert all(item["wazuh_mapping_status"] == "not_connected" for item in detections["items"])
+    filtered_detections = client.get(
+        "/api/v1/cyber-range/detections",
+        params={"data_source": "Sysmon", "validation_state": "not_validated"},
+    ).json()
+    assert filtered_detections["total"] == 3
+    assert_safe(detections)
+
+    openapi = client.get("/openapi.json").json()
+    cyber_paths = [path for path in openapi["paths"] if path.startswith("/api/v1/cyber-range")]
+    assert set(cyber_paths) == {
+        "/api/v1/cyber-range/summary",
+        "/api/v1/cyber-range/zones",
+        "/api/v1/cyber-range/systems",
+        "/api/v1/cyber-range/systems/{system_id}",
+        "/api/v1/cyber-range/scenarios",
+        "/api/v1/cyber-range/scenarios/{scenario_id}",
+        "/api/v1/cyber-range/telemetry",
+        "/api/v1/cyber-range/detections",
+    }
+    for path in cyber_paths:
+        methods = set(openapi["paths"][path])
+        assert methods == {"get"}
+        assert "post" not in methods
+        assert "put" not in methods
+        assert "patch" not in methods
+        assert "delete" not in methods
+
+    too_large = client.get("/api/v1/cyber-range/systems", params={"page_size": 101})
+    assert too_large.status_code == 422
 
 
 def test_openapi_lists_read_routes(client: TestClient) -> None:

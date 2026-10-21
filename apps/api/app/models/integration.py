@@ -30,7 +30,7 @@ class Integration(UUIDMixin, TimestampMixin, Base):
 
     organization: Mapped[Organization] = relationship()
     sync_jobs: Mapped[list[SyncJob]] = relationship(back_populates="integration")
-    sync_state: Mapped[SyncState | None] = relationship(back_populates="integration")
+    sync_state: Mapped[SyncState | None] = relationship(back_populates="integration", uselist=False)
 
 
 class SyncJob(UUIDMixin, TimestampMixin, Base):

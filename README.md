@@ -124,7 +124,7 @@ pnpm dev
 
 The web app still reads local mock data. It is not connected to the API.
 
-Read-only domain routes, including threat intelligence, administration, reports, datasets, and dataset experiments, are documented in `docs/api/API_CONTRACTS.md`. They require the migration and development seed above. The Reports page is still on local mocks.
+Read-only domain routes, including threat intelligence, administration, reports, datasets, dataset experiments, and cyber-range, are documented in `docs/api/API_CONTRACTS.md`. They require the migration and development seed above. The Reports page reads those contracts; the Cyber Range and Account pages remain on local mocks.
 
 **Not yet created:** authentication, write endpoints, external integrations, background jobs, Celery worker, CI workflows.
 

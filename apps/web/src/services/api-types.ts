@@ -461,3 +461,130 @@ export type AccessReviewListItem = {
   total_finding_count: number;
   due_at: string | null;
 };
+
+export type ReportsSummary = {
+  report_definition_count: number;
+  scheduled_report_count: number;
+  completed_report_count: number;
+  failed_report_count: number;
+  recent_execution_count: number;
+  dataset_count: number;
+  dataset_quality_review_count: number;
+  experiment_count: number;
+  semantics: string;
+};
+
+export type ReportDefinitionListItem = {
+  id: string;
+  name: string;
+  description: string;
+  report_type: string;
+  status: string;
+  schedule_state: string;
+  schedule_label: string | null;
+  format_label: string | null;
+  owner: PersonRef | null;
+  created_at: string;
+  updated_at: string;
+  last_run_at: string | null;
+  next_run_at: string | null;
+};
+
+export type ReportDefinitionDetail = ReportDefinitionListItem & {
+  generated_files: string[];
+};
+
+export type ReportDefinitionQuery = {
+  search?: string;
+  status?: string;
+  reportType?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+export type DatasetListItem = {
+  id: string;
+  name: string;
+  description: string | null;
+  publisher: string | null;
+  source_label: string | null;
+  source_url: string | null;
+  publication_year: number | null;
+  domain: string | null;
+  license_label: string | null;
+  status: string;
+  verification_status: string | null;
+  purpose: string | null;
+  size_label: string | null;
+  row_count: number | null;
+  feature_count: number | null;
+  file_count: number;
+  version_count: number;
+  experiment_count: number;
+  created_at: string;
+  updated_at: string;
+  notes: string | null;
+};
+
+export type DatasetFileItem = {
+  filename: string;
+  sha256: string | null;
+  size_bytes: number | null;
+  has_storage_uri: boolean;
+};
+
+export type DatasetVersionItem = {
+  version_label: string;
+  file_count: number;
+  experiment_count: number;
+  created_at: string;
+};
+
+export type DatasetExperimentRef = {
+  id: string;
+  name: string;
+  status: string;
+  experiment_type: string | null;
+};
+
+export type DatasetDetail = DatasetListItem & {
+  versions: DatasetVersionItem[];
+  files: DatasetFileItem[];
+  experiments: DatasetExperimentRef[];
+};
+
+export type DatasetQuery = {
+  search?: string;
+  status?: string;
+  domain?: string;
+  verificationStatus?: string;
+  publicationYear?: number;
+  page?: number;
+  pageSize?: number;
+};
+
+export type ExperimentListItem = {
+  id: string;
+  name: string;
+  status: string;
+  experiment_type: string | null;
+  approach: string | null;
+  metrics_summary: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  notes: string | null;
+  dataset: RelatedRecord;
+};
+
+export type ExperimentDetail = ExperimentListItem & {
+  dataset_version_label: string;
+};
+
+export type ExperimentQuery = {
+  search?: string;
+  status?: string;
+  datasetId?: string;
+  experimentType?: string;
+  page?: number;
+  pageSize?: number;
+};

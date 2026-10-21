@@ -38,6 +38,14 @@ Human-readable IDs are the public identifiers (`AST-0007`, `RISK-0021`, `VULN-00
 | GET | `/datasets/{dataset_id}` | Registry detail with versions, files, and experiments |
 | GET | `/dataset-experiments` | Filters: `search`, `status`, `dataset_id`, `experiment_type` |
 | GET | `/dataset-experiments/{experiment_id}` | Stored experiment metadata |
+| GET | `/cyber-range/summary` | Zone, system, telemetry, scenario, detection, and Lab Bridge counts |
+| GET | `/cyber-range/zones` | Logical lab segments |
+| GET | `/cyber-range/systems` | Filters: `search`, `zone`, `role`, `telemetry_status`, `observed_state` |
+| GET | `/cyber-range/systems/{system_id}` | Lab system detail and telemetry expectation |
+| GET | `/cyber-range/scenarios` | Filters: `search`, `status`, `category`, `attack_technique` |
+| GET | `/cyber-range/scenarios/{scenario_id}` | Scenario detail without execute actions |
+| GET | `/cyber-range/telemetry` | Per-system telemetry expectation rows |
+| GET | `/cyber-range/detections` | Filters: `search`, `validation_state`, `attack_technique`, `data_source` |
 
 `{asset_id}` and the other path IDs are human IDs, not UUIDs.
 
@@ -83,6 +91,7 @@ Validation uses the same shape with `code` `validation_error` and `details` entr
 - Report definitions are catalog rows. `schedule_defined` stores a cadence label only. No report scheduler or worker is running. `completed_report_count`, `failed_report_count`, and `recent_execution_count` are zero because no execution or export rows are stored. Detail responses set `generated_files` to an empty list.
 - Dataset rows are registry metadata. `status` values in the seed are `not_downloaded`. `verification_status` may be `not_reviewed`, `verification_required`, or `reviewed`. File counts stay at zero unless `dataset_files` rows exist. `storage_uri` is never returned.
 - Experiment metrics are the stored `metrics_summary` text only. No model runtime or performance claim is inferred.
+- Cyber-range responses are DEVELOPMENT / SEEDED catalog rows. MacBook is the development machine. Lenovo is the private cyber-range host. There is no public inbound access to Lenovo and no remote-control endpoint. A future Lab Bridge is outbound-only from the lab to the hosted API. `lab_bridge_status` and `freshness_state` are `not_connected` in the seed. `last_successful_lab_sync_at` is null. `scenarios_running_count` is always zero because no runner exists. System `observed_state` values are `not_observed` unless a stored row says otherwise. Wazuh and Suricata stay `not_connected` or `not_reporting`. Detection `validation_state` is `not_validated` and `last_validated_at` is null unless a validation row is intentionally stored.
 
 ## Development data
 
@@ -93,3 +102,5 @@ Threat intelligence adds `SRC-0001` through `SRC-0006`, `IOC-0001` through `IOC-
 Administration adds `USR-0002` Nia Okeke as Security Engineer, `INT-0001` Wazuh, `INT-0002` example identity provider, and `AUD-0002`. The role catalog is the original six roles plus Security Engineer. That seventh role is required by master requirements §6 and `SECURITY_REQUIREMENTS.md`. Permission labels are not authorization checks.
 
 Reports add `RPT-0001` through `RPT-0005` as definitions only. Datasets `DS-0001` through `DS-0009` are registry metadata with a `registry` version and no files. Experiments `RSCH-0001` through `RSCH-0004` store notes and optional metrics text.
+
+Cyber range adds zones `MGMT` through `ATTACK`, systems `LAB-GW-01`, `SEC-WAZUH-01`, `WIN-USER-01`, `LINUX-APP-01`, and `KALI-RED-01`, scenarios `SCN-0001` through `SCN-0006`, detections `DET-0001` through `DET-0012`, and Lab Bridge integration `INT-0003` as `not_connected`.

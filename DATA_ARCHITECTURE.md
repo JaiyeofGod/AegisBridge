@@ -75,6 +75,11 @@
 
 Report definitions are catalog rows. Generated report objects and execution history are not part of this foundation.
 
+### Cyber range
+`lab_zones`, `lab_systems`, `lab_scenarios`, `lab_scenario_systems`, `lab_scenario_detections`, `lab_scenario_attack_mappings`
+
+These tables store the private-range plan and scenario catalog. They are not a live Lenovo connection and do not expose remote-control actions.
+
 ### Integrations
 `integrations`, `sync_jobs`, `sync_states`, `integration_health`
 
@@ -95,7 +100,8 @@ AST-0001  RISK-0001  CTRL-0001  EVID-0001
 VULN-0001 DET-0001   INC-0001   POL-0001
 VEN-0001  DS-0001    USR-0001   AUD-0001
 INT-0001  SRC-0001   IOC-0001   ADV-0001
-RPT-0001  RSCH-0001
+RPT-0001  RSCH-0001 SCN-0001
+LAB-GW-01 MGMT
 ```
 
 ---

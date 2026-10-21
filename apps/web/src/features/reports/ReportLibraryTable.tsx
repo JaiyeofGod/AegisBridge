@@ -1,112 +1,107 @@
-import { useMemo, useState } from "react";
-
 import { StatusBadge } from "@/components/status/StatusBadge";
-import type { ReportRecord, ReportStatus } from "@/types/reports";
+import { reportStatusTone, type ReportDefinitionView } from "@/features/reports/mapReports";
+
+export type ReportTableFilters = {
+  search: string;
+  status: string;
+  reportType: string;
+};
+
+export type ReportFilterOption = { value: string; label: string };
 
 const selectClass =
   "min-h-11 min-w-[140px] rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]";
 
-function statusTone(status: ReportStatus): "success" | "warning" | "accent" {
-  if (status === "Ready") return "success";
-  if (status === "Review") return "warning";
-  return "accent";
-}
+const statuses: ReportFilterOption[] = [
+  { value: "ready", label: "Ready" },
+  { value: "review", label: "Review" },
+  { value: "draft", label: "Draft" },
+  { value: "archived", label: "Archived" },
+];
 
 export function ReportLibraryTable({
   reports,
+  total,
   selectedId,
   onSelect,
+  filters,
+  onFiltersChange,
+  reportTypeOptions,
+  emptyLabel,
+  showFilters = true,
 }: {
-  reports: ReportRecord[];
+  reports: ReportDefinitionView[];
+  total: number;
   selectedId: string;
   onSelect: (id: string) => void;
+  filters: ReportTableFilters;
+  onFiltersChange: (filters: ReportTableFilters) => void;
+  reportTypeOptions: ReportFilterOption[];
+  emptyLabel: string;
+  showFilters?: boolean;
 }) {
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("all");
-  const [owner, setOwner] = useState("all");
-
-  const owners = useMemo(
-    () => Array.from(new Set(reports.map((item) => item.owner))).sort(),
-    [reports],
-  );
-
-  const filtered = reports.filter((item) => {
-    const haystack = `${item.reportId} ${item.name} ${item.type} ${item.scope}`.toLowerCase();
-    const matchesQuery = query.trim().length === 0 || haystack.includes(query.trim().toLowerCase());
-    return (
-      matchesQuery &&
-      (status === "all" || item.status === status) &&
-      (owner === "all" || item.owner === owner)
-    );
-  });
-
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-end">
-        <div className="min-w-[200px] flex-1">
-          <label
-            className="mb-2 block text-sm font-medium text-[var(--text)]"
-            htmlFor="report-search"
-          >
-            Search records
-          </label>
-          <input
-            id="report-search"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search records…"
-            className="min-h-11 w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 text-[var(--text)] placeholder:text-[var(--muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+      {showFilters ? (
+        <div className="flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-end">
+          <div className="min-w-[200px] flex-1">
+            <label
+              className="mb-2 block text-sm font-medium text-[var(--text)]"
+              htmlFor="report-search"
+            >
+              Search records
+            </label>
+            <input
+              id="report-search"
+              type="search"
+              value={filters.search}
+              onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
+              placeholder="Search records…"
+              className="min-h-11 w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 text-[var(--text)] placeholder:text-[var(--muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+            />
+          </div>
+          <Filter
+            id="report-status"
+            label="Status"
+            value={filters.status}
+            onChange={(status) => onFiltersChange({ ...filters, status })}
+            options={statuses}
+          />
+          <Filter
+            id="report-type"
+            label="Report type"
+            value={filters.reportType}
+            onChange={(reportType) => onFiltersChange({ ...filters, reportType })}
+            options={reportTypeOptions}
           />
         </div>
-        <Filter
-          id="report-status"
-          label="Status"
-          value={status}
-          onChange={setStatus}
-          options={["Ready", "Review", "Scheduled"]}
-        />
-        <Filter
-          id="report-owner"
-          label="Owner"
-          value={owner}
-          onChange={setOwner}
-          options={owners}
-        />
-      </div>
+      ) : null}
 
       <div className="hidden overflow-x-auto md:block">
         <table className="min-w-full border-collapse text-left text-sm">
           <caption className="sr-only">
-            Report library with type, owner, generated time, freshness, status, format, and scope
+            Report definitions with type, owner, last run, schedule, status, and format
           </caption>
           <thead className="text-[var(--muted)]">
             <tr>
-              {[
-                "Report",
-                "Type",
-                "Scope",
-                "Owner",
-                "Generated",
-                "Freshness",
-                "Status",
-                "Format",
-              ].map((heading) => (
-                <th key={heading} scope="col" className="px-3 py-3 font-medium whitespace-nowrap">
-                  {heading}
-                </th>
-              ))}
+              {["Report", "Type", "Owner", "Last run", "Schedule", "Status", "Format"].map(
+                (heading) => (
+                  <th key={heading} scope="col" className="px-3 py-3 font-medium whitespace-nowrap">
+                    {heading}
+                  </th>
+                ),
+              )}
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {reports.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-[var(--muted)]">
-                  No reports match the current filters.
+                <td colSpan={7} className="px-3 py-8 text-[var(--muted)]">
+                  {emptyLabel}
                 </td>
               </tr>
             ) : (
-              filtered.map((item) => (
+              reports.map((item) => (
                 <tr key={item.id} className="border-t border-[var(--border)]">
                   <td className="px-3 py-3">
                     <button
@@ -116,20 +111,26 @@ export function ReportLibraryTable({
                       className="inline-flex min-h-11 flex-col items-start justify-center text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                     >
                       <span className="font-medium text-[var(--text)]">{item.name}</span>
-                      <span className="text-xs text-[var(--muted)]">{item.reportId}</span>
+                      <span className="text-xs text-[var(--muted)]">{item.id}</span>
                     </button>
                   </td>
-                  <td className="px-3 py-3 text-[var(--muted)]">{item.type}</td>
-                  <td className="px-3 py-3 text-[var(--muted)]">{item.scope}</td>
+                  <td className="px-3 py-3 text-[var(--muted)]">{item.reportTypeLabel}</td>
                   <td className="px-3 py-3 text-[var(--muted)]">{item.owner}</td>
                   <td className="px-3 py-3 whitespace-nowrap text-[var(--muted)]">
-                    {item.generatedLabel}
+                    {item.lastRunAt}
                   </td>
-                  <td className="px-3 py-3 text-[var(--muted)]">{item.freshness}</td>
+                  <td className="px-3 py-3 text-[var(--muted)]">
+                    {item.scheduleStateLabel}
+                    {item.scheduleState === "schedule_defined" ? (
+                      <span className="mt-1 block text-xs">
+                        {item.scheduleLabel} · cadence only
+                      </span>
+                    ) : null}
+                  </td>
                   <td className="px-3 py-3">
-                    <StatusBadge label={item.status} tone={statusTone(item.status)} />
+                    <StatusBadge label={item.statusLabel} tone={reportStatusTone(item.status)} />
                   </td>
-                  <td className="px-3 py-3 text-[var(--text)]">{item.format}</td>
+                  <td className="px-3 py-3 text-[var(--text)]">{item.formatLabel}</td>
                 </tr>
               ))
             )}
@@ -138,28 +139,32 @@ export function ReportLibraryTable({
       </div>
 
       <ul className="space-y-3 md:hidden">
-        {filtered.map((item) => (
-          <li key={item.id}>
-            <button
-              type="button"
-              aria-pressed={selectedId === item.id}
-              onClick={() => onSelect(item.id)}
-              className="flex min-h-11 w-full flex-col gap-1 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-            >
-              <span className="font-medium text-[var(--text)]">
-                {item.reportId} · {item.name}
-              </span>
-              <span className="text-xs text-[var(--muted)]">
-                {item.status} · {item.format} · {item.freshness}
-              </span>
-            </button>
-          </li>
-        ))}
+        {reports.length === 0 ? (
+          <li className="text-sm text-[var(--muted)]">{emptyLabel}</li>
+        ) : (
+          reports.map((item) => (
+            <li key={item.id}>
+              <button
+                type="button"
+                aria-pressed={selectedId === item.id}
+                onClick={() => onSelect(item.id)}
+                className="flex min-h-11 w-full flex-col gap-1 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+              >
+                <span className="font-medium text-[var(--text)]">
+                  {item.id} · {item.name}
+                </span>
+                <span className="text-xs text-[var(--muted)]">
+                  {item.statusLabel} · {item.formatLabel} · {item.scheduleStateLabel}
+                </span>
+              </button>
+            </li>
+          ))
+        )}
       </ul>
 
       <p className="text-xs text-[var(--muted)]">
-        Showing {filtered.length} of {reports.length} sample records · Row selection opens record
-        details
+        Showing {reports.length} of {total} stored definitions · Row selection opens definition
+        details · Schedule cadence is not a running worker
       </p>
     </div>
   );
@@ -176,7 +181,7 @@ function Filter({
   label: string;
   value: string;
   onChange: (value: string) => void;
-  options: string[];
+  options: ReportFilterOption[];
 }) {
   return (
     <div>
@@ -191,8 +196,8 @@ function Filter({
       >
         <option value="all">All</option>
         {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
+          <option key={option.value} value={option.value}>
+            {option.label}
           </option>
         ))}
       </select>

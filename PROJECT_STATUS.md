@@ -2,7 +2,7 @@
 
 **Last updated:** October 20, 2026  
 **Current phase:** Phase 2 — read-only API contracts  
-**Next:** Authentication, when authorized. Reports remains on local mocks until a frontend read integration is requested.
+**Next:** Authentication, when authorized. Frontend Cyber Range and Account remain on local mocks until a read integration is requested.
 
 ---
 
@@ -15,11 +15,11 @@
 | Phase 1 plan | Present (`PHASE_1_IMPLEMENTATION_PLAN.md` v1.1) — corrected routes/tooling |
 | Minimal Phase 0 docs | Complete |
 | Application code | API domain schema + web UI on local mocks |
-| Domain schema | Through `20261020_0004` including reports and dataset registry metadata |
-| Read API | `/api/v1` through governance, threat intelligence, administration, reports, datasets, and dataset experiments |
+| Domain schema | Through `20261020_0005` including cyber-range catalog tables |
+| Read API | `/api/v1` through reports, datasets, experiments, and cyber-range |
 | Authentication | Not started |
 | Write API | Not started |
-| Frontend API connection | Not started |
+| Frontend API connection | Overview through Reports (incl. dataset registry / experiments); Cyber Range and Account still mocked |
 | Package installs | API via uv; web via pnpm (`apps/web`) |
 | Cyber range | Not started |
 | Hosting | Not started |

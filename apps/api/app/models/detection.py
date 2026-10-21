@@ -33,6 +33,13 @@ class Detection(UUIDMixin, TimestampMixin, Base):
     human_id: Mapped[str] = human_id_column()
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    data_source: Mapped[str | None] = mapped_column(String(120))
+    sigma_reference: Mapped[str | None] = mapped_column(String(240))
+    wazuh_mapping_status: Mapped[str | None] = mapped_column(String(120))
+    validation_state: Mapped[str | None] = mapped_column(String(32))
+    last_validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    notes: Mapped[str | None] = mapped_column(Text)
 
     organization: Mapped[Organization] = relationship()
     versions: Mapped[list[DetectionVersion]] = relationship(back_populates="detection")
