@@ -1,6 +1,7 @@
 import { BrandMark } from "@/components/navigation/BrandMark";
 import { primaryNav } from "@/components/navigation/nav-config";
 import { SidebarNavItem } from "@/components/navigation/SidebarNavItem";
+import { useAuthStatus } from "@/features/auth/useAuthSession";
 import { cn } from "@/lib/cn";
 
 export function Sidebar({
@@ -10,6 +11,12 @@ export function Sidebar({
   className?: string;
   onNavigate?: () => void;
 }) {
+  const auth = useAuthStatus();
+  const canSeeAdministration =
+    auth.user?.permissions.includes("administration.read") === true ||
+    auth.user?.privileged === true;
+  const items = primaryNav.filter((item) => item.to !== "/administration" || canSeeAdministration);
+
   return (
     <aside
       className={cn(
@@ -22,7 +29,7 @@ export function Sidebar({
         <BrandMark />
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4" aria-label="Modules">
-        {primaryNav.map((item) => (
+        {items.map((item) => (
           <SidebarNavItem key={item.to} item={item} onNavigate={onNavigate} />
         ))}
       </nav>

@@ -40,12 +40,105 @@ import type {
 } from "@/services/api-types";
 
 export function jsonResponse(body: unknown, status = 200) {
+  const payload = typeof body === "string" ? body : JSON.stringify(body);
   return {
     ok: status >= 200 && status < 300,
     status,
-    json: async () => body,
+    json: async () => (typeof body === "string" ? JSON.parse(body) : body),
+    text: async () => payload,
+    headers: { get: () => "application/json" },
   };
 }
+
+export const currentUserFixture = {
+  id: "USR-0001",
+  display_name: "Amara Okonkwo",
+  email: "amara.okonkwo@aegisbridge.example",
+  status: "active",
+  department: "Security",
+  roles: ["Administrator"],
+  permissions: [
+    "administration.read",
+    "administration.manage",
+    "integration.manage",
+    "user.role.manage",
+    "asset.read",
+  ],
+  privileged: true,
+  organization: "AegisBridge Technologies",
+  environment_label: "Lab · Simulated",
+  data_origin: "simulated",
+  job_title: "Security administrator",
+  timezone: "America/New_York",
+};
+
+export const authenticatedSessionFixture = {
+  authenticated: true,
+  user: currentUserFixture,
+  session_id: "SES-TEST0001",
+  expires_at: "2026-10-21T04:00:00+00:00",
+  last_seen_at: "2026-10-20T21:00:00+00:00",
+};
+
+export const anonymousSessionFixture = {
+  authenticated: false,
+  user: null,
+  session_id: null,
+  expires_at: null,
+  last_seen_at: null,
+};
+
+export const accountProfileFixture = {
+  id: "USR-0001",
+  display_name: "Amara Okonkwo",
+  email: "amara.okonkwo@aegisbridge.example",
+  department: "Security",
+  account_status: "active",
+  job_title: "Security administrator",
+  timezone: "America/New_York",
+  organization: "AegisBridge Technologies",
+  created_at: "2026-03-04T12:00:00+00:00",
+  data_origin: "simulated",
+};
+
+export const accountSecurityFixture = {
+  password_authentication_configured: true,
+  active_session_count: 1,
+  current_session: {
+    id: "SES-TEST0001",
+    created_at: "2026-10-20T20:00:00+00:00",
+    last_seen_at: "2026-10-20T21:00:00+00:00",
+    expires_at: "2026-10-21T04:00:00+00:00",
+    current: true,
+  },
+  mfa_status: "not_configured",
+  last_authenticated_at: "2026-10-20T20:00:00+00:00",
+  semantics:
+    "MFA enrollment is not available in this phase. Session tokens and password hashes are never returned.",
+};
+
+export const accountPreferencesFixture = {
+  persistence: "not_stored",
+  theme: "system",
+  density: "comfortable",
+  landing_page: "overview",
+  reduced_motion: false,
+  semantics:
+    "User preference persistence is not stored yet. These values are explicit defaults, not fabricated saved settings.",
+};
+
+export const accountWorkspaceFixture = {
+  organization: "AegisBridge Technologies",
+  department: "Security",
+  roles: ["Administrator"],
+  permissions: currentUserFixture.permissions,
+  privileged: true,
+  environment_label: "Lab · Simulated",
+  data_origin: "simulated",
+  privileged_roles: ["Administrator", "Security Engineer"],
+  semantics:
+    "Privileged users hold Administrator or Security Engineer. Permissions are resolved from the deterministic role catalog.",
+};
 
 export const overviewFixture: OverviewResponse = {
   generated_at: "2026-10-20T12:00:00Z",
@@ -1702,12 +1795,90 @@ export function filteredLabDetections(url: string) {
   return assetPage(items);
 }
 
-export function installApiFetch(resolve?: (url: string) => unknown) {
+export function installApiFetch(
+  resolve?: (url: string, init?: RequestInit) => unknown,
+  options?: { authenticated?: boolean; allowAuthOverride?: boolean },
+) {
+  const authenticated = options?.authenticated ?? true;
   const calls: string[] = [];
-  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+  const credentialFlags: Array<RequestCredentials | undefined> = [];
+  let sessionAuthenticated = authenticated;
+
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     calls.push(url);
-    if (resolve) return resolve(url);
+    credentialFlags.push(init?.credentials);
+
+    const isAuthPath = url.includes("/api/v1/auth/") || url.includes("/api/v1/account/");
+    // Auth/account mocks stay centralized so domain test overrides cannot break session restore.
+    if (isAuthPath) {
+      if (options?.allowAuthOverride && resolve) {
+        const custom = resolve(url, init);
+        if (custom !== undefined) return custom;
+      }
+      if (url.includes("/api/v1/auth/session")) {
+        return jsonResponse(
+          sessionAuthenticated ? authenticatedSessionFixture : anonymousSessionFixture,
+        );
+      }
+      if (url.includes("/api/v1/auth/me")) {
+        return sessionAuthenticated
+          ? jsonResponse(currentUserFixture)
+          : jsonResponse({ code: "unauthenticated", message: "Authentication is required." }, 401);
+      }
+      if (url.includes("/api/v1/auth/login") && init?.method === "POST") {
+        const body = init.body
+          ? (JSON.parse(String(init.body)) as { email?: string; password?: string })
+          : {};
+        if (
+          body.email === currentUserFixture.email &&
+          typeof body.password === "string" &&
+          body.password.length > 0 &&
+          body.password !== "wrong-password"
+        ) {
+          sessionAuthenticated = true;
+          return jsonResponse(currentUserFixture);
+        }
+        return jsonResponse(
+          { code: "authentication_failed", message: "Invalid email or password." },
+          401,
+        );
+      }
+      if (url.includes("/api/v1/auth/logout-all") && init?.method === "POST") {
+        sessionAuthenticated = false;
+        return jsonResponse(anonymousSessionFixture);
+      }
+      if (url.includes("/api/v1/auth/logout") && init?.method === "POST") {
+        sessionAuthenticated = false;
+        return jsonResponse(anonymousSessionFixture);
+      }
+      if (url.includes("/api/v1/account/profile")) {
+        return sessionAuthenticated
+          ? jsonResponse(accountProfileFixture)
+          : jsonResponse({ code: "unauthenticated", message: "Authentication is required." }, 401);
+      }
+      if (url.includes("/api/v1/account/security")) {
+        return sessionAuthenticated
+          ? jsonResponse(accountSecurityFixture)
+          : jsonResponse({ code: "unauthenticated", message: "Authentication is required." }, 401);
+      }
+      if (url.includes("/api/v1/account/preferences")) {
+        return sessionAuthenticated
+          ? jsonResponse(accountPreferencesFixture)
+          : jsonResponse({ code: "unauthenticated", message: "Authentication is required." }, 401);
+      }
+      if (url.includes("/api/v1/account/workspace")) {
+        return sessionAuthenticated
+          ? jsonResponse(accountWorkspaceFixture)
+          : jsonResponse({ code: "unauthenticated", message: "Authentication is required." }, 401);
+      }
+    }
+
+    if (resolve) {
+      const custom = resolve(url, init);
+      if (custom !== undefined) return custom;
+    }
+
     if (url.includes("/api/v1/health")) {
       return jsonResponse({ status: "ok", service: "aegisbridge" });
     }
@@ -1820,5 +1991,5 @@ export function installApiFetch(resolve?: (url: string) => unknown) {
     return jsonResponse({});
   });
   vi.stubGlobal("fetch", fetchMock);
-  return { fetchMock, calls };
+  return { fetchMock, calls, credentialFlags };
 }

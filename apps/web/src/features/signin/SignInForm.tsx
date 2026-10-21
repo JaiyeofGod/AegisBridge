@@ -1,18 +1,44 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/buttons/Button";
 import { Input } from "@/components/forms/Input";
-import { SimulatedDataBanner } from "@/components/feedback/SimulatedDataBanner";
+import { authKeys } from "@/features/auth/auth-keys";
+import { ApiError } from "@/services/api-client";
+import { loginWithPassword } from "@/services/auth";
+
+const DEV_EMAIL_HINT = "amara.okonkwo@aegisbridge.example";
 
 /**
- * UI-only authentication surface. No real auth, SSO, or production bypass.
- * Explore demo navigates to Overview with an explicit simulated label; Phase 2
- * must replace this with authenticated session handling.
+ * Local password sign-in against the FastAPI session cookie.
+ * Session tokens stay HttpOnly and are never stored in JavaScript.
  */
 export function SignInForm() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const login = useMutation({
+    mutationFn: () => loginWithPassword(email.trim(), password),
+    onSuccess: async () => {
+      setPassword("");
+      setFormError(null);
+      await queryClient.invalidateQueries({ queryKey: authKeys.session });
+      await queryClient.invalidateQueries({ queryKey: authKeys.me });
+      navigate("/overview", { replace: true });
+    },
+    onError: (error) => {
+      setPassword("");
+      if (error instanceof ApiError && error.status === 401) {
+        setFormError("Invalid email or password.");
+        return;
+      }
+      setFormError("Sign-in could not be completed. Try again.");
+    },
+  });
 
   return (
     <div className="flex h-full flex-col justify-center px-6 py-10 md:px-12 lg:px-16">
@@ -27,12 +53,13 @@ export function SignInForm() {
           </p>
         </div>
 
-        <SimulatedDataBanner message="UI-only sign-in — authentication is not connected" />
-
         <form
           className="space-y-4"
           onSubmit={(event) => {
             event.preventDefault();
+            if (login.isPending) return;
+            setFormError(null);
+            login.mutate();
           }}
           noValidate
         >
@@ -44,10 +71,25 @@ export function SignInForm() {
             placeholder="you@company.com"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            hint="Placeholder control. Submitting does not authenticate."
+            disabled={login.isPending}
           />
-          <Button type="submit" fullWidth disabled title="Authentication arrives in Phase 2">
-            Continue with email
+          <Input
+            label="Password"
+            type="password"
+            name="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            disabled={login.isPending}
+            error={formError ?? undefined}
+          />
+          <Button
+            type="submit"
+            fullWidth
+            disabled={login.isPending || email.trim().length === 0 || password.length === 0}
+            aria-busy={login.isPending || undefined}
+          >
+            {login.isPending ? "Signing in…" : "Continue with email"}
           </Button>
         </form>
 
@@ -61,27 +103,19 @@ export function SignInForm() {
         </Button>
 
         <div className="rounded-[var(--radius-panel)] border border-dashed border-[var(--border)] p-4">
-          <p className="text-sm font-semibold text-[var(--text)]">Explore the demo</p>
+          <p className="text-sm font-semibold text-[var(--text)]">Development sign-in</p>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            Opens Overview with simulated AegisBridge Technologies data. Not a production auth
-            bypass.
+            Local seed account email (password comes from your private environment configuration and
+            is never shown here):
           </p>
-          <Button
-            type="button"
-            variant="ghost"
-            className="mt-3 border border-[var(--border)]"
-            fullWidth
-            data-testid="explore-demo"
-            onClick={() => {
-              navigate("/overview", { state: { demoEntry: true } });
-            }}
-          >
-            Explore demo (SIMULATED)
-          </Button>
+          <p className="mt-2 font-mono text-xs text-[var(--text)]" data-testid="dev-email-hint">
+            {DEV_EMAIL_HINT}
+          </p>
         </div>
 
         <p className="text-xs text-[var(--muted)]">
           Authorized access only. This portfolio environment uses fictional organizational data.
+          Frontend route checks are UX only; server authorization is enforced separately.
         </p>
       </div>
     </div>

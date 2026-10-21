@@ -718,3 +718,78 @@ export type LabDetectionQuery = {
   page?: number;
   pageSize?: number;
 };
+
+export type CurrentUser = {
+  id: string;
+  display_name: string;
+  email: string;
+  status: string;
+  department: string | null;
+  roles: string[];
+  permissions: string[];
+  privileged: boolean;
+  organization: string;
+  environment_label: string;
+  data_origin: string;
+  job_title: string | null;
+  timezone: string | null;
+};
+
+export type SessionStatus = {
+  authenticated: boolean;
+  user: CurrentUser | null;
+  session_id: string | null;
+  expires_at: string | null;
+  last_seen_at: string | null;
+};
+
+export type AccountProfileResponse = {
+  id: string;
+  display_name: string;
+  email: string;
+  department: string | null;
+  account_status: string;
+  job_title: string | null;
+  timezone: string;
+  organization: string;
+  created_at: string;
+  data_origin: string;
+};
+
+export type AccountSessionSummary = {
+  id: string;
+  created_at: string;
+  last_seen_at: string;
+  expires_at: string;
+  current: boolean;
+};
+
+export type AccountSecurityResponse = {
+  password_authentication_configured: boolean;
+  active_session_count: number;
+  current_session: AccountSessionSummary | null;
+  mfa_status: string;
+  last_authenticated_at: string | null;
+  semantics: string;
+};
+
+export type AccountPreferencesResponse = {
+  persistence: string;
+  theme: string;
+  density: string;
+  landing_page: string;
+  reduced_motion: boolean;
+  semantics: string;
+};
+
+export type AccountWorkspaceResponse = {
+  organization: string;
+  department: string | null;
+  roles: string[];
+  permissions: string[];
+  privileged: boolean;
+  environment_label: string;
+  data_origin: string;
+  privileged_roles: string[];
+  semantics: string;
+};

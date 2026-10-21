@@ -22,15 +22,30 @@ function TestProviders({
 
 export async function renderWithProviders(
   ui: ReactElement,
-  options?: Omit<RenderOptions, "wrapper"> & { initialEntries?: string[] },
+  options?: Omit<RenderOptions, "wrapper"> & {
+    initialEntries?: string[];
+    /** Wait for session restore (default true). Set false to assert auth-loading. */
+    waitForAuth?: boolean;
+  },
 ) {
-  const { initialEntries, ...rest } = options ?? {};
+  const { initialEntries, waitForAuth = true, ...rest } = options ?? {};
   const view = render(ui, {
     wrapper: ({ children }) => (
       <TestProviders initialEntries={initialEntries}>{children}</TestProviders>
     ),
     ...rest,
   });
+
+  if (waitForAuth) {
+    await waitFor(
+      () => {
+        if (view.queryByTestId("auth-loading")) {
+          throw new Error("auth still loading");
+        }
+      },
+      { timeout: 10_000 },
+    );
+  }
 
   if (view.queryByText(/Loading page/)) {
     await waitFor(

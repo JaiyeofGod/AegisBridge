@@ -122,13 +122,13 @@ cd apps/web
 pnpm dev
 ```
 
-The web app still reads local mock data. It is not connected to the API.
+The web app reads development API data through the Vite `/api` proxy (`VITE_API_BASE_URL`). Auth uses HttpOnly session cookies with `credentials: "include"`.
 
-Domain read routes, including threat intelligence, administration, reports, datasets, dataset experiments, and cyber-range, are documented in `docs/api/API_CONTRACTS.md`. Auth and Account APIs are documented there and in `docs/security/AUTHENTICATION_AND_RBAC.md`. Reports and Cyber Range pages already read domain contracts; Account/sign-in remain on local mocks until frontend wiring is requested.
+Domain read routes, including threat intelligence, administration, reports, datasets, dataset experiments, and cyber-range, are documented in `docs/api/API_CONTRACTS.md`. Auth and Account APIs are documented there and in `docs/security/AUTHENTICATION_AND_RBAC.md`.
 
-**Backend auth foundation:** Argon2id local passwords, HttpOnly session cookies, `/api/v1/auth/*`, `/api/v1/account/*`, RBAC helpers. Domain GETs stay unauthenticated for now.
+**Auth status:** Backend Argon2id passwords + session cookies; frontend sign-in, session restore, logout, and Account pages are wired. SPA route guards are UX only — **backend domain authorization enforcement is the next security slice.** Domain GETs may still be public until then.
 
-**Not yet created:** frontend auth wiring, write endpoints, SSO/MFA, external integrations, background jobs, Celery worker, CI workflows.
+**Not yet created:** domain GET/write authz enforcement, CSRF-protected writes, SSO/MFA, password reset, external integrations, background jobs, Celery worker, CI workflows.
 
 Local login seed: set `AEGIS_DEV_ADMIN_PASSWORD` in `.env`, run migrations + `python -m app.db.seed`, then use `amara.okonkwo@aegisbridge.example` (`USR-0001`).
 

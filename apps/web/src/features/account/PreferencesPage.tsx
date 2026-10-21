@@ -1,152 +1,102 @@
 import { useState } from "react";
 
 import { Panel } from "@/components/cards/Panel";
+import { ErrorState } from "@/components/feedback/ErrorState";
+import { LoadingState } from "@/components/feedback/LoadingState";
 import { AccountField } from "@/features/account/AccountField";
 import { AccountLayout } from "@/features/account/AccountLayout";
 import { PrototypeAction } from "@/features/account/AccountActions";
-import { useAccountData } from "@/features/account/useAccountData";
+import { useAccountPreferencesQuery } from "@/features/account/useAccountData";
 import { cn } from "@/lib/cn";
-import type { NotificationPreference } from "@/types/account";
 
-const themes = ["Dark", "Light", "System"] as const;
-const densities = ["Comfortable", "Compact"] as const;
-const landingPages = ["Overview", "Governance", "Risks", "SOC Operations"] as const;
+const themes = ["system", "dark", "light"] as const;
+const densities = ["comfortable", "compact"] as const;
 
 export function PreferencesPage() {
-  const account = useAccountData();
-  const seed = account.data.preferences;
-  const [theme, setTheme] = useState<(typeof themes)[number]>(seed.theme);
-  const [density, setDensity] = useState<(typeof densities)[number]>(seed.density);
-  const [reducedMotion, setReducedMotion] = useState(false);
-  const [landingPage, setLandingPage] = useState(seed.landingPage);
-  const [notifications, setNotifications] = useState<NotificationPreference[]>(seed.notifications);
+  const preferencesQuery = useAccountPreferencesQuery();
+  const preferences = preferencesQuery.data;
+  const [theme, setTheme] = useState<string | null>(null);
+  const [density, setDensity] = useState<string | null>(null);
 
-  function toggleInApp(id: string) {
-    setNotifications((current) =>
-      current.map((item) => (item.id === id ? { ...item, inApp: !item.inApp } : item)),
-    );
-  }
+  const themeValue = theme ?? preferences?.theme ?? "system";
+  const densityValue = density ?? preferences?.density ?? "comfortable";
 
   return (
     <AccountLayout
       title="Preferences"
       crumb="Preferences"
-      description="Choose how AegisBridge looks and which updates you receive."
+      description="Choose how AegisBridge looks. Persistence is not connected yet."
       actions={
         <PrototypeAction
           label="Save changes"
-          reason="Preference changes stay in this browser session and are not saved."
+          reason="Preferences are not persisted. No save API exists in this phase."
         />
       }
     >
-      <div className="space-y-4" data-testid="account-preferences">
-        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(260px,0.8fr)]">
-          <Panel title="Appearance & accessibility">
-            <ChoiceGroup label="Theme" value={theme} options={themes} onChange={setTheme} />
-            <ChoiceGroup
-              label="Display density"
-              value={density}
-              options={densities}
-              onChange={setDensity}
-              hint="Table density follows this display setting. The choice is local only."
-            />
-            <div className="border-b border-[var(--border)] py-4">
-              <div className="text-xs text-[var(--muted)]">Motion</div>
-              <p className="mt-1 text-sm text-[var(--text)]">{seed.motion}</p>
-              <label className="mt-3 flex min-h-11 items-center gap-3 text-sm text-[var(--text)]">
-                <input
-                  type="checkbox"
-                  className="size-4 accent-[var(--accent)]"
-                  checked={reducedMotion}
-                  onChange={(event) => setReducedMotion(event.target.checked)}
-                />
-                Prefer reduced motion in this page preview
-              </label>
-              <p className="mt-1 text-xs text-[var(--muted)]">
-                The product follows the device reduced-motion setting. This checkbox is not saved.
-                Current preview: {reducedMotion ? "Reduced motion on" : "Follow device setting"}.
+      {preferencesQuery.isPending ? <LoadingState label="Updating preferences" /> : null}
+      {preferencesQuery.isError ? (
+        <ErrorState
+          title="Preferences unavailable"
+          description="The preferences request failed. Fixture preferences are not substituted."
+          onRetry={() => void preferencesQuery.refetch()}
+        />
+      ) : null}
+      {preferences ? (
+        <div className="space-y-4" data-testid="account-preferences">
+          <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-3 py-2 text-sm text-[var(--warning)]">
+            Persistence: {preferences.persistence}. {preferences.semantics}
+          </div>
+          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(260px,0.8fr)]">
+            <Panel title="Appearance">
+              <ChoiceGroup
+                label="Theme"
+                value={themeValue}
+                options={themes}
+                onChange={setTheme}
+                hint="Local preview only. Not persisted."
+              />
+              <ChoiceGroup
+                label="Display density"
+                value={densityValue}
+                options={densities}
+                onChange={setDensity}
+                hint="Local preview only. Not persisted."
+              />
+              <AccountField
+                label="Default landing page"
+                value={preferences.landingPage}
+                hint="Server default only. Not stored for this user."
+              />
+              <AccountField
+                label="Reduced motion default"
+                value={preferences.reducedMotion ? "On" : "Off"}
+              />
+            </Panel>
+            <Panel title="Persistence">
+              <p className="text-sm text-[var(--muted)]">
+                Controls on this page do not call a save endpoint. Changing theme or density updates
+                local UI state only and is labeled Not persisted.
               </p>
-            </div>
-            <AccountField label="Date & time" value={seed.dateTime} />
-            <div className="py-4">
-              <label htmlFor="default-landing-page" className="text-xs text-[var(--muted)]">
-                Default landing page
-              </label>
-              <select
-                id="default-landing-page"
-                className="mt-2 min-h-11 w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-                value={landingPage}
-                onChange={(event) => setLandingPage(event.target.value)}
-              >
-                {landingPages.map((page) => (
-                  <option key={page} value={page}>
-                    {page}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1 text-xs text-[var(--muted)]">
-                Local preview only. Opening the app still starts at the current route.
-              </p>
-            </div>
-          </Panel>
-
-          <Panel title="Your preferences">
-            <ul className="space-y-3">
-              {seed.notes.map((note) => (
-                <li key={note} className="text-sm text-[var(--muted)]">
-                  {note}
-                </li>
-              ))}
-            </ul>
-          </Panel>
+            </Panel>
+          </div>
         </div>
-
-        <Panel title="Notifications">
-          <ul className="space-y-4">
-            {notifications.map((item) => (
-              <li key={item.id} className="border-b border-[var(--border)] pb-4 last:border-b-0">
-                <div className="text-sm text-[var(--text)]">{item.label}</div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="inline-flex min-h-11 items-center rounded-[var(--radius-control)] border border-[var(--border)] px-3 text-sm text-[var(--text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-                    aria-pressed={item.inApp}
-                    onClick={() => toggleInApp(item.id)}
-                  >
-                    In-app: {item.inApp ? "On" : "Off"}
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex min-h-11 items-center rounded-[var(--radius-control)] border border-[var(--border)] px-3 text-sm text-[var(--muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:opacity-70"
-                    aria-pressed={item.email}
-                    disabled
-                    title="Email delivery is not connected. This switch does not send mail."
-                    aria-label={`${item.label} email. Email delivery is not connected.`}
-                  >
-                    Email: {item.email ? "On" : "Off"} · Not connected
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </Panel>
-      </div>
+      ) : null}
     </AccountLayout>
   );
 }
 
-function ChoiceGroup<T extends string>({
+function ChoiceGroup({
   label,
   value,
   options,
   onChange,
-  hint = "Local preview only. This choice is not saved.",
+  hint,
 }: {
   label: string;
-  value: T;
-  options: readonly T[];
-  onChange: (next: T) => void;
-  hint?: string;
+  value: string;
+  options: readonly string[];
+  onChange: (next: string) => void;
+  hint: string;
 }) {
   return (
     <fieldset className="border-b border-[var(--border)] py-4">
@@ -161,7 +111,7 @@ function ChoiceGroup<T extends string>({
               role="radio"
               aria-checked={selected}
               className={cn(
-                "inline-flex min-h-11 items-center rounded-[var(--radius-control)] px-3 text-sm",
+                "inline-flex min-h-11 items-center rounded-[var(--radius-control)] px-3 text-sm capitalize",
                 "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",
                 selected
                   ? "bg-[var(--raised)] font-semibold text-[var(--accent)]"

@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
 
-import { SimulatedDataBanner } from "@/components/feedback/SimulatedDataBanner";
 import { AppShell } from "@/components/navigation/AppShell";
 import { PageContainer } from "@/components/navigation/PageContainer";
 import { PageHeader } from "@/components/navigation/PageHeader";
 import { AccountNav } from "@/features/account/AccountNav";
-import { useAccountData } from "@/features/account/useAccountData";
+import { LogoutButton } from "@/features/account/LogoutButton";
+import { useAccountShellMeta } from "@/features/account/useAccountData";
 
 export function AccountLayout({
   title,
@@ -20,10 +20,10 @@ export function AccountLayout({
   actions?: ReactNode;
   children: ReactNode;
 }) {
-  const account = useAccountData();
+  const shell = useAccountShellMeta();
 
   return (
-    <AppShell environmentLabel={account.data.environmentLabel}>
+    <AppShell environmentLabel={shell.environmentLabel}>
       <PageContainer data-testid="account-page">
         <p className="mb-3 text-xs text-[var(--muted)]">Account / {crumb}</p>
         <PageHeader
@@ -32,7 +32,7 @@ export function AccountLayout({
           actions={
             <div className="flex flex-col items-stretch gap-2.5 sm:items-end">
               {actions}
-              <SimulatedDataBanner message={account.data.snapshotLabel} />
+              <LogoutButton />
             </div>
           }
         />

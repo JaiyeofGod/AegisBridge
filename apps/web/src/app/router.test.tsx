@@ -2,6 +2,7 @@ import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { AppRouter } from "@/app/router";
+import { installApiFetch } from "@/test/api-fixtures";
 import { renderWithProviders } from "@/test/render";
 
 const routes = [
@@ -26,6 +27,7 @@ const routes = [
 
 describe("Implemented routes", () => {
   it.each(routes)("%s resolves to its page", async (path, testId) => {
+    installApiFetch(undefined, { authenticated: path === "/signin" ? false : true });
     await renderWithProviders(<AppRouter />, { initialEntries: [path] });
     expect(await screen.findByTestId(testId)).toBeInTheDocument();
     expect(screen.queryByText(/not implemented yet/i)).not.toBeInTheDocument();

@@ -1,7 +1,8 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { LoadingState } from "@/components/feedback/LoadingState";
+import { GuestOnly, RequireAuth } from "@/features/auth/RequireAuth";
 
 const SignInPage = lazy(() =>
   import("@/features/signin/SignInPage").then((module) => ({ default: module.SignInPage })),
@@ -79,28 +80,151 @@ function RouteFallback() {
   );
 }
 
+function Protected({ children }: { children: ReactNode }) {
+  return <RequireAuth>{children}</RequireAuth>;
+}
+
 export function AppRouter() {
   return (
     <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/" element={<Navigate to="/signin" replace />} />
-        <Route path="/signin" element={<SignInPage />} />
-        <Route path="/overview" element={<OverviewPage />} />
-        <Route path="/governance" element={<GovernancePage />} />
-        <Route path="/risks" element={<RiskPage />} />
-        <Route path="/assets" element={<AssetInventoryPage />} />
-        <Route path="/assets/:assetId" element={<AssetDetailPage />} />
-        <Route path="/vulnerabilities" element={<VulnerabilityPage />} />
-        <Route path="/soc" element={<SocPage />} />
-        <Route path="/incidents" element={<IncidentPage />} />
-        <Route path="/threat-intelligence" element={<ThreatIntelPage />} />
-        <Route path="/cyber-range" element={<CyberRangePage />} />
-        <Route path="/reports" element={<ReportsPage />} />
-        <Route path="/administration" element={<AdministrationPage />} />
-        <Route path="/account/profile" element={<ProfilePage />} />
-        <Route path="/account/security" element={<SecurityPage />} />
-        <Route path="/account/preferences" element={<PreferencesPage />} />
-        <Route path="/account/workspace" element={<WorkspacePage />} />
+        <Route
+          path="/signin"
+          element={
+            <GuestOnly>
+              <SignInPage />
+            </GuestOnly>
+          }
+        />
+        <Route
+          path="/overview"
+          element={
+            <Protected>
+              <OverviewPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/governance"
+          element={
+            <Protected>
+              <GovernancePage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/risks"
+          element={
+            <Protected>
+              <RiskPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/assets"
+          element={
+            <Protected>
+              <AssetInventoryPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/assets/:assetId"
+          element={
+            <Protected>
+              <AssetDetailPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/vulnerabilities"
+          element={
+            <Protected>
+              <VulnerabilityPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/soc"
+          element={
+            <Protected>
+              <SocPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/incidents"
+          element={
+            <Protected>
+              <IncidentPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/threat-intelligence"
+          element={
+            <Protected>
+              <ThreatIntelPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/cyber-range"
+          element={
+            <Protected>
+              <CyberRangePage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/reports"
+          element={
+            <Protected>
+              <ReportsPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/administration"
+          element={
+            <Protected>
+              <AdministrationPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/account/profile"
+          element={
+            <Protected>
+              <ProfilePage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/account/security"
+          element={
+            <Protected>
+              <SecurityPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/account/preferences"
+          element={
+            <Protected>
+              <PreferencesPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/account/workspace"
+          element={
+            <Protected>
+              <WorkspacePage />
+            </Protected>
+          }
+        />
         <Route path="*" element={<Navigate to="/signin" replace />} />
       </Routes>
     </Suspense>
