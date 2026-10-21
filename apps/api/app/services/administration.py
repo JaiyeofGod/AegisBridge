@@ -24,9 +24,9 @@ from app.schemas.administration import (
     UserListItem,
 )
 from app.schemas.common import Page
+from app.security.permissions import PRIVILEGED_ROLES, permissions_for_roles
 from app.services.support import PageParams, page, paginate, person
 
-PRIVILEGED_ROLES = ("Administrator", "Security Engineer")
 CLOSED_REVIEWS = frozenset({"closed", "completed", "cancelled"})
 RECENT_AUDIT_DAYS = 30
 SUMMARY_SEMANTICS = (
@@ -72,7 +72,7 @@ def get_summary(session: Session) -> AdministrationSummary:
         privileged_user_count=privileged,
         recent_audit_event_count=recent_audits,
         pending_access_review_count=pending,
-        privileged_roles=list(PRIVILEGED_ROLES),
+        privileged_roles=sorted(PRIVILEGED_ROLES),
         semantics=SUMMARY_SEMANTICS,
     )
 
@@ -200,11 +200,12 @@ def _integration(row: Integration) -> IntegrationListItem:
 
 
 def _role(session: Session, role: Role) -> RoleListItem:
-    """Permissions are role_catalog entitlements on users who hold this role."""
+    """Permissions come from the deterministic role catalog, then stored labels."""
+    catalog = permissions_for_roles([role.name])
     user_ids = [link.user_id for link in role.user_links]
-    codes: list[str] = []
+    stored: list[str] = []
     if user_ids:
-        codes = list(
+        stored = list(
             session.scalars(
                 select(Permission.code)
                 .join(AccessEntitlement, AccessEntitlement.permission_id == Permission.id)
@@ -216,4 +217,5 @@ def _role(session: Session, role: Role) -> RoleListItem:
                 .order_by(Permission.code)
             ).all()
         )
+    codes = sorted(set(catalog) | set(stored))
     return RoleListItem(id=role.name, name=role.name, summary=role.summary, permissions=codes)

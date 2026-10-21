@@ -419,15 +419,22 @@ def test_administration_catalog_omits_secrets(client: TestClient) -> None:
         "Read Only",
     }
     assert by_role["Security Engineer"]["id"] == "Security Engineer"
-    assert by_role["Security Engineer"]["permissions"] == ["detection.manage", "integration.manage"]
-    assert by_role["Administrator"]["permissions"] == ["integration.manage", "user.role.manage"]
-    assert by_role["CISO"]["permissions"] == []
-    assert by_role["Read Only"]["permissions"] == []
+    assert "detection.manage" in by_role["Security Engineer"]["permissions"]
+    assert "integration.manage" in by_role["Security Engineer"]["permissions"]
+    assert "integration.manage" in by_role["Administrator"]["permissions"]
+    assert "user.role.manage" in by_role["Administrator"]["permissions"]
+    assert "asset.read" in by_role["Administrator"]["permissions"]
+    assert "evidence.download" in by_role["Auditor"]["permissions"]
+    assert "risk.read" in by_role["CISO"]["permissions"]
+    assert "asset.read" in by_role["Read Only"]["permissions"]
     assert_safe(roles)
 
-    audits = client.get("/api/v1/administration/audit-events").json()
+    audits = client.get(
+        "/api/v1/administration/audit-events",
+        params={"page_size": 100},
+    ).json()
     by_audit = {item["id"]: item for item in audits["items"]}
-    assert set(by_audit) == {"AUD-0001", "AUD-0002"}
+    assert {"AUD-0001", "AUD-0002"} <= set(by_audit)
     assert by_audit["AUD-0002"]["actor"]["id"] == "USR-0001"
     assert by_audit["AUD-0002"]["action"] == "Recorded Security Engineer catalog role"
     assert by_audit["AUD-0002"]["object_type"] == "role"

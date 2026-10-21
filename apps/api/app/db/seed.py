@@ -7,7 +7,7 @@ import hashlib
 from datetime import UTC, date, datetime
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import get_settings
 from app.core.db import SessionLocal
@@ -71,11 +71,14 @@ from app.models import (
     ThreatIndicator,
     ThreatIntelSource,
     User,
+    UserCredential,
     UserRole,
     Vendor,
     VendorService,
     Vulnerability,
 )
+from app.security.passwords import hash_password
+from app.security.permissions import PERMISSION_CATALOG, ROLE_PERMISSIONS
 
 ORG_SLUG = "aegisbridge-technologies"
 
@@ -94,6 +97,7 @@ def seed_development(session: Session) -> None:
     existing = session.scalar(select(Organization).where(Organization.slug == ORG_SLUG))
     if existing is not None:
         _ensure_contract_records(session, existing)
+        _ensure_auth_foundation(session, existing)
         session.commit()
         return
 
@@ -648,7 +652,72 @@ def seed_development(session: Session) -> None:
         )
     )
     _ensure_contract_records(session, org)
+    _ensure_auth_foundation(session, org)
     session.commit()
+
+
+def _ensure_auth_foundation(session: Session, org: Organization) -> None:
+    """Permission catalog, role entitlements, and optional local admin password hash."""
+    existing = {row.code: row for row in session.scalars(select(Permission)).all()}
+    for code, description in PERMISSION_CATALOG.items():
+        if code not in existing:
+            row = Permission(code=code, description=description)
+            session.add(row)
+            existing[code] = row
+    session.flush()
+
+    users = session.scalars(
+        select(User)
+        .options(selectinload(User.role_links).selectinload(UserRole.role))
+        .where(User.organization_id == org.id)
+    ).all()
+    for user in users:
+        wanted: set[str] = set()
+        for link in user.role_links:
+            wanted.update(ROLE_PERMISSIONS.get(link.role.name, frozenset()))
+        held = set(
+            session.scalars(
+                select(Permission.code)
+                .join(AccessEntitlement, AccessEntitlement.permission_id == Permission.id)
+                .where(AccessEntitlement.user_id == user.id)
+            ).all()
+        )
+        for code in sorted(wanted - held):
+            session.add(
+                AccessEntitlement(
+                    user_id=user.id,
+                    permission_id=existing[code].id,
+                    grant_source="role_catalog",
+                )
+            )
+
+    _ensure_dev_admin_password(session)
+
+
+def _ensure_dev_admin_password(session: Session) -> None:
+    """Hash AEGIS_DEV_ADMIN_PASSWORD for USR-0001 in local/dev/test only."""
+    settings = get_settings()
+    if settings.app_env.lower() not in {"local", "development", "dev", "test"}:
+        return
+    password = settings.aegis_dev_admin_password
+    if password is None or password.strip() == "":
+        return
+    admin = session.scalar(select(User).where(User.human_id == "USR-0001"))
+    if admin is None:
+        return
+    digest = hash_password(password)
+    credential = session.scalar(select(UserCredential).where(UserCredential.user_id == admin.id))
+    if credential is None:
+        session.add(
+            UserCredential(
+                user_id=admin.id,
+                password_hash=digest,
+                algorithm="argon2id",
+            )
+        )
+    else:
+        credential.password_hash = digest
+        credential.algorithm = "argon2id"
 
 
 def _ensure_contract_records(session: Session, org: Organization) -> None:

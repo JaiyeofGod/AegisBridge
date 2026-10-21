@@ -111,6 +111,8 @@ REQUIRED_TABLES = {
     "lab_scenario_systems",
     "lab_scenario_detections",
     "lab_scenario_attack_mappings",
+    "user_credentials",
+    "sessions",
 }
 
 SECRET_COLUMN_NAMES = {"password", "secret", "token", "api_key", "credential"}

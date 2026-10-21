@@ -41,6 +41,15 @@ class Settings(BaseSettings):
         default="change-me-generate-a-long-random-secret",
         alias="SESSION_SECRET",
     )
+    session_cookie_name: str = Field(default="aegis_session", alias="SESSION_COOKIE_NAME")
+    session_cookie_path: str = Field(default="/", alias="SESSION_COOKIE_PATH")
+    session_cookie_samesite: str = Field(default="lax", alias="SESSION_COOKIE_SAMESITE")
+    session_cookie_secure: bool | None = Field(default=None, alias="SESSION_COOKIE_SECURE")
+    session_ttl_seconds: int = Field(default=28_800, alias="SESSION_TTL_SECONDS")
+    aegis_dev_admin_password: str | None = Field(
+        default=None,
+        alias="AEGIS_DEV_ADMIN_PASSWORD",
+    )
 
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

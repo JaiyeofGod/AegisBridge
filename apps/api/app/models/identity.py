@@ -1,4 +1,4 @@
-"""Identity catalog. Authentication secrets and sessions are intentionally absent."""
+"""Identity catalog. Password hashes and sessions live in app.models.auth."""
 
 from __future__ import annotations
 

@@ -1,9 +1,10 @@
 # AegisBridge Security Requirements
 
-**Document version:** 1.0  
+**Document version:** 1.1  
 **Date:** October 20, 2026  
-**Status:** Phase 0 baseline  
-**Baselines:** OWASP ASVS 5.0.0 (meaningful Level 2 subset), OWASP Top 10:2025, NIST SSDF SP 800-218 v1.1
+**Status:** Phase 2 authentication foundation in progress  
+**Baselines:** OWASP ASVS 5.0.0 (meaningful Level 2 subset), OWASP Top 10:2025, NIST SSDF SP 800-218 v1.1  
+**Implementation detail:** `docs/security/AUTHENTICATION_AND_RBAC.md`
 
 ---
 
@@ -17,23 +18,29 @@ Visual mockups never weaken authentication, authorization, or data-handling requ
 
 ## 2. Authentication
 
-**Initial (Phase 2)**
+**Initial (Phase 2) — backend foundation implemented**
 
 - Local accounts only (no public self-registration in primary portfolio deployment)
-- Argon2id password hashing
-- Server-side sessions or carefully designed secure cookie token model
-- HTTP-only cookies; Secure flag in hosted environments; SameSite policy
-- CSRF defense
-- Session expiration
-- Login rate limiting
-- Login success/failure audit events
+- Argon2id password hashing (`argon2-cffi`)
+- Server-side sessions: opaque cookie token, SHA-256 digest stored only
+- HTTP-only cookies; Secure flag outside local/dev/test; SameSite=Lax default
+- Session expiration and revocation
+- Login success/failure (and logout) audit events
+- Auth + Account APIs; reusable RBAC dependencies
+
+**Still required before production**
+
+- CSRF defense for authenticated write APIs (SameSite+proxy mitigates some cases; write CSRF not complete)
+- Login rate limiting / lockout
+- Global permission enforcement on domain routes (domain GETs remain public until frontend auth wiring)
 
 **Later**
 
 - TOTP MFA
 - Optional OIDC/OAuth
+- Password-reset email flows
 
-**UI note:** Figma Organization SSO and Explore demo are design concepts. Implement auth per this document. Do not create a production authentication bypass to reproduce prototype navigation. Demo Mode (§33 master) uses seeded synthetic data with clear labeling.
+**UI note:** Figma Organization SSO and Explore demo are design concepts. Implement auth per this document. Do not create a production authentication bypass to reproduce prototype navigation. Demo Mode (§33 master) uses seeded synthetic data with clear labeling. Frontend sign-in wiring is a separate slice.
 
 ---
 

@@ -10,6 +10,7 @@ from app.models.assets import (
     SoftwareProduct,
 )
 from app.models.audit import AuditEvent
+from app.models.auth import AuthSession, UserCredential
 from app.models.base import Base
 from app.models.cyber_range import (
     LabScenario,
@@ -76,6 +77,7 @@ __all__ = [
     "AccessReview",
     "AccessReviewFinding",
     "AlertReference",
+    "AuthSession",
     "Asset",
     "AssetDataRelationship",
     "AssetOwner",
@@ -140,6 +142,7 @@ __all__ = [
     "ThreatIndicator",
     "ThreatIntelSource",
     "User",
+    "UserCredential",
     "UserRole",
     "ValidationRun",
     "Vendor",

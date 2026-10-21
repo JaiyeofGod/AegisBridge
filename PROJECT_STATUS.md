@@ -2,7 +2,7 @@
 
 **Last updated:** October 20, 2026  
 **Current phase:** Phase 2 — read-only API contracts  
-**Next:** Authentication, when authorized. Account remains on local mocks until a read integration is requested.
+**Next:** Frontend sign-in / Account wiring to auth APIs, when authorized. Domain GET routes stay public until that slice.
 
 ---
 
@@ -17,7 +17,7 @@
 | Application code | API domain schema + web UI on local mocks |
 | Domain schema | Through `20261020_0005` including cyber-range catalog tables |
 | Read API | `/api/v1` through reports, datasets, experiments, and cyber-range |
-| Authentication | Not started |
+| Authentication | Backend foundation (sessions, Argon2id, auth/account APIs, RBAC helpers). Frontend not wired. |
 | Write API | Not started |
 | Frontend API connection | Overview through Reports and Cyber Range; Account still mocked |
 | Package installs | API via uv; web via pnpm (`apps/web`) |

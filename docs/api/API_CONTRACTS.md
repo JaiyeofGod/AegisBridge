@@ -1,10 +1,31 @@
-# Read-only API contracts
+# API contracts
 
-Base path: `/api/v1`. These routes read the Phase 2 domain tables. They do not authenticate, write, call external systems, or connect the frontend.
+Base path: `/api/v1`. Domain GET routes read the Phase 2 tables and remain **unauthenticated** until the frontend auth wiring slice. Authentication and Account routes require a server session cookie. No SSO, MFA enrollment, email delivery, or remote lab control.
 
-Human-readable IDs are the public identifiers (`AST-0007`, `RISK-0021`, `VULN-0041`, `AL-0107`, `INC-0001`). Internal UUIDs are not returned. Timestamps are ISO 8601. Absent values are JSON `null`.
+Human-readable IDs are the public identifiers (`AST-0007`, `RISK-0021`, `VULN-0041`, `AL-0107`, `INC-0001`, `USR-0001`). Internal UUIDs are not returned. Timestamps are ISO 8601. Absent values are JSON `null`. Details: `docs/security/AUTHENTICATION_AND_RBAC.md`.
 
-## Endpoints
+## Auth endpoints
+
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/auth/login` | Email + password. Sets HttpOnly `aegis_session` cookie. Generic credential errors. |
+| POST | `/auth/logout` | Revokes current session; clears cookie. Safe if already logged out. |
+| POST | `/auth/logout-all` | Authenticated. Revokes all sessions for the current user. |
+| GET | `/auth/session` | `{authenticated, user?, session_id?, expires_at?, last_seen_at?}` |
+| GET | `/auth/me` | Current user. `401` when unauthenticated. |
+
+Login body: `{ "email", "password" }`. Responses never include password hashes, raw tokens, or digests.
+
+## Account endpoints (authenticated)
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/account/profile` | Safe profile fields for the current user |
+| GET | `/account/security` | Password configured flag, session counts/metadata, MFA `not_configured` |
+| GET | `/account/preferences` | Explicit defaults; `persistence: not_stored` |
+| GET | `/account/workspace` | Organization, roles, permissions, privileged flag |
+
+## Domain read endpoints
 
 | Method | Path | Notes |
 |---|---|---|
@@ -69,6 +90,9 @@ Validation uses the same shape with `code` `validation_error` and `details` entr
 
 ## Security semantics
 
+- Auth uses Argon2id password hashes and opaque session cookies. Domain GET routes are not yet permission-gated.
+- Role permissions are resolved from the deterministic catalog in `app/security/permissions.py`. Administration role list responses include that catalog (union stored `role_catalog` entitlements).
+- A user is privileged when a role is Administrator or Security Engineer.
 - Risk `score` is likelihood × impact. `methodology` is `aegisbridge_likelihood_x_impact`. Bands are low 1–4, medium 5–9, high 10–15, and critical 16–25.
 - `cvss_severity` is a label for the CVSS base score only. There is no combined vulnerability score.
 - KEV exposure counts internet-exposed assets that have a KEV row. It does not add CVSS or EPSS.
@@ -80,8 +104,8 @@ Validation uses the same shape with `code` `validation_error` and `details` entr
 - An incident summary is not a confirmed-compromise verdict.
 - Owner objects are `{id, display_name}`. Passwords, tokens, and integration secrets are not returned.
 - User list items include the stored email. Integration `credential_state` repeats the stored label `No credentials stored`. The database column `auth_state` is not a response field.
-- A user is privileged when a role is Administrator or Security Engineer. CISO, GRC Analyst, SOC Analyst, Auditor, and Read Only are not privileged.
-- Role `id` is the stored role name. `permissions` are the distinct `role_catalog` entitlements of users who hold that role. A role with no user has an empty permission list. There is no role-permission table.
+- CISO, GRC Analyst, SOC Analyst, Auditor, and Read Only are not privileged.
+- Role `id` is the stored role name. `permissions` are the deterministic role catalog codes (and any additional stored `role_catalog` entitlements). There is no separate role-permission table.
 - `recent_audit_event_count` counts stored audit events from the last 30 days. Audit `detail` is the stored text. Audit responses do not include secrets.
 - Access-review `owner` and `due_at` are null because those facts are not stored. Pending reviews are any status other than `closed`, `completed`, or `cancelled`.
 - `configured_integration_count` counts integrations whose stored status is `configured`. Seed status `not_configured` and freshness `not_connected` stay absent. `last_sync_at` is the latest sync-job finish time and is null when no job exists.
