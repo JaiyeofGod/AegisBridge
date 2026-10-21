@@ -126,7 +126,7 @@ The web app reads development API data through the Vite `/api` proxy (`VITE_API_
 
 Domain read routes, including threat intelligence, administration, reports, datasets, dataset experiments, and cyber-range, are documented in `docs/api/API_CONTRACTS.md`. Auth and Account APIs are documented there and in `docs/security/AUTHENTICATION_AND_RBAC.md`.
 
-**Auth status:** Argon2id passwords + HttpOnly sessions + synchronizer CSRF; domain GET RBAC enforced; preferences and risk treatment writes available. SPA route guards remain UX only. Frontend write wiring is the next UI slice.
+**Auth status:** Argon2id passwords + HttpOnly sessions + synchronizer CSRF; domain GET RBAC enforced; preferences and risk treatment writes available end-to-end (frontend CSRF client + mutations). SPA route guards remain UX only. Backend remains the authorization boundary.
 
 **Not yet created:** Broader domain writes, SSO/MFA, password reset, rate limiting, external integrations, background jobs, Celery worker, CI workflows.
 

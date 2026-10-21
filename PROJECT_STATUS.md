@@ -1,8 +1,8 @@
 # AegisBridge Project Status
 
-**Last updated:** October 20, 2026  
-**Current phase:** Phase 2 — auth + domain GET RBAC + first CSRF-protected writes (preferences, risk treatment)  
-**Next:** Wire frontend CSRF + preference/risk writes; then broader domain mutations when authorized. MFA, SSO, password reset, rate limiting, and Cyber Range control remain out of scope.
+**Last updated:** October 21, 2026  
+**Current phase:** Phase 2 — auth + domain GET RBAC + first CSRF-protected writes wired end-to-end (preferences, risk treatment)  
+**Next:** Broader domain mutations when authorized. MFA, SSO, password reset, rate limiting, and Cyber Range control remain out of scope.
 
 ---
 
@@ -19,7 +19,7 @@
 | Read API | `/api/v1` through reports, datasets, experiments, and cyber-range |
 | Authentication | Sessions + CSRF synchronizer tokens; domain GET RBAC enforced |
 | Write API | Preferences PATCH + risk treatment PATCH (first slice); broader writes deferred |
-| Frontend API connection | Overview through Reports, Cyber Range, Account, and sign-in/session |
+| Frontend API connection | Reads + CSRF client + preferences PATCH + risk treatment PATCH; other writes still disabled |
 | Package installs | API via uv; web via pnpm (`apps/web`) |
 | Cyber range | Not started |
 | Hosting | Not started |

@@ -1,9 +1,10 @@
-import { apiGet } from "@/services/api-client";
+import { apiGet, apiPatch } from "@/services/api-client";
 import type {
   PageResponse,
   RiskDetailResponse,
   RiskListItem,
   RiskQuery,
+  RiskTreatmentUpdate,
 } from "@/services/api-types";
 
 export function fetchRisks(query: RiskQuery = {}) {
@@ -19,4 +20,11 @@ export function fetchRisks(query: RiskQuery = {}) {
 
 export function fetchRisk(riskId: string) {
   return apiGet<RiskDetailResponse>(`/api/v1/risks/${encodeURIComponent(riskId)}`);
+}
+
+export function updateRiskTreatment(riskId: string, patch: RiskTreatmentUpdate) {
+  return apiPatch<RiskDetailResponse>(
+    `/api/v1/risks/${encodeURIComponent(riskId)}/treatment`,
+    patch,
+  );
 }

@@ -1,6 +1,7 @@
-import { apiGet } from "@/services/api-client";
+import { apiGet, apiPatch } from "@/services/api-client";
 import type {
   AccountPreferencesResponse,
+  AccountPreferencesUpdate,
   AccountProfileResponse,
   AccountSecurityResponse,
   AccountWorkspaceResponse,
@@ -16,6 +17,10 @@ export function fetchAccountSecurity() {
 
 export function fetchAccountPreferences() {
   return apiGet<AccountPreferencesResponse>("/api/v1/account/preferences");
+}
+
+export function updateAccountPreferences(patch: AccountPreferencesUpdate) {
+  return apiPatch<AccountPreferencesResponse>("/api/v1/account/preferences", patch);
 }
 
 export function fetchAccountWorkspace() {

@@ -63,6 +63,8 @@ export const currentUserFixture = {
     "integration.manage",
     "user.role.manage",
     "asset.read",
+    "risk.read",
+    "risk.manage",
   ],
   privileged: true,
   organization: "AegisBridge Technologies",
@@ -118,13 +120,24 @@ export const accountSecurityFixture = {
 };
 
 export const accountPreferencesFixture = {
-  persistence: "not_stored",
+  persistence: "default",
   theme: "system",
   density: "comfortable",
   landing_page: "overview",
   reduced_motion: false,
+  semantics: "No stored preference row exists yet. These values are service defaults.",
+  updated_at: null,
+};
+
+export const accountPreferencesStoredFixture = {
+  persistence: "stored",
+  theme: "dark",
+  density: "compact",
+  landing_page: "overview",
+  reduced_motion: true,
   semantics:
-    "User preference persistence is not stored yet. These values are explicit defaults, not fabricated saved settings.",
+    "Preferences are stored for this user. Theme and density are not applied server-side; the client may use them when presentation wiring exists.",
+  updated_at: "2026-10-21T12:00:00+00:00",
 };
 
 export const accountWorkspaceFixture = {
@@ -291,6 +304,7 @@ export const riskDetail: RiskDetailResponse = {
   ...riskCritical,
   statement: "FIN-APP-01 remains exposed with a known critical finding.",
   treatment_notes: "No control change was applied.",
+  treatment_updated_at: "2026-10-20T12:00:00+00:00",
   evidence: [
     {
       id: "EVID-0041",
@@ -1795,6 +1809,20 @@ export function filteredLabDetections(url: string) {
   return assetPage(items);
 }
 
+function headerValue(init: RequestInit | undefined, name: string): string | null {
+  if (!init?.headers) return null;
+  if (init.headers instanceof Headers) {
+    return init.headers.get(name);
+  }
+  if (Array.isArray(init.headers)) {
+    const match = init.headers.find(([key]) => key.toLowerCase() === name.toLowerCase());
+    return match?.[1] ?? null;
+  }
+  const record = init.headers as Record<string, string>;
+  const key = Object.keys(record).find((entry) => entry.toLowerCase() === name.toLowerCase());
+  return key ? record[key] : null;
+}
+
 export function installApiFetch(
   resolve?: (url: string, init?: RequestInit) => unknown,
   options?: { authenticated?: boolean; allowAuthOverride?: boolean },
@@ -1802,12 +1830,25 @@ export function installApiFetch(
   const authenticated = options?.authenticated ?? true;
   const calls: string[] = [];
   const credentialFlags: Array<RequestCredentials | undefined> = [];
+  const inits: Array<RequestInit | undefined> = [];
   let sessionAuthenticated = authenticated;
+  let csrfToken = "test-csrf-token";
+  let preferencesState: {
+    persistence: string;
+    theme: string;
+    density: string;
+    landing_page: string;
+    reduced_motion: boolean;
+    semantics: string;
+    updated_at: string | null;
+  } = { ...accountPreferencesFixture };
+  let riskDetailState: RiskDetailResponse = { ...riskDetail };
 
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     calls.push(url);
     credentialFlags.push(init?.credentials);
+    inits.push(init);
 
     const isAuthPath = url.includes("/api/v1/auth/") || url.includes("/api/v1/account/");
     // Auth/account mocks stay centralized so domain test overrides cannot break session restore.
@@ -1826,6 +1867,16 @@ export function installApiFetch(
           ? jsonResponse(currentUserFixture)
           : jsonResponse({ code: "unauthenticated", message: "Authentication is required." }, 401);
       }
+      if (url.includes("/api/v1/auth/csrf") && (!init?.method || init.method === "GET")) {
+        if (!sessionAuthenticated) {
+          return jsonResponse(
+            { code: "unauthenticated", message: "Authentication is required." },
+            401,
+          );
+        }
+        csrfToken = `csrf-${calls.length}`;
+        return jsonResponse({ csrf_token: csrfToken, header_name: "X-CSRF-Token" });
+      }
       if (url.includes("/api/v1/auth/login") && init?.method === "POST") {
         const body = init.body
           ? (JSON.parse(String(init.body)) as { email?: string; password?: string })
@@ -1837,18 +1888,22 @@ export function installApiFetch(
           body.password !== "wrong-password"
         ) {
           sessionAuthenticated = true;
-          return jsonResponse(currentUserFixture);
+          csrfToken = "login-csrf-token";
+          return jsonResponse({ ...currentUserFixture, csrf_token: csrfToken });
         }
         return jsonResponse(
           { code: "authentication_failed", message: "Invalid email or password." },
           401,
         );
       }
-      if (url.includes("/api/v1/auth/logout-all") && init?.method === "POST") {
-        sessionAuthenticated = false;
-        return jsonResponse(anonymousSessionFixture);
-      }
-      if (url.includes("/api/v1/auth/logout") && init?.method === "POST") {
+      if (
+        (url.includes("/api/v1/auth/logout-all") || url.includes("/api/v1/auth/logout")) &&
+        init?.method === "POST"
+      ) {
+        const provided = headerValue(init, "X-CSRF-Token");
+        if (!provided) {
+          return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+        }
         sessionAuthenticated = false;
         return jsonResponse(anonymousSessionFixture);
       }
@@ -1863,9 +1918,28 @@ export function installApiFetch(
           : jsonResponse({ code: "unauthenticated", message: "Authentication is required." }, 401);
       }
       if (url.includes("/api/v1/account/preferences")) {
-        return sessionAuthenticated
-          ? jsonResponse(accountPreferencesFixture)
-          : jsonResponse({ code: "unauthenticated", message: "Authentication is required." }, 401);
+        if (!sessionAuthenticated) {
+          return jsonResponse(
+            { code: "unauthenticated", message: "Authentication is required." },
+            401,
+          );
+        }
+        if (init?.method === "PATCH") {
+          const provided = headerValue(init, "X-CSRF-Token");
+          if (!provided) {
+            return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+          }
+          const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+          preferencesState = {
+            ...preferencesState,
+            ...body,
+            persistence: "stored",
+            semantics: accountPreferencesStoredFixture.semantics,
+            updated_at: "2026-10-21T15:00:00+00:00",
+          };
+          return jsonResponse(preferencesState);
+        }
+        return jsonResponse(preferencesState);
       }
       if (url.includes("/api/v1/account/workspace")) {
         return sessionAuthenticated
@@ -1888,7 +1962,25 @@ export function installApiFetch(
       if (url.includes("criticality=critical")) return jsonResponse(assetPage([finAppListItem]));
       return jsonResponse(assetPage(assetListItems));
     }
-    if (/\/api\/v1\/risks\/[^?]+/.test(url)) return jsonResponse(riskDetail);
+    if (/\/api\/v1\/risks\/[^/?]+\/treatment/.test(url) && init?.method === "PATCH") {
+      const provided = headerValue(init, "X-CSRF-Token");
+      if (!provided) {
+        return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+      }
+      const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+      riskDetailState = {
+        ...riskDetailState,
+        treatment_strategy:
+          typeof body.strategy === "string" ? body.strategy : riskDetailState.treatment_strategy,
+        treatment_status:
+          typeof body.status === "string" ? body.status : riskDetailState.treatment_status,
+        treatment_notes:
+          typeof body.notes === "string" ? body.notes : riskDetailState.treatment_notes,
+        treatment_updated_at: "2026-10-21T16:00:00+00:00",
+      };
+      return jsonResponse(riskDetailState);
+    }
+    if (/\/api\/v1\/risks\/[^?]+/.test(url)) return jsonResponse(riskDetailState);
     if (url.includes("/api/v1/risks")) {
       if (url.includes("risk_level=critical")) return jsonResponse(assetPage([riskCritical]));
       return jsonResponse(assetPage(riskItems));
@@ -1991,5 +2083,5 @@ export function installApiFetch(
     return jsonResponse({});
   });
   vi.stubGlobal("fetch", fetchMock);
-  return { fetchMock, calls, credentialFlags };
+  return { fetchMock, calls, credentialFlags, inits, headerValue };
 }

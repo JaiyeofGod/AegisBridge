@@ -84,20 +84,64 @@ describe("Account", () => {
     expect(security).not.toHaveTextContent("token_digest");
   });
 
-  it("renders preferences as not stored", async () => {
-    installApiFetch(undefined, { authenticated: true });
+  it("renders preferences as Default and persists changed fields", async () => {
+    const { inits, calls } = installApiFetch(undefined, { authenticated: true });
     const user = userEvent.setup();
     await renderWithProviders(<AppRouter />, { initialEntries: ["/account/preferences"] });
     const preferences = await screen.findByTestId("account-preferences");
-    expect(preferences).toHaveTextContent("not_stored");
-    expect(preferences).toHaveTextContent("Not persisted");
-    expect(screen.getByRole("button", { name: /save changes/i })).toBeDisabled();
+    expect(preferences).toHaveTextContent("Default");
+    expect(preferences).not.toHaveTextContent("not_stored");
+    expect(screen.getByTestId("preferences-save")).toBeEnabled();
+
     await user.click(within(preferences).getByRole("radio", { name: "dark" }));
-    expect(within(preferences).getByRole("radio", { name: "dark selected" })).toHaveAttribute(
-      "aria-checked",
-      "true",
+    await user.click(screen.getByTestId("preferences-save"));
+
+    expect(await screen.findByTestId("preferences-success")).toHaveTextContent("Preferences saved");
+    expect(await screen.findByTestId("preferences-persistence")).toHaveTextContent("Stored");
+
+    const patchIndex = calls.findIndex(
+      (url, index) =>
+        url.includes("/api/v1/account/preferences") && inits[index]?.method === "PATCH",
     );
-    expect(preferences).toHaveTextContent("not_stored");
+    expect(patchIndex).toBeGreaterThanOrEqual(0);
+    const patchInit = inits[patchIndex];
+    expect(patchInit?.credentials).toBe("include");
+    expect((patchInit?.headers as Headers).get("X-CSRF-Token")).toBeTruthy();
+    expect(JSON.parse(String(patchInit?.body))).toEqual({ theme: "dark" });
+    expect(JSON.stringify(patchInit?.body)).not.toContain("landing_page");
+  });
+
+  it("shows validation errors from preference PATCH", async () => {
+    installApiFetch(
+      (url, init) => {
+        if (url.includes("/api/v1/account/preferences") && init?.method === "PATCH") {
+          return {
+            ok: false,
+            status: 422,
+            json: async () => ({
+              code: "validation_error",
+              message: "theme must be one of: system, dark, light",
+            }),
+            text: async () =>
+              JSON.stringify({
+                code: "validation_error",
+                message: "theme must be one of: system, dark, light",
+              }),
+            headers: { get: () => "application/json" },
+          };
+        }
+        return undefined;
+      },
+      { authenticated: true, allowAuthOverride: true },
+    );
+    const user = userEvent.setup();
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/account/preferences"] });
+    await screen.findByTestId("account-preferences");
+    await user.click(screen.getByRole("radio", { name: "dark" }));
+    await user.click(screen.getByTestId("preferences-save"));
+    expect(await screen.findByTestId("preferences-error")).toHaveTextContent(
+      /theme must be one of/i,
+    );
   });
 
   it("renders workspace roles and privileged flag from the API", async () => {

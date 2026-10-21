@@ -14,9 +14,11 @@ import { StaleDataIndicator } from "@/components/status/StaleDataIndicator";
 import { SEEDED_DATA_LABEL, SEEDED_DATA_NOTE } from "@/features/data-origin";
 import { mapRiskInventory } from "@/features/risk/mapRisk";
 import { impactLabel, likelihoodLabel, riskBand } from "@/features/risk/risk-model";
+import { RiskTreatmentEditor } from "@/features/risk/RiskTreatmentEditor";
 import { RiskRegisterTable, type RiskTableFilters } from "@/features/risk/RiskRegisterTable";
 import { RiskSectionNav } from "@/features/risk/RiskSectionNav";
 import { useRiskCatalog, useRiskDetail, useRiskList } from "@/features/risk/useRiskData";
+import { useAuthStatus } from "@/features/auth/useAuthSession";
 import { formatTimestamp } from "@/lib/format";
 import type { RiskQuery } from "@/services/api-types";
 import type { OverviewMetric } from "@/types/overview";
@@ -248,6 +250,8 @@ function RegisterSection({
 }
 
 function SelectedRisk({ risk }: { risk: RiskRecord }) {
+  const auth = useAuthStatus();
+  const canManage = auth.user?.permissions.includes("risk.manage") === true;
   const inherent =
     risk.likelihood != null && risk.impact != null ? risk.likelihood * risk.impact : risk.score;
   const residual =
@@ -286,8 +290,15 @@ function SelectedRisk({ risk }: { risk: RiskRecord }) {
       <div>
         <dt className="text-[var(--muted)]">Treatment</dt>
         <dd className="mt-1 text-[var(--text)]">
-          {risk.treatment} · {risk.treatmentStatus}. {risk.treatmentDetail} Review{" "}
-          {risk.reviewDueLabel}.
+          <RiskTreatmentEditor
+            riskId={risk.riskId}
+            strategy={risk.treatmentStrategyRaw ?? null}
+            status={risk.treatmentStatusRaw ?? null}
+            notes={risk.treatmentNotesRaw ?? null}
+            updatedAt={risk.treatmentUpdatedAt ?? null}
+            readOnly={!canManage}
+          />
+          <p className="mt-2 text-xs text-[var(--muted)]">Review {risk.reviewDueLabel}.</p>
         </dd>
       </div>
     </dl>

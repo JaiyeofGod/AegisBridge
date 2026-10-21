@@ -116,6 +116,18 @@ export type RiskDetailResponse = RiskListItem & {
   treatment_notes: string | null;
   evidence: RelatedRecord[];
   reviews: RelatedRecord[];
+  treatment_updated_at?: string | null;
+};
+
+export type TreatmentStrategyValue = "accept" | "avoid" | "mitigate" | "transfer";
+export type TreatmentStatusValue =
+  "planned" | "in_progress" | "complete" | "deferred" | "cancelled";
+
+export type RiskTreatmentUpdate = {
+  strategy?: TreatmentStrategyValue;
+  status?: TreatmentStatusValue;
+  notes?: string;
+  expected_updated_at?: string | null;
 };
 
 export type RiskQuery = {
@@ -735,6 +747,11 @@ export type CurrentUser = {
   timezone: string | null;
 };
 
+/** Login payload. csrf_token is not the session cookie value. */
+export type LoginResponse = CurrentUser & {
+  csrf_token: string;
+};
+
 export type SessionStatus = {
   authenticated: boolean;
   user: CurrentUser | null;
@@ -773,13 +790,25 @@ export type AccountSecurityResponse = {
   semantics: string;
 };
 
+export type ThemeValue = "system" | "dark" | "light";
+export type DensityValue = "comfortable" | "compact";
+export type LandingPageValue = "overview";
+
 export type AccountPreferencesResponse = {
-  persistence: string;
+  persistence: "default" | "stored" | string;
   theme: string;
   density: string;
   landing_page: string;
   reduced_motion: boolean;
   semantics: string;
+  updated_at?: string | null;
+};
+
+export type AccountPreferencesUpdate = {
+  theme?: ThemeValue;
+  density?: DensityValue;
+  landing_page?: LandingPageValue;
+  reduced_motion?: boolean;
 };
 
 export type AccountWorkspaceResponse = {

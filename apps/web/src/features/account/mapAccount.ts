@@ -62,15 +62,20 @@ export function mapAccountSecurity(security: AccountSecurityResponse) {
 }
 
 export function mapAccountPreferences(preferences: AccountPreferencesResponse) {
-  const notStored = preferences.persistence === "not_stored";
+  const persistence = preferences.persistence;
+  const isDefault = persistence === "default";
+  const isStored = persistence === "stored";
   return {
-    persistence: preferences.persistence,
-    notStored,
+    persistence,
+    isDefault,
+    isStored,
+    persistenceLabel: isStored ? "Stored" : isDefault ? "Default" : persistence,
     theme: preferences.theme,
     density: preferences.density,
     landingPage: preferences.landing_page,
     reducedMotion: preferences.reduced_motion,
     semantics: preferences.semantics,
+    updatedAt: preferences.updated_at ?? null,
   };
 }
 

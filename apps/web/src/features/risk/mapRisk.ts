@@ -38,6 +38,10 @@ export function mapRiskListItem(item: RiskListItem): RiskRecord {
     treatment: item.treatment_strategy ? titleCase(item.treatment_strategy) : "Not recorded",
     treatmentStatus: item.treatment_status ? titleCase(item.treatment_status) : "Not recorded",
     treatmentDetail: "Treatment notes load on the risk record.",
+    treatmentStrategyRaw: item.treatment_strategy,
+    treatmentStatusRaw: item.treatment_status,
+    treatmentNotesRaw: null,
+    treatmentUpdatedAt: null,
     reviewDueLabel: "Not stored",
     reviewDueSoon: false,
     overdue: false,
@@ -60,6 +64,8 @@ export function applyRiskDetail(detail: RiskDetailResponse): RiskRecord {
     scenario: detail.statement,
     businessImpact: detail.methodology_label,
     treatmentDetail: detail.treatment_notes ?? "No treatment notes are stored.",
+    treatmentNotesRaw: detail.treatment_notes,
+    treatmentUpdatedAt: detail.treatment_updated_at ?? null,
     linkedRecords: `${mapRiskListItem(detail).linkedRecords} Evidence: ${evidence}. Reviews: ${reviews}.`,
   };
 }

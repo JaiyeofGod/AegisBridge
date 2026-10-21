@@ -28,6 +28,10 @@ export type RiskRecord = {
   treatment: string;
   treatmentStatus: string;
   treatmentDetail: string;
+  treatmentStrategyRaw?: string | null;
+  treatmentStatusRaw?: string | null;
+  treatmentNotesRaw?: string | null;
+  treatmentUpdatedAt?: string | null;
   reviewDueLabel: string;
   reviewDueSoon: boolean;
   overdue: boolean;

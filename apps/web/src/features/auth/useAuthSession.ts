@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 
 import { authKeys, accountKeys } from "@/features/auth/auth-keys";
-import { ApiError } from "@/services/api-client";
+import { ApiError, clearCsrfToken } from "@/services/api-client";
 import { fetchAuthSession } from "@/services/auth";
 
 export function useAuthSession() {
@@ -39,6 +39,7 @@ export function useAuthActions() {
   }
 
   async function clearAuthCaches() {
+    clearCsrfToken();
     queryClient.removeQueries({ queryKey: authKeys.session });
     queryClient.removeQueries({ queryKey: authKeys.me });
     queryClient.removeQueries({ queryKey: accountKeys.all });
