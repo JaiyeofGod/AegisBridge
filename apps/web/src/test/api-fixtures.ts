@@ -11,6 +11,7 @@ import type {
   AssetDetailResponse,
   AssetListItem,
   AuditEventListItem,
+  CyberRangeSummary,
   DatasetDetail,
   DatasetListItem,
   ExperimentDetail,
@@ -21,6 +22,11 @@ import type {
   IndicatorDetailResponse,
   IndicatorListItem,
   IntegrationListItem,
+  LabDetectionItem,
+  LabScenarioListItem,
+  LabSystemListItem,
+  LabTelemetryItem,
+  LabZoneItem,
   OverviewResponse,
   ReportDefinitionDetail,
   ReportDefinitionListItem,
@@ -1283,6 +1289,419 @@ export function filteredExperiments(url: string) {
   return assetPage(items);
 }
 
+export const cyberRangeSummary: CyberRangeSummary = {
+  zone_count: 5,
+  expected_system_count: 5,
+  active_observed_system_count: 0,
+  telemetry_active_count: 0,
+  telemetry_expected_count: 4,
+  scenarios_ready_count: 4,
+  scenarios_total_count: 6,
+  scenarios_running_count: 0,
+  detection_coverage_count: 12,
+  lab_bridge_status: "not_connected",
+  lab_bridge_freshness: "not_connected",
+  last_successful_lab_sync_at: null,
+  freshness_state: "not_connected",
+  data_origin: "DEVELOPMENT / SEEDED",
+  semantics:
+    "DEVELOPMENT / SEEDED cyber-range catalog. MacBook is the development machine. Lenovo is the private cyber-range host. There is no public inbound access to Lenovo and no remote-control capability in this API. A future Lab Bridge is outbound-only from the lab to the hosted AegisBridge API.",
+};
+
+export const emptyCyberRangeSummary: CyberRangeSummary = {
+  zone_count: 0,
+  expected_system_count: 0,
+  active_observed_system_count: 0,
+  telemetry_active_count: 0,
+  telemetry_expected_count: 0,
+  scenarios_ready_count: 0,
+  scenarios_total_count: 0,
+  scenarios_running_count: 0,
+  detection_coverage_count: 0,
+  lab_bridge_status: "not_connected",
+  lab_bridge_freshness: "not_connected",
+  last_successful_lab_sync_at: null,
+  freshness_state: "not_connected",
+  data_origin: "DEVELOPMENT / SEEDED",
+  semantics: "No cyber-range rows are stored. Lab Bridge is not connected.",
+};
+
+export const labZones: LabZoneItem[] = [
+  {
+    id: "MGMT",
+    name: "Management",
+    cidr: "10.10.10.0/24",
+    gateway: "10.10.10.1",
+    purpose: "Security management. Wazuh and gateway administration.",
+    status: "defined",
+    observed_state: "not_observed",
+    isolation_notes: "Default deny. ATTACK may not reach MGMT.",
+    system_count: 2,
+    notes: "Logical zone plan only.",
+  },
+  {
+    id: "CORP",
+    name: "Corporate",
+    cidr: "10.10.20.0/24",
+    gateway: "10.10.20.1",
+    purpose: "User endpoints for authorized lab scenarios.",
+    status: "defined",
+    observed_state: "not_observed",
+    isolation_notes: "Wazuh agent flows to MGMT are planned.",
+    system_count: 1,
+    notes: "Logical zone plan only.",
+  },
+  {
+    id: "SERVER",
+    name: "Server",
+    cidr: "10.10.30.0/24",
+    gateway: "10.10.30.1",
+    purpose: "Application and server workloads.",
+    status: "defined",
+    observed_state: "not_observed",
+    isolation_notes: "Wazuh agent flows to MGMT are planned.",
+    system_count: 1,
+    notes: "Logical zone plan only.",
+  },
+  {
+    id: "DMZ",
+    name: "DMZ",
+    cidr: "10.10.40.0/24",
+    gateway: "10.10.40.1",
+    purpose: "Intentionally exposed lab services when a scenario places one here.",
+    status: "defined",
+    observed_state: "not_observed",
+    isolation_notes: "No dedicated system in the development catalog.",
+    system_count: 0,
+    notes: "Logical zone plan only.",
+  },
+  {
+    id: "ATTACK",
+    name: "Attack",
+    cidr: "10.10.50.0/24",
+    gateway: "10.10.50.1",
+    purpose: "Authorized testing and controlled validation.",
+    status: "defined",
+    observed_state: "not_observed",
+    isolation_notes: "Denied to MGMT.",
+    system_count: 1,
+    notes: "Logical zone plan only.",
+  },
+];
+
+function zoneRef(id: string, title: string, cidr: string) {
+  return { id, title, status: "defined", summary: cidr };
+}
+
+export const labSystems: LabSystemListItem[] = [
+  {
+    id: "LAB-GW-01",
+    hostname: "LAB-GW-01",
+    zone: zoneRef("MGMT", "Management", "10.10.10.0/24"),
+    ip_address: "10.10.10.1",
+    role: "Gateway, nftables, Suricata",
+    platform: "Ubuntu",
+    expected_state: "approved",
+    observed_state: "not_observed",
+    telemetry_status: "not_connected",
+    last_seen_at: null,
+    source_origin: "development_seed",
+    notes: "Ubuntu gateway. The hosted platform does not reach this host.",
+  },
+  {
+    id: "SEC-WAZUH-01",
+    hostname: "SEC-WAZUH-01",
+    zone: zoneRef("MGMT", "Management", "10.10.10.0/24"),
+    ip_address: "10.10.10.10",
+    role: "Wazuh SIEM/XDR",
+    platform: "Linux",
+    expected_state: "approved",
+    observed_state: "not_observed",
+    telemetry_status: "not_connected",
+    last_seen_at: null,
+    source_origin: "development_seed",
+    notes: "Planning baseline Wazuh in MGMT. Not connected.",
+  },
+  {
+    id: "WIN-USER-01",
+    hostname: "WIN-USER-01",
+    zone: zoneRef("CORP", "Corporate", "10.10.20.0/24"),
+    ip_address: "10.10.20.11",
+    role: "Windows 11 endpoint",
+    platform: "Windows 11",
+    expected_state: "approved",
+    observed_state: "not_observed",
+    telemetry_status: "not_connected",
+    last_seen_at: null,
+    source_origin: "development_seed",
+    notes: "Corporate lab endpoint. Not observed live.",
+  },
+  {
+    id: "LINUX-APP-01",
+    hostname: "LINUX-APP-01",
+    zone: zoneRef("SERVER", "Server", "10.10.30.0/24"),
+    ip_address: "10.10.30.11",
+    role: "Ubuntu application server",
+    platform: "Ubuntu",
+    expected_state: "approved",
+    observed_state: "not_observed",
+    telemetry_status: "not_connected",
+    last_seen_at: null,
+    source_origin: "development_seed",
+    notes: "Internal application host. Not observed live.",
+  },
+  {
+    id: "KALI-RED-01",
+    hostname: "KALI-RED-01",
+    zone: zoneRef("ATTACK", "Attack", "10.10.50.0/24"),
+    ip_address: "10.10.50.10",
+    role: "Authorized testing workstation",
+    platform: "Kali Linux",
+    expected_state: "approved",
+    observed_state: "not_observed",
+    telemetry_status: "not_reporting",
+    last_seen_at: null,
+    source_origin: "development_seed",
+    notes: "Authorized testing workstation. No remote control.",
+  },
+];
+
+export function labSystemDetail(id: string) {
+  const item = labSystems.find((row) => row.id === id) ?? labSystems[0];
+  return {
+    ...item,
+    telemetry_source:
+      item.id === "KALI-RED-01"
+        ? "No current telemetry expectation while stopped"
+        : "Planned agent or Suricata summary",
+    telemetry_expected: item.id !== "KALI-RED-01",
+    telemetry_freshness: item.telemetry_status,
+    telemetry_semantics:
+      "Development expectation only. Wazuh and Suricata remain not_connected. No live Lenovo telemetry is stored.",
+  };
+}
+
+export function filteredLabSystems(url: string) {
+  let items = [...labSystems];
+  const params = new URL(url, "http://localhost").searchParams;
+  const search = params.get("search")?.toLowerCase();
+  const zone = params.get("zone")?.toLowerCase();
+  const role = params.get("role")?.toLowerCase();
+  const telemetry = params.get("telemetry_status");
+  const observed = params.get("observed_state");
+  if (search) {
+    items = items.filter((item) =>
+      `${item.id} ${item.hostname} ${item.role} ${item.ip_address ?? ""}`
+        .toLowerCase()
+        .includes(search),
+    );
+  }
+  if (zone) items = items.filter((item) => item.zone.id.toLowerCase() === zone);
+  if (role) items = items.filter((item) => item.role.toLowerCase() === role);
+  if (telemetry) items = items.filter((item) => item.telemetry_status === telemetry);
+  if (observed) items = items.filter((item) => item.observed_state === observed);
+  return assetPage(items);
+}
+
+export const labScenarios: LabScenarioListItem[] = [
+  {
+    id: "SCN-0001",
+    name: "Repeated authentication failures and suspicious success",
+    objective: "Exercise repeated authentication failures and a later success pattern.",
+    status: "ready",
+    category: "Identity",
+    attack_techniques: [
+      { id: "T1110", name: "Brute Force", tactic: "Credential Access" },
+      { id: "T1078", name: "Valid Accounts", tactic: "Defense Evasion" },
+    ],
+    expected_system_ids: ["WIN-USER-01"],
+    expected_detection_ids: ["DET-0001", "DET-0002"],
+    last_run_at: null,
+    safety_notes: "No execute, start, or stop action is available.",
+  },
+  {
+    id: "SCN-0002",
+    name: "Unauthorized privileged group change",
+    objective: "Exercise an unauthorized privileged group-membership change.",
+    status: "ready",
+    category: "Identity",
+    attack_techniques: [{ id: "T1098", name: "Account Manipulation", tactic: "Persistence" }],
+    expected_system_ids: ["WIN-USER-01"],
+    expected_detection_ids: ["DET-0004"],
+    last_run_at: null,
+    safety_notes: "No execute, start, or stop action is available.",
+  },
+  {
+    id: "SCN-0003",
+    name: "Suspicious PowerShell activity",
+    objective: "Exercise suspicious PowerShell child-process creation.",
+    status: "ready",
+    category: "Endpoint",
+    attack_techniques: [{ id: "T1059.001", name: "PowerShell", tactic: "Execution" }],
+    expected_system_ids: ["WIN-USER-01"],
+    expected_detection_ids: ["DET-0005"],
+    last_run_at: null,
+    safety_notes: "No execute, start, or stop action is available.",
+  },
+  {
+    id: "SCN-0004",
+    name: "Malware-test validation",
+    objective: "Exercise an approved lab malware-test sample path.",
+    status: "validated",
+    category: "Endpoint",
+    attack_techniques: [{ id: "T1204.002", name: "Malicious File", tactic: "Execution" }],
+    expected_system_ids: ["WIN-USER-01"],
+    expected_detection_ids: ["DET-0009"],
+    last_run_at: null,
+    safety_notes: "No execute, start, or stop action is available.",
+  },
+  {
+    id: "SCN-0005",
+    name: "Exploitable critical vulnerability",
+    objective: "Plan a controlled vulnerability exposure exercise.",
+    status: "planned",
+    category: "Exposure",
+    attack_techniques: [],
+    expected_system_ids: ["LINUX-APP-01"],
+    expected_detection_ids: [],
+    last_run_at: null,
+    safety_notes: "No execute, start, or stop action is available.",
+  },
+  {
+    id: "SCN-0006",
+    name: "Phishing tabletop",
+    objective: "Tabletop exercise without live endpoint telemetry.",
+    status: "simulated",
+    category: "Exercise",
+    attack_techniques: [],
+    expected_system_ids: [],
+    expected_detection_ids: [],
+    last_run_at: null,
+    safety_notes: "No execute, start, or stop action is available.",
+  },
+];
+
+export function labScenarioDetail(id: string) {
+  const item = labScenarios.find((row) => row.id === id) ?? labScenarios[0];
+  return {
+    ...item,
+    expected_telemetry: "Planned telemetry only. No live host connection.",
+    notes: "Development scenario catalog. last_run_at stays null.",
+  };
+}
+
+export function filteredLabScenarios(url: string) {
+  let items = [...labScenarios];
+  const params = new URL(url, "http://localhost").searchParams;
+  const search = params.get("search")?.toLowerCase();
+  const status = params.get("status");
+  const category = params.get("category")?.toLowerCase();
+  const technique = params.get("attack_technique")?.toUpperCase();
+  if (search) {
+    items = items.filter((item) =>
+      `${item.id} ${item.name} ${item.objective} ${item.category}`.toLowerCase().includes(search),
+    );
+  }
+  if (status) items = items.filter((item) => item.status === status);
+  if (category) items = items.filter((item) => item.category.toLowerCase() === category);
+  if (technique) {
+    items = items.filter((item) =>
+      item.attack_techniques.some((entry) => entry.id.toUpperCase() === technique),
+    );
+  }
+  return assetPage(items);
+}
+
+export const labTelemetry: LabTelemetryItem[] = labSystems.map((system) => ({
+  system_id: system.id,
+  hostname: system.hostname,
+  telemetry_source:
+    system.id === "KALI-RED-01"
+      ? "No current telemetry expectation while stopped"
+      : "Planned agent or Suricata summary",
+  expected: system.id !== "KALI-RED-01",
+  status: system.telemetry_status,
+  last_seen_at: null,
+  freshness: system.telemetry_status,
+  semantics:
+    "Development expectation only. Wazuh and Suricata remain not_connected. No live Lenovo telemetry is stored.",
+}));
+
+const detectionSeed: Array<[string, string, string, string, string]> = [
+  ["DET-0001", "Repeated authentication failures", "Windows Security", "T1110", "Brute Force"],
+  [
+    "DET-0002",
+    "Suspicious successful login after failures",
+    "Windows Security",
+    "T1078",
+    "Valid Accounts",
+  ],
+  ["DET-0003", "Privileged account creation", "Windows Security", "T1136.001", "Local Account"],
+  [
+    "DET-0004",
+    "Admin group membership change",
+    "Windows Security",
+    "T1098",
+    "Account Manipulation",
+  ],
+  ["DET-0005", "Suspicious PowerShell child process", "Sysmon", "T1059.001", "PowerShell"],
+  ["DET-0006", "Scheduled task creation", "Windows Security", "T1053.005", "Scheduled Task"],
+  ["DET-0007", "New service installation", "Windows System", "T1543.003", "Windows Service"],
+  [
+    "DET-0008",
+    "Security and logging tampering",
+    "Windows Security",
+    "T1562.001",
+    "Disable or Modify Tools",
+  ],
+  ["DET-0009", "Executable from a user directory", "Sysmon", "T1204.002", "Malicious File"],
+  ["DET-0010", "Unusual outbound network connection", "Suricata", "T1071.001", "Web Protocols"],
+  ["DET-0011", "Sensitive file modification", "Sysmon", "T1565.001", "Stored Data Manipulation"],
+  ["DET-0012", "Suspicious SSH activity", "Linux auth", "T1021.004", "SSH"],
+];
+
+export const labDetections: LabDetectionItem[] = detectionSeed.map(
+  ([id, name, dataSource, techniqueId, techniqueName]) => ({
+    id,
+    name,
+    description: `Catalog entry for ${name.toLowerCase()}.`,
+    status: "draft",
+    data_source: dataSource,
+    sigma_reference: `detections/sigma/${id.toLowerCase()}.yml`,
+    wazuh_mapping_status: "not_connected",
+    validation_state: "not_validated",
+    last_validated_at: null,
+    attack_techniques: [{ id: techniqueId, name: techniqueName, tactic: null }],
+    notes: "Development catalog metadata only. No successful validation run is stored.",
+  }),
+);
+
+export function filteredLabDetections(url: string) {
+  let items = [...labDetections];
+  const params = new URL(url, "http://localhost").searchParams;
+  const search = params.get("search")?.toLowerCase();
+  const validation = params.get("validation_state");
+  const technique = params.get("attack_technique")?.toUpperCase();
+  const dataSource = params.get("data_source")?.toLowerCase();
+  if (search) {
+    items = items.filter((item) =>
+      `${item.id} ${item.name} ${item.description ?? ""} ${item.data_source ?? ""}`
+        .toLowerCase()
+        .includes(search),
+    );
+  }
+  if (validation) items = items.filter((item) => item.validation_state === validation);
+  if (dataSource) {
+    items = items.filter((item) => (item.data_source ?? "").toLowerCase() === dataSource);
+  }
+  if (technique) {
+    items = items.filter((item) =>
+      item.attack_techniques.some((entry) => entry.id.toUpperCase() === technique),
+    );
+  }
+  return assetPage(items);
+}
+
 export function installApiFetch(resolve?: (url: string) => unknown) {
   const calls: string[] = [];
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -1368,6 +1787,28 @@ export function installApiFetch(resolve?: (url: string) => unknown) {
     }
     if (url.includes("/api/v1/dataset-experiments")) {
       return jsonResponse(filteredExperiments(url));
+    }
+    if (url.includes("/api/v1/cyber-range/summary")) return jsonResponse(cyberRangeSummary);
+    if (url.includes("/api/v1/cyber-range/zones")) return jsonResponse(assetPage(labZones));
+    if (/\/api\/v1\/cyber-range\/systems\/[^/?]+/.test(url)) {
+      const id = url.split("/systems/")[1]?.split("?")[0] ?? "";
+      return jsonResponse(labSystemDetail(decodeURIComponent(id)));
+    }
+    if (url.includes("/api/v1/cyber-range/systems")) {
+      return jsonResponse(filteredLabSystems(url));
+    }
+    if (/\/api\/v1\/cyber-range\/scenarios\/[^/?]+/.test(url)) {
+      const id = url.split("/scenarios/")[1]?.split("?")[0] ?? "";
+      return jsonResponse(labScenarioDetail(decodeURIComponent(id)));
+    }
+    if (url.includes("/api/v1/cyber-range/scenarios")) {
+      return jsonResponse(filteredLabScenarios(url));
+    }
+    if (url.includes("/api/v1/cyber-range/telemetry")) {
+      return jsonResponse(assetPage(labTelemetry));
+    }
+    if (url.includes("/api/v1/cyber-range/detections")) {
+      return jsonResponse(filteredLabDetections(url));
     }
     if (url.includes("/api/v1/incidents")) {
       if (url.includes("containment_state=")) return jsonResponse(assetPage([]));

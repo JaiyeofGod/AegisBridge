@@ -2,7 +2,7 @@
 
 **Last updated:** October 20, 2026  
 **Current phase:** Phase 2 — read-only API contracts  
-**Next:** Authentication, when authorized. Frontend Cyber Range and Account remain on local mocks until a read integration is requested.
+**Next:** Authentication, when authorized. Account remains on local mocks until a read integration is requested.
 
 ---
 
@@ -19,7 +19,7 @@
 | Read API | `/api/v1` through reports, datasets, experiments, and cyber-range |
 | Authentication | Not started |
 | Write API | Not started |
-| Frontend API connection | Overview through Reports (incl. dataset registry / experiments); Cyber Range and Account still mocked |
+| Frontend API connection | Overview through Reports and Cyber Range; Account still mocked |
 | Package installs | API via uv; web via pnpm (`apps/web`) |
 | Cyber range | Not started |
 | Hosting | Not started |

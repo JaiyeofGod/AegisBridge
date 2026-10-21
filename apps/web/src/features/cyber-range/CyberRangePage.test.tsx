@@ -3,24 +3,80 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { AppRouter } from "@/app/router";
+import {
+  assetPage,
+  cyberRangeSummary,
+  emptyCyberRangeSummary,
+  installApiFetch,
+  jsonResponse,
+} from "@/test/api-fixtures";
 import { renderWithProviders } from "@/test/render";
 
+const secretPattern =
+  /sk_live|AKIA[0-9A-Z]{8,}|api[_-]?key\s*[:=]\s*\S+|password\s*[:=]\s*\S+|BEGIN (RSA |OPENSSH )?PRIVATE KEY|eyJ[A-Za-z0-9_-]{10,}|ssh |hypervisor|vm start/i;
+
 describe("Cyber range", () => {
-  it("renders /cyber-range with simulated labeling and no aggregate score", async () => {
+  it("renders seeded cyber-range summary counts from the API", async () => {
     await renderWithProviders(<AppRouter />, { initialEntries: ["/cyber-range"] });
     const page = screen.getByTestId("cyber-range-page");
     expect(
       within(page).getByRole("heading", { level: 1, name: "Cyber range" }),
     ).toBeInTheDocument();
-    expect(within(page).getAllByText(/simulated/i).length).toBeGreaterThan(0);
-    expect(within(page).getAllByText(/not connected/i).length).toBeGreaterThan(0);
-    expect(within(page).getAllByText(/no aggregate security score/i).length).toBeGreaterThan(0);
-    expect(within(page).queryByText(/overall security score/i)).not.toBeInTheDocument();
-    expect(within(page).getAllByText(/hypothetical/i).length).toBeGreaterThan(0);
-    expect(within(page).getAllByText(/not observed telemetry/i).length).toBeGreaterThan(0);
+    expect((await within(page).findAllByText("DEVELOPMENT / SEEDED")).length).toBeGreaterThan(0);
+    expect(within(page).getAllByText(/Development seeded data/i).length).toBeGreaterThan(0);
+    expect(within(page).queryByText(/^SIMULATED$/)).not.toBeInTheDocument();
+    expect(within(page).getByText(/no aggregate security score/i)).toBeInTheDocument();
+    expect(within(page).getByText(/Lab Bridge: not_connected/)).toBeInTheDocument();
+    expect(within(page).getByText(/Last successful lab sync: Not recorded/)).toBeInTheDocument();
+    expect(within(page).getByText(/Scenarios running: 0/)).toBeInTheDocument();
+    expect(within(page).getByText(/Detection coverage: 12/)).toBeInTheDocument();
+    expect(within(page).getAllByText("Expected systems").length).toBeGreaterThan(0);
+    expect(within(page).getAllByText("Active observed").length).toBeGreaterThan(0);
+    expect(within(page).getByText("0 / 4")).toBeInTheDocument();
+    expect(within(page).getByText("4 / 6")).toBeInTheDocument();
+    expect(page.textContent ?? "").toMatch(/outbound-only/i);
+    expect(page.textContent ?? "").toMatch(/MacBook/i);
+    expect(page.textContent ?? "").toMatch(/Lenovo/i);
+    expect(page.textContent ?? "").toMatch(/no public inbound/i);
+    expect(page.textContent ?? "").not.toMatch(secretPattern);
+    expect(within(page).queryByText("SCN-001")).not.toBeInTheDocument();
+    expect(within(page).queryByText("RUN-014")).not.toBeInTheDocument();
+    expect(within(page).queryByRole("button", { name: /start|stop|ssh|execute/i })).toBeNull();
   });
 
-  it("renders the five segments and key lab systems", async () => {
+  it("shows the loading skeleton before the cyber-range response arrives", async () => {
+    installApiFetch((url) => {
+      if (url.includes("/api/v1/cyber-range")) return new Promise(() => undefined);
+      return jsonResponse({ status: "ok", service: "aegisbridge" });
+    });
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/cyber-range"] });
+    expect(await screen.findByText("Updating…")).toBeInTheDocument();
+    expect(screen.queryByText("LAB-GW-01")).not.toBeInTheDocument();
+    expect(screen.queryByText("SCN-001")).not.toBeInTheDocument();
+    expect(screen.queryByText("RUN-014")).not.toBeInTheDocument();
+  });
+
+  it("shows an error with retry and does not substitute fixture rows", async () => {
+    let fail = true;
+    installApiFetch((url) => {
+      if (url.includes("/api/v1/cyber-range/summary")) {
+        return fail ? jsonResponse({ message: "down" }, 500) : jsonResponse(cyberRangeSummary);
+      }
+      if (url.includes("/api/v1/cyber-range")) return jsonResponse(assetPage([]));
+      return jsonResponse({ status: "ok", service: "aegisbridge" });
+    });
+    const user = userEvent.setup();
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/cyber-range"] });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Cyber range data unavailable");
+    expect(screen.queryByText("RUN-014")).not.toBeInTheDocument();
+    fail = false;
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    expect((await screen.findAllByText("DEVELOPMENT / SEEDED")).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Lab Bridge: not_connected/)).toBeInTheDocument();
+    expect(screen.queryByText("RUN-014")).not.toBeInTheDocument();
+  });
+
+  it("renders five zones and systems as not_observed", async () => {
     await renderWithProviders(<AppRouter />, { initialEntries: ["/cyber-range"] });
     const page = screen.getByTestId("cyber-range-page");
     for (const cidr of [
@@ -30,7 +86,7 @@ describe("Cyber range", () => {
       "10.10.40.0/24",
       "10.10.50.0/24",
     ]) {
-      expect(within(page).getAllByText(cidr).length).toBeGreaterThan(0);
+      expect(await within(page).findAllByText(cidr)).not.toHaveLength(0);
     }
     for (const host of [
       "LAB-GW-01",
@@ -41,29 +97,146 @@ describe("Cyber range", () => {
     ]) {
       expect(within(page).getAllByText(host).length).toBeGreaterThan(0);
     }
-    expect(within(page).getByRole("tab", { name: "Topology" })).toHaveAttribute(
-      "aria-selected",
-      "true",
+    expect(within(page).getAllByText("Not observed").length).toBeGreaterThan(0);
+    expect(within(page).getByTestId("range-context")).toHaveTextContent("not_observed");
+    expect(within(page).getByTestId("range-context")).toHaveTextContent("not_connected");
+    expect(within(page).getByTestId("range-relationships")).toHaveTextContent(
+      "Relationship edges are not stored",
+    );
+    expect(within(page).queryByText("Reporting")).not.toBeInTheDocument();
+  });
+
+  it("maps system filters to supported API parameters", async () => {
+    const { calls } = installApiFetch();
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/cyber-range"] });
+    const page = screen.getByTestId("cyber-range-page");
+    await within(page).findAllByText("LAB-GW-01");
+    const user = userEvent.setup();
+    await user.selectOptions(within(page).getByLabelText("Zone"), "MGMT");
+    await user.selectOptions(within(page).getByLabelText("Telemetry status"), "not_connected");
+    expect(
+      calls.some(
+        (url) =>
+          url.includes("/api/v1/cyber-range/systems") &&
+          url.includes("zone=MGMT") &&
+          url.includes("telemetry_status=not_connected"),
+      ),
+    ).toBe(true);
+  });
+
+  it("renders scenarios with zero running and null last runs", async () => {
+    const user = userEvent.setup();
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/cyber-range"] });
+    const page = screen.getByTestId("cyber-range-page");
+    await user.click(await within(page).findByRole("tab", { name: "Scenarios" }));
+    const scenarios = within(page).getByTestId("range-scenarios");
+    expect(scenarios).toHaveTextContent("SCN-0001");
+    expect(scenarios).toHaveTextContent("SCN-0006");
+    expect(scenarios).not.toHaveTextContent("SCN-001");
+    expect(scenarios).toHaveTextContent("Not run");
+    expect(within(page).getByText(/Running scenarios: 0/)).toBeInTheDocument();
+    expect(within(page).getByTestId("scenario-detail")).toHaveTextContent("Not run");
+    expect(within(page).getByTestId("scenario-detail")).toHaveTextContent(
+      "No execute, start, or stop action",
     );
   });
 
-  it("renders scenarios and runs", async () => {
+  it("maps scenario filters to supported API parameters", async () => {
+    const { calls } = installApiFetch();
+    const user = userEvent.setup();
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/cyber-range"] });
+    const page = screen.getByTestId("cyber-range-page");
+    await user.click(await within(page).findByRole("tab", { name: "Scenarios" }));
+    await user.selectOptions(within(page).getByLabelText("Status"), "ready");
+    await user.selectOptions(within(page).getByLabelText("ATT&CK technique"), "T1059.001");
+    expect(
+      calls.some(
+        (url) =>
+          url.includes("/api/v1/cyber-range/scenarios") &&
+          url.includes("status=ready") &&
+          url.includes("attack_technique=T1059.001"),
+      ),
+    ).toBe(true);
+  });
+
+  it("renders telemetry as not_connected and detections as not_validated", async () => {
     const user = userEvent.setup();
     await renderWithProviders(<AppRouter />, { initialEntries: ["/cyber-range"] });
     const page = screen.getByTestId("cyber-range-page");
 
+    await user.click(await within(page).findByRole("tab", { name: "Telemetry" }));
+    const telemetry = within(page).getByTestId("range-telemetry");
+    expect(telemetry).toHaveTextContent("not_connected");
+    expect(telemetry).toHaveTextContent("Not connected");
+    expect(telemetry).toHaveTextContent("Not recorded");
+    expect(telemetry).toHaveTextContent("Wazuh and Suricata remain not_connected");
+
+    await user.click(within(page).getByRole("tab", { name: "Detections" }));
+    const detections = within(page).getByTestId("range-detections");
+    for (let index = 1; index <= 12; index += 1) {
+      expect(detections).toHaveTextContent(`DET-${String(index).padStart(4, "0")}`);
+    }
+    expect(detections).toHaveTextContent("not_validated");
+    expect(detections).toHaveTextContent("Not validated");
+    expect(detections).toHaveTextContent("not_connected");
+    expect(detections.textContent ?? "").not.toMatch(/\bDET-001\b/);
+  });
+
+  it("maps detection filters to supported API parameters", async () => {
+    const { calls } = installApiFetch();
+    const user = userEvent.setup();
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/cyber-range"] });
+    const page = screen.getByTestId("cyber-range-page");
+    await user.click(await within(page).findByRole("tab", { name: "Detections" }));
+    await user.selectOptions(within(page).getByLabelText("Validation state"), "not_validated");
+    await user.selectOptions(within(page).getByLabelText("Data source"), "Sysmon");
+    expect(
+      calls.some(
+        (url) =>
+          url.includes("/api/v1/cyber-range/detections") &&
+          url.includes("validation_state=not_validated") &&
+          url.includes("data_source=Sysmon"),
+      ),
+    ).toBe(true);
+  });
+
+  it("shows empty states when no cyber-range rows are stored", async () => {
+    installApiFetch((url) => {
+      if (url.includes("/api/v1/cyber-range/summary")) return jsonResponse(emptyCyberRangeSummary);
+      if (url.includes("/api/v1/cyber-range")) return jsonResponse(assetPage([]));
+      return jsonResponse({ status: "ok", service: "aegisbridge" });
+    });
+    const user = userEvent.setup();
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/cyber-range"] });
+    const page = screen.getByTestId("cyber-range-page");
+    expect(await within(page).findByText(/Lab Bridge: not_connected/)).toBeInTheDocument();
+    expect(within(page).queryByText("LAB-GW-01")).not.toBeInTheDocument();
+    expect(within(page).queryByText("RUN-014")).not.toBeInTheDocument();
+
     await user.click(within(page).getByRole("tab", { name: "Segments" }));
-    expect(within(page).getByTestId("range-segments")).toHaveTextContent("ATTACK");
+    expect(within(page).getByText("No zones are stored.")).toBeInTheDocument();
 
     await user.click(within(page).getByRole("tab", { name: "Scenarios" }));
-    expect(within(page).getByTestId("range-scenarios")).toHaveTextContent("SCN-001");
-    expect(within(page).getByTestId("range-scenarios")).toHaveTextContent("SCN-006");
-    expect(within(page).getAllByText("Ready").length).toBeGreaterThan(0);
-    expect(within(page).getAllByText("Not connected").length).toBeGreaterThan(0);
+    expect(within(page).getByTestId("range-scenarios")).toHaveTextContent(
+      "No scenarios are stored.",
+    );
 
-    await user.click(within(page).getByRole("tab", { name: "Runs" }));
-    expect(within(page).getByTestId("range-runs")).toHaveTextContent("RUN-014");
-    expect(within(page).getByTestId("range-runs")).toHaveTextContent("Partial");
-    expect(within(page).getByTestId("range-runs")).toHaveTextContent("Validated");
+    await user.click(within(page).getByRole("tab", { name: "Detections" }));
+    expect(within(page).getByTestId("range-detections")).toHaveTextContent(
+      "No detections are stored.",
+    );
+  });
+
+  it("does not fall back to the old cyber-range fixture catalog", async () => {
+    const user = userEvent.setup();
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/cyber-range"] });
+    const page = screen.getByTestId("cyber-range-page");
+    expect((await within(page).findAllByText("LAB-GW-01")).length).toBeGreaterThan(0);
+    expect(within(page).queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
+    await user.click(within(page).getByRole("tab", { name: "Scenarios" }));
+    expect(within(page).getByTestId("range-scenarios")).toHaveTextContent("SCN-0001");
+    expect(within(page).queryByText("SCN-001")).not.toBeInTheDocument();
+    expect(within(page).queryByText("RUN-014")).not.toBeInTheDocument();
+    expect(within(page).queryByText("RUN-011")).not.toBeInTheDocument();
   });
 });

@@ -1,40 +1,35 @@
 import { StatusBadge } from "@/components/status/StatusBadge";
-import type { LabRelationship, LabSegment, LabSystem } from "@/types/cyber-range";
-
-const kindHint: Record<LabRelationship["kind"], string> = {
-  Telemetry: "Solid label · simulated snapshot",
-  Logging: "Solid label · gateway to SIEM",
-  Policy: "Deny label · not a connection",
-  Hypothetical: "Dashed label · not observed",
-};
+import {
+  observedTone,
+  type LabSystemView,
+  type LabZoneView,
+} from "@/features/cyber-range/mapCyberRange";
 
 export function RangeTopology({
-  segments,
+  zones,
   systems,
-  relationships,
   selectedId,
   onSelect,
 }: {
-  segments: LabSegment[];
-  systems: LabSystem[];
-  relationships: LabRelationship[];
+  zones: LabZoneView[];
+  systems: LabSystemView[];
   selectedId: string;
   onSelect: (id: string) => void;
 }) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {segments.map((segment) => (
+        {zones.map((zone) => (
           <section
-            key={segment.id}
-            aria-label={`${segment.id} ${segment.cidr}`}
+            key={zone.id}
+            aria-label={`${zone.id} ${zone.cidr}`}
             className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] p-3"
           >
-            <h3 className="font-heading text-sm font-bold text-[var(--text)]">{segment.id}</h3>
-            <p className="mt-1 text-xs text-[var(--muted)]">{segment.cidr}</p>
+            <h3 className="font-heading text-sm font-bold text-[var(--text)]">{zone.id}</h3>
+            <p className="mt-1 text-xs text-[var(--muted)]">{zone.cidr}</p>
             <ul className="mt-3 space-y-2">
               {systems
-                .filter((system) => system.zone === segment.id)
+                .filter((system) => system.zoneId === zone.id)
                 .map((system) => (
                   <li key={system.id}>
                     <button
@@ -45,14 +40,14 @@ export function RangeTopology({
                     >
                       <span className="font-medium text-[var(--text)]">{system.hostname}</span>
                       <span className="text-xs text-[var(--muted)]">
-                        {system.state} · {system.address}
+                        {system.observedLabel} · {system.ipAddress}
                       </span>
                     </button>
                   </li>
                 ))}
-              {systems.every((system) => system.zone !== segment.id) ? (
+              {systems.every((system) => system.zoneId !== zone.id) ? (
                 <li className="text-xs text-[var(--muted)]">
-                  No dedicated system in this snapshot.
+                  No dedicated system in this catalog.
                 </li>
               ) : null}
             </ul>
@@ -62,35 +57,21 @@ export function RangeTopology({
 
       <div>
         <h3 className="text-sm font-semibold text-[var(--text)]">Relationships</h3>
-        <p className="mt-1 text-xs text-[var(--muted)]">
-          Type is written on every row. Line style is a hint, not the only signal.
+        <p className="mt-1 text-xs text-[var(--muted)]" data-testid="range-relationships">
+          Relationship edges are not stored in the development catalog. Isolation notes live on each
+          zone. Paths are not live reachability.
         </p>
-        <ul className="mt-3 space-y-2">
-          {relationships.map((link) => (
-            <li
-              key={link.id}
-              className="rounded-[var(--radius-control)] border border-[var(--border)] px-3 py-3 text-sm"
-            >
-              <p className="font-medium text-[var(--text)]">
-                {link.kind} · {link.from} → {link.to}
-              </p>
-              <p className="mt-1 text-[var(--muted)]">
-                {kindHint[link.kind]}. {link.detail}
-              </p>
-            </li>
-          ))}
-        </ul>
       </div>
 
       <div className="overflow-x-auto rounded-[var(--radius-control)] border border-[var(--border)]">
         <table className="min-w-full border-collapse text-left text-sm">
           <caption className="sr-only">
-            Accessible alternative to the zone diagram. Lab systems with zone, address, telemetry,
-            and state. Relationship type is in the list above, not color alone.
+            Accessible alternative to the zone diagram. Lab systems with zone, address, telemetry
+            status, and observed state.
           </caption>
           <thead className="bg-[var(--raised)] text-[var(--muted)]">
             <tr>
-              {["System", "Zone", "Address", "Role", "Telemetry", "State"].map((heading) => (
+              {["System", "Zone", "Address", "Role", "Telemetry", "Observed"].map((heading) => (
                 <th key={heading} scope="col" className="px-3 py-3 font-medium whitespace-nowrap">
                   {heading}
                 </th>
@@ -110,14 +91,14 @@ export function RangeTopology({
                     {system.hostname}
                   </button>
                 </td>
-                <td className="px-3 py-3 text-[var(--muted)]">{system.zone}</td>
-                <td className="px-3 py-3 text-[var(--muted)]">{system.address}</td>
+                <td className="px-3 py-3 text-[var(--muted)]">{system.zoneId}</td>
+                <td className="px-3 py-3 text-[var(--muted)]">{system.ipAddress}</td>
                 <td className="px-3 py-3 text-[var(--muted)]">{system.role}</td>
-                <td className="px-3 py-3 text-[var(--muted)]">{system.telemetry}</td>
+                <td className="px-3 py-3 text-[var(--muted)]">{system.telemetryLabel}</td>
                 <td className="px-3 py-3">
                   <StatusBadge
-                    label={system.state}
-                    tone={system.state === "Reporting" ? "success" : "warning"}
+                    label={system.observedLabel}
+                    tone={observedTone(system.observedState)}
                   />
                 </td>
               </tr>
