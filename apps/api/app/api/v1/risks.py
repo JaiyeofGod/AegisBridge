@@ -1,14 +1,16 @@
-"""Read-only risks."""
+"""Risk register reads and treatment updates."""
 
 from fastapi import APIRouter, Depends
 
-from app.api.deps import DbSession, PageQuery, require_permissions
+from app.api.deps import DbSession, PageQuery, RequireCsrf, require_permissions
 from app.schemas.common import ErrorBody, Page
-from app.schemas.risks import RiskDetail, RiskListItem
-from app.services.risks import get_risk, list_risks
+from app.schemas.risks import RiskDetail, RiskListItem, RiskTreatmentUpdate
+from app.services.risks import get_risk, list_risks, update_risk_treatment
 
 router = APIRouter(
-    prefix="/risks", tags=["risks"], dependencies=[Depends(require_permissions("risk.read"))]
+    prefix="/risks",
+    tags=["risks"],
+    dependencies=[Depends(require_permissions("risk.read"))],
 )
 
 
@@ -34,3 +36,18 @@ def read_risks(
 @router.get("/{risk_id}", response_model=RiskDetail, responses={404: {"model": ErrorBody}})
 def read_risk(risk_id: str, session: DbSession) -> RiskDetail:
     return get_risk(session, risk_id)
+
+
+@router.patch(
+    "/{risk_id}/treatment",
+    response_model=RiskDetail,
+    responses={404: {"model": ErrorBody}, 409: {"model": ErrorBody}, 422: {"model": ErrorBody}},
+    dependencies=[Depends(require_permissions("risk.manage"))],
+)
+def patch_risk_treatment(
+    risk_id: str,
+    body: RiskTreatmentUpdate,
+    session: DbSession,
+    principal: RequireCsrf,
+) -> RiskDetail:
+    return update_risk_treatment(session, principal, risk_id, body)

@@ -32,7 +32,7 @@ Visual mockups never weaken authentication, authorization, or data-handling requ
 
 - CSRF defense for authenticated write APIs (SameSite+proxy mitigates some cases; write CSRF not complete)
 - Login rate limiting / lockout
-- CSRF-protected authenticated domain writes; MFA; SSO; login rate limiting (domain GET permission enforcement is implemented)
+- Broader CSRF-protected domain writes beyond preferences + risk treatment; MFA; SSO; login rate limiting (CSRF foundation + first write slice implemented)
 
 **Later**
 

@@ -35,9 +35,9 @@
 `organizations`, `departments`, `business_processes`
 
 ### Identity and authorization
-`users`, `roles`, `permissions`, `user_roles`, `user_credentials`, `sessions`, `access_entitlements`, `access_reviews`, `access_review_findings`
+`users`, `roles`, `permissions`, `user_roles`, `user_credentials`, `sessions`, `user_preferences`, `access_entitlements`, `access_reviews`, `access_review_findings`
 
-Local password hashes live in `user_credentials` (Argon2id). Server sessions store only `token_digest`. Deferred name `api_credentials` for machine/API keys is not implemented.
+Local password hashes live in `user_credentials` (Argon2id). Server sessions store only `token_digest` and optional `csrf_token_digest`. `user_preferences` stores theme/density/landing/reduced_motion per user. Deferred name `api_credentials` for machine/API keys is not implemented.
 
 ### Assets
 `assets`, `asset_types`, `asset_owners`, `software_products`, `asset_software`, `data_assets`, `asset_data_relationships`
@@ -167,7 +167,7 @@ Portfolio/demo data: fictional identities, no real PII, no live credentials, no 
 
 ## 11. Phase 2 schema notes
 
-The implemented tables are the domain list in section 3 except these deferred tables: `api_credentials`, `control_findings`, `evidence_objects`, `evidence_incident_links`, `investigation_notes`, `policy_approvals`, and `integration_health`. `20261020_0003` adds threat-intelligence tables and nullable `integrations.human_id`. `20261020_0004` adds `report_definitions` and dataset registry metadata. `20261020_0005` adds cyber-range catalog tables. `20261020_0006` adds `user_credentials` and `sessions` for local Argon2id authentication. Object-byte storage and integration health remain out of this foundation.
+The implemented tables are the domain list in section 3 except these deferred tables: `api_credentials`, `control_findings`, `evidence_objects`, `evidence_incident_links`, `investigation_notes`, `policy_approvals`, and `integration_health`. `20261020_0003` adds threat-intelligence tables and nullable `integrations.human_id`. `20261020_0004` adds `report_definitions` and dataset registry metadata. `20261020_0005` adds cyber-range catalog tables. `20261020_0006` adds `user_credentials` and `sessions` for local Argon2id authentication. `20261020_0007` adds `sessions.csrf_token_digest` and `user_preferences`. Object-byte storage and integration health remain out of this foundation.
 
 Human IDs are a unique `human_id` string, not the primary key. Operational prefixes use four digits (`RISK-0021`, `CTRL-0002`, `VULN-0041`, `EVID-0041`, `USR-0001`, `AL-0107`). Frontend mocks still show shorter labels such as `R-021` until a later integration.
 

@@ -1,6 +1,6 @@
 # AegisBridge API (`apps/api`)
 
-FastAPI service with Phase 2 domain models, read-only `/api/v1` contracts, session authentication, and **enforced RBAC on domain reads**. Frontend guards are UX only. SSO/MFA, rate limiting, and CSRF-protected authenticated writes are not implemented in this slice.
+FastAPI service with Phase 2 domain models, session authentication, enforced RBAC on domain reads, synchronizer CSRF, and the first authenticated write slice (account preferences + risk treatment). Frontend guards are UX only. Broader writes, SSO/MFA, and rate limiting remain deferred.
 
 ## Commands
 
@@ -29,7 +29,7 @@ uv run --project apps/api python -m app.db.seed
 uv run --project apps/api python -m app.db.seed --reset
 ```
 
-The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. Threat-intelligence tables and `integrations.human_id` are `20261020_0003`. Report definitions and dataset registry metadata are `20261020_0004`. Cyber-range catalog tables and detection metadata columns are `20261020_0005`. Local credentials and sessions are `20261020_0006`. Seed data is not in the migration. Re-running the seed ensures contract rows when the organization already exists.
+The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. Threat-intelligence tables and `integrations.human_id` are `20261020_0003`. Report definitions and dataset registry metadata are `20261020_0004`. Cyber-range catalog tables and detection metadata columns are `20261020_0005`. Local credentials and sessions are `20261020_0006`. CSRF digests and `user_preferences` are `20261020_0007`. Seed data is not in the migration. Re-running the seed ensures contract rows when the organization already exists.
 
 ## Authentication (local)
 
@@ -37,6 +37,7 @@ The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. T
 2. `alembic upgrade head` and `python -m app.db.seed`.
 3. `POST /api/v1/auth/login` with email `amara.okonkwo@aegisbridge.example` and that password.
 4. Cookie `aegis_session` is HttpOnly. Use it for `/api/v1/auth/me`, `/api/v1/account/*`, and all domain GET routes.
+5. Login returns `csrf_token` (or call `GET /api/v1/auth/csrf`). Send `X-CSRF-Token` on logout, preference PATCH, and risk treatment PATCH.
 
 See `docs/security/AUTHENTICATION_AND_RBAC.md`. Never commit a real password. Production must not bootstrap a default password from this variable.
 
@@ -52,11 +53,13 @@ See `docs/security/AUTHENTICATION_AND_RBAC.md`. Never commit a real password. Pr
 - `POST /api/v1/auth/logout`
 - `POST /api/v1/auth/logout-all`
 - `GET /api/v1/auth/session`
+- `GET /api/v1/auth/csrf`
 - `GET /api/v1/auth/me`
 - `GET /api/v1/account/profile`
 - `GET /api/v1/account/security`
-- `GET /api/v1/account/preferences`
+- `GET` / `PATCH /api/v1/account/preferences`
 - `GET /api/v1/account/workspace`
+- `PATCH /api/v1/risks/{risk_id}/treatment` (`risk.manage` + CSRF)
 
 ## Domain read API
 

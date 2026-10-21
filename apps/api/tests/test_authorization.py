@@ -190,40 +190,48 @@ def test_audit_events_require_administration_and_audit_read(client: TestClient) 
     denied = client.get("/api/v1/administration/audit-events")
     assert denied.status_code == 403
 
-    client.post("/api/v1/auth/logout")
+    from tests.csrf_helpers import logout
+
+    logout(client)
     # GRC Analyst: audit.read, no administration.read
     login_as_role(client, "GRC Analyst")
     assert "audit.read" in ROLE_PERMISSIONS["GRC Analyst"]
     assert "administration.read" not in ROLE_PERMISSIONS["GRC Analyst"]
     assert client.get("/api/v1/administration/audit-events").status_code == 403
 
-    client.post("/api/v1/auth/logout")
+    logout(client)
     login_as_role(client, "Auditor")
     assert client.get("/api/v1/administration/audit-events").status_code == 200
 
 
 def test_integrations_require_administration_and_integration_read(client: TestClient) -> None:
+    from tests.csrf_helpers import logout
+
     login_as_role(client, "Auditor")
     assert "administration.read" in ROLE_PERMISSIONS["Auditor"]
     assert "integration.read" not in ROLE_PERMISSIONS["Auditor"]
     assert client.get("/api/v1/administration/summary").status_code == 200
     assert client.get("/api/v1/administration/integrations").status_code == 403
 
-    client.post("/api/v1/auth/logout")
+    logout(client)
     login_as_role(client, "Security Engineer")
     assert client.get("/api/v1/administration/integrations").status_code == 200
 
 
 def test_cyber_range_requires_cyber_range_read(client: TestClient) -> None:
+    from tests.csrf_helpers import logout
+
     login_as_role(client, "GRC Analyst")
     assert "cyber_range.read" not in ROLE_PERMISSIONS["GRC Analyst"]
     assert client.get("/api/v1/cyber-range/summary").status_code == 403
-    client.post("/api/v1/auth/logout")
+    logout(client)
     login_as_role(client, "SOC Analyst")
     assert client.get("/api/v1/cyber-range/summary").status_code == 200
 
 
 def test_overview_filters_sections_without_failing(client: TestClient) -> None:
+    from tests.csrf_helpers import logout
+
     login_as_role(client, "Read Only")
     body = client.get("/api/v1/overview").json()
     assert body["organization_name"] == "AegisBridge Technologies"
@@ -233,7 +241,7 @@ def test_overview_filters_sections_without_failing(client: TestClient) -> None:
     assert "access_review" not in kinds
     assert "remediation" in kinds or "risk" in kinds or "incident" in kinds
 
-    client.post("/api/v1/auth/logout")
+    logout(client)
     login_as_role(client, "GRC Analyst")
     grc = client.get("/api/v1/overview").json()
     assert grc["open_incidents"] == 0  # no incident.read

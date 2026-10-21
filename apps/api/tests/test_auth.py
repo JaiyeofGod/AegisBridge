@@ -172,10 +172,14 @@ def test_session_endpoint_reports_authenticated_state(client: TestClient) -> Non
 
 
 def test_logout_revokes_session(client: TestClient) -> None:
+    from tests.csrf_helpers import csrf_headers
+
     login = _login(client)
     token = login.cookies.get("aegis_session")
     assert token
-    logout = client.post("/api/v1/auth/logout")
+    assert "csrf_token" in login.json()
+    assert login.json()["csrf_token"] != token
+    logout = client.post("/api/v1/auth/logout", headers=csrf_headers(client))
     assert logout.status_code == 200
     assert logout.json()["authenticated"] is False
     assert client.get("/api/v1/auth/me").status_code == 401
@@ -278,7 +282,8 @@ def test_account_endpoints(client: TestClient) -> None:
     assert security["active_session_count"] >= 1
     assert security["current_session"]["id"].startswith("SES-")
     preferences = client.get("/api/v1/account/preferences").json()
-    assert preferences["persistence"] == "not_stored"
+    assert preferences["persistence"] in {"default", "stored"}
+    assert preferences["theme"] in {"system", "dark", "light"}
     workspace = client.get("/api/v1/account/workspace").json()
     assert workspace["privileged"] is True
     assert "Administrator" in workspace["roles"]
@@ -286,13 +291,15 @@ def test_account_endpoints(client: TestClient) -> None:
 
 
 def test_logout_all_revokes_sessions(client: TestClient) -> None:
+    from tests.csrf_helpers import csrf_headers
+
     _login(client)
     second = TestClient(create_app())
     second.post(
         "/api/v1/auth/login",
         json={"email": ADMIN_EMAIL, "password": DEV_PASSWORD},
     )
-    response = client.post("/api/v1/auth/logout-all")
+    response = client.post("/api/v1/auth/logout-all", headers=csrf_headers(client))
     assert response.status_code == 200
     assert client.get("/api/v1/auth/me").status_code == 401
 
@@ -337,7 +344,9 @@ def test_cookie_attributes_and_logout_clear(client: TestClient) -> None:
     assert "path=/" in set_cookie
     assert "max-age=" in set_cookie
     assert "domain=" not in set_cookie
-    logout = client.post("/api/v1/auth/logout")
+    from tests.csrf_helpers import csrf_headers
+
+    logout = client.post("/api/v1/auth/logout", headers=csrf_headers(client))
     clear = logout.headers.get("set-cookie", "").lower()
     assert "aegis_session=" in clear
     assert "path=/" in clear

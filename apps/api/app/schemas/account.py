@@ -1,6 +1,7 @@
-"""Authenticated account read contracts. No password or session secrets."""
+"""Authenticated account contracts. No password or session secrets."""
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -35,6 +36,11 @@ class AccountSecurity(BaseModel):
     semantics: str
 
 
+ThemeValue = Literal["system", "dark", "light"]
+DensityValue = Literal["comfortable", "compact"]
+LandingPageValue = Literal["overview"]
+
+
 class AccountPreferences(BaseModel):
     persistence: str
     theme: str
@@ -42,6 +48,16 @@ class AccountPreferences(BaseModel):
     landing_page: str
     reduced_motion: bool
     semantics: str
+    updated_at: datetime | None = None
+
+
+class AccountPreferencesUpdate(BaseModel):
+    """Partial preferences patch. Omitted fields are left unchanged."""
+
+    theme: ThemeValue | None = None
+    density: DensityValue | None = None
+    landing_page: LandingPageValue | None = None
+    reduced_motion: bool | None = None
 
 
 class AccountWorkspace(BaseModel):

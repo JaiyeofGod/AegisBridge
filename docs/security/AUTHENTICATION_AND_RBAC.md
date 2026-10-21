@@ -1,6 +1,6 @@
 # Authentication and RBAC
 
-**Status:** Backend authentication and **domain read authorization are enforced**. Frontend route guards remain UX only. SSO/OIDC, MFA, email reset, rate limiting, and CSRF-protected authenticated writes are deferred.
+**Status:** Backend authentication, domain read authorization, **CSRF-protected authenticated writes** (preferences + risk treatment), and session CSRF foundation are in place. Frontend route guards remain UX only. SSO/OIDC, MFA, email reset, rate limiting, and broader domain writes remain deferred.
 
 ## Authentication model
 
@@ -46,13 +46,34 @@ Preferred local setup: Vite proxies `/api` to the API so the browser treats the 
 
 If the frontend calls the API cross-origin with credentials (`VITE_API_BASE_URL=http://localhost:8000`), CORS allowlists `http://localhost:5173` and `http://127.0.0.1:5173` with `allow_credentials=True`. Wildcard origins are rejected when credentials are enabled.
 
-## CSRF strategy (current limitation)
+## CSRF strategy (synchronizer token)
 
-- GET endpoints remain safe/read-only.
-- `POST /auth/login` is not cookie-authenticated beforehand (credentials in body).
-- `POST /auth/logout` and `POST /auth/logout-all` are cookie-authenticated state changes. With same-site Vite proxy + `SameSite=Lax`, classic cross-site POSTs do not include the session cookie, which limits CSRF risk in the preferred local/same-site deployment.
-- Cross-origin credentialed SPAs (different site than the API) and future authenticated **domain write** endpoints are **not** covered by a CSRF token scheme yet.
-- **Do not introduce additional authenticated state-changing application endpoints until the selected CSRF defense is implemented.** Do not claim write CSRF coverage is complete.
+Session cookies remain HttpOnly. CSRF uses a **synchronizer token** bound to the server session:
+
+1. On login, the API generates a CSRF token distinct from the session cookie, stores only its SHA-256 digest on `sessions.csrf_token_digest`, and returns the raw token in the login JSON as `csrf_token`.
+2. `GET /api/v1/auth/csrf` (authenticated) rotates the token and returns `{ csrf_token, header_name: "X-CSRF-Token" }`.
+3. Authenticated state-changing requests must send header `X-CSRF-Token` matching the digest for the caller’s current session.
+4. Failures return `403` / `csrf_failed` without leaking tokens or digests.
+5. SameSite=Lax remains a defense-in-depth layer; it is **not** sufficient alone.
+
+### Methods / routes that require CSRF
+
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/auth/logout` | Required when a session cookie is present; anonymous logout is a no-op |
+| POST | `/auth/logout-all` | Authenticated + CSRF |
+| PATCH | `/account/preferences` | Authenticated + CSRF |
+| PATCH | `/risks/{risk_id}/treatment` | Authenticated + `risk.manage` + CSRF |
+
+### CSRF exemptions
+
+| Method | Path | Reason |
+|---|---|---|
+| POST | `/auth/login` | Not session-authenticated beforehand; credentials in body |
+| GET | `*` | Safe/read-only |
+| GET | `/auth/csrf` | Issues the token; does not mutate domain state |
+
+Do **not** put the session cookie value in JavaScript or localStorage. Do not treat the CSRF token as authentication.
 
 ## Client metadata
 
@@ -125,9 +146,10 @@ Authenticated reads (401 without a valid session):
 | GET | `/api/v1/account/profile` |
 | GET | `/api/v1/account/security` |
 | GET | `/api/v1/account/preferences` |
+| PATCH | `/api/v1/account/preferences` | CSRF; current user only |
 | GET | `/api/v1/account/workspace` |
 
-Preferences return explicit **defaults** with `persistence: not_stored` (no preference table in this phase). MFA is `not_configured`.
+Preferences: `persistence` is `default` until the user saves, then `stored` in `user_preferences`. MFA remains `not_configured`.
 
 ## Current API enforcement
 
@@ -151,7 +173,7 @@ Authenticated session required (401 without a valid cookie):
 |---|---|---|
 | Overview | Authenticated session (any role). Sections omit data the caller lacks `*.read` for. | Yes |
 | Assets | `asset.read` | Yes |
-| Risks | `risk.read` (+ `risk.accept` / `risk.manage` for writes later) | Yes (read) |
+| Risks | `risk.read`; treatment PATCH requires `risk.manage` + CSRF | Yes (read + treatment write) |
 | Controls / governance | `control.read` (+ manage/update for writes later) | Yes (read) |
 | Evidence | `evidence.read` (+ manage/download for writes later) | No dedicated list route yet |
 | Vulnerabilities | `vulnerability.read` (+ manage for writes later) | Yes (read) |
@@ -167,23 +189,26 @@ Authenticated session required (401 without a valid cookie):
 | Administration audit events | `administration.read` **and** `audit.read` | Yes |
 | Administration writes / role assignment | `administration.manage`, `user.role.manage`, `integration.manage` | No (writes deferred; need CSRF) |
 | Auth session/me | authenticated (`/me`); `/session` public | Yes |
-| Account | authenticated | Yes |
+| Account | authenticated; preferences PATCH + CSRF | Yes |
+| Risk treatment PATCH | `risk.manage` + CSRF | Yes |
 
 **401** = no valid session (missing, revoked, expired, or inactive user).  
-**403** = authenticated session without the required permission(s). Error bodies use `code: forbidden` without listing missing capability codes.
+**403** = missing permission (`forbidden`) or CSRF failure (`csrf_failed`). Error bodies do not list capability codes or tokens.
 
-Authenticated **domain writes** remain deferred until CSRF protection is implemented.
+**Broader authenticated domain writes** (incidents, vulns, admin, integrations, reports, cyber-range control) remain deferred. No Cyber Range remote control.
 
 ## Audit behavior
 
-Security-relevant auth actions write `audit_events` rows:
+Security-relevant actions write `audit_events` rows:
 
 - `LOGIN_SUCCESS`
 - `LOGIN_FAILURE`
 - `LOGOUT`
 - `LOGOUT_ALL`
+- `PREFERENCES_UPDATE`
+- `RISK_TREATMENT_UPDATE`
 
-Metadata must not include passwords, hashes, tokens, or digests.
+Metadata may include actor human id, action, object human id, and changed field names. Metadata must not include passwords, hashes, session/CSRF tokens, or digests.
 
 ## Development login setup
 
@@ -197,7 +222,7 @@ Never commit the real password. Production must not rely on this variable.
 ## Production hardening still required
 
 - Login rate limiting / lockout (structure is ready; not implemented)
-- CSRF tokens for authenticated writes
+- Broader CSRF-protected domain writes beyond preferences + risk treatment
 - MFA/TOTP
 - Password reset email flows
 - SSO/OIDC

@@ -6,9 +6,24 @@ from typing import Annotated, Literal, cast
 
 from fastapi import APIRouter, Depends, Request, Response
 
-from app.api.deps import CurrentPrincipal, DbSession, OptionalPrincipal, get_settings_dep
+from app.api.deps import (
+    CurrentPrincipal,
+    DbSession,
+    OptionalPrincipal,
+    RequireCsrf,
+    get_settings_dep,
+    require_csrf_for_active_session,
+)
 from app.core.config import Settings
-from app.schemas.auth import CurrentUser, LoginRequest, SessionStatus
+from app.models.auth import AuthSession
+from app.schemas.auth import (
+    CsrfTokenResponse,
+    CurrentUser,
+    LoginRequest,
+    LoginResponse,
+    SessionStatus,
+)
+from app.security.csrf import CSRF_HEADER_NAME
 from app.security.sessions import cookie_secure
 from app.services import auth as auth_service
 
@@ -54,15 +69,15 @@ def _no_store(response: Response) -> None:
     response.headers["X-Content-Type-Options"] = "nosniff"
 
 
-@router.post("/login", response_model=CurrentUser)
+@router.post("/login", response_model=LoginResponse)
 def login(
     body: LoginRequest,
     request: Request,
     response: Response,
     session: DbSession,
     settings: Annotated[Settings, Depends(get_settings_dep)],
-) -> CurrentUser:
-    token, _auth_session, user = auth_service.authenticate_and_create_session(
+) -> LoginResponse:
+    token, _auth_session, user, csrf_token = auth_service.authenticate_and_create_session(
         session,
         email=body.email,
         password=body.password,
@@ -72,18 +87,17 @@ def login(
     )
     _set_session_cookie(response, token, settings)
     _no_store(response)
-    return user
+    return LoginResponse(**user.model_dump(), csrf_token=csrf_token)
 
 
 @router.post("/logout", response_model=SessionStatus)
 def logout(
-    request: Request,
     response: Response,
     session: DbSession,
     settings: Annotated[Settings, Depends(get_settings_dep)],
+    auth_session: Annotated[AuthSession | None, Depends(require_csrf_for_active_session)],
 ) -> SessionStatus:
-    raw = request.cookies.get(settings.session_cookie_name)
-    auth_session = auth_service.get_auth_session_by_token(session, raw)
+    # Anonymous logout is a no-op. Active sessions require X-CSRF-Token.
     auth_service.logout_session(session, auth_session=auth_session, settings=settings)
     _clear_session_cookie(response, settings)
     _no_store(response)
@@ -95,15 +109,25 @@ def logout_all(
     request: Request,
     response: Response,
     session: DbSession,
-    principal: CurrentPrincipal,
+    principal: RequireCsrf,
     settings: Annotated[Settings, Depends(get_settings_dep)],
 ) -> SessionStatus:
     auth_service.logout_all_sessions(session, user_id=principal.user_id, settings=settings)
     _clear_session_cookie(response, settings)
     _no_store(response)
-    # Cookie cleared; request principal is no longer valid for subsequent calls.
     _ = request
     return SessionStatus(authenticated=False)
+
+
+@router.get("/csrf", response_model=CsrfTokenResponse)
+def read_csrf(
+    response: Response,
+    session: DbSession,
+    principal: CurrentPrincipal,
+) -> CsrfTokenResponse:
+    token = auth_service.issue_csrf_token(session, principal=principal)
+    _no_store(response)
+    return CsrfTokenResponse(csrf_token=token, header_name=CSRF_HEADER_NAME)
 
 
 @router.get("/session", response_model=SessionStatus)

@@ -26,9 +26,22 @@ class CurrentUser(BaseModel):
     timezone: str | None = None
 
 
+class LoginResponse(CurrentUser):
+    """Login payload. csrf_token is not the session cookie value."""
+
+    csrf_token: str
+
+
 class SessionStatus(BaseModel):
     authenticated: bool
     user: CurrentUser | None = None
     session_id: str | None = None
     expires_at: datetime | None = None
     last_seen_at: datetime | None = None
+
+
+class CsrfTokenResponse(BaseModel):
+    """Synchronizer CSRF token for authenticated writes. Not the session cookie."""
+
+    csrf_token: str
+    header_name: str = "X-CSRF-Token"

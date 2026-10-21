@@ -1,8 +1,14 @@
 """Risk register contract. Likelihood, impact, and score stay separate."""
 
-from pydantic import BaseModel
+from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, Field
 
 from app.schemas.common import PersonRef, RelatedRecord
+
+TreatmentStrategy = Literal["accept", "avoid", "mitigate", "transfer"]
+TreatmentStatus = Literal["planned", "in_progress", "complete", "deferred", "cancelled"]
 
 
 class RiskListItem(BaseModel):
@@ -30,3 +36,13 @@ class RiskDetail(RiskListItem):
     treatment_notes: str | None
     evidence: list[RelatedRecord]
     reviews: list[RelatedRecord]
+    treatment_updated_at: datetime | None = None
+
+
+class RiskTreatmentUpdate(BaseModel):
+    """Partial treatment patch. Only RiskTreatment columns are writable here."""
+
+    strategy: TreatmentStrategy | None = None
+    status: TreatmentStatus | None = None
+    notes: str | None = Field(default=None, max_length=4000)
+    expected_updated_at: datetime | None = None

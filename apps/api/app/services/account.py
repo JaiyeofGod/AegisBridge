@@ -1,14 +1,18 @@
-"""Authenticated account reads. Preferences are defaults until a store exists."""
+"""Authenticated account reads and preference persistence."""
 
 from __future__ import annotations
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.api.errors import ApiError
+from app.core.config import get_settings
 from app.models.auth import AuthSession, UserCredential
 from app.models.identity import User
+from app.models.preferences import UserPreferences
 from app.schemas.account import (
     AccountPreferences,
+    AccountPreferencesUpdate,
     AccountProfile,
     AccountSecurity,
     AccountSessionSummary,
@@ -16,6 +20,20 @@ from app.schemas.account import (
 )
 from app.security.permissions import PRIVILEGED_ROLES
 from app.security.rbac import AuthenticatedPrincipal
+from app.services.audit_write import record_audit_event
+
+DEFAULT_THEME = "system"
+DEFAULT_DENSITY = "comfortable"
+DEFAULT_LANDING_PAGE = "overview"
+DEFAULT_REDUCED_MOTION = False
+
+DEFAULT_PREFERENCES_SEMANTICS = (
+    "No stored preference row exists yet. These values are service defaults."
+)
+STORED_PREFERENCES_SEMANTICS = (
+    "Preferences are stored for this user. Theme and density are not applied "
+    "server-side; the client may use them when presentation wiring exists."
+)
 
 
 def get_profile(principal: AuthenticatedPrincipal) -> AccountProfile:
@@ -74,18 +92,82 @@ def get_security(session: Session, principal: AuthenticatedPrincipal) -> Account
     )
 
 
-def get_preferences() -> AccountPreferences:
+def get_preferences(session: Session, principal: AuthenticatedPrincipal) -> AccountPreferences:
+    row = session.scalar(
+        select(UserPreferences).where(UserPreferences.user_id == principal.user_id)
+    )
+    if row is None:
+        return AccountPreferences(
+            persistence="default",
+            theme=DEFAULT_THEME,
+            density=DEFAULT_DENSITY,
+            landing_page=DEFAULT_LANDING_PAGE,
+            reduced_motion=DEFAULT_REDUCED_MOTION,
+            semantics=DEFAULT_PREFERENCES_SEMANTICS,
+            updated_at=None,
+        )
     return AccountPreferences(
-        persistence="not_stored",
-        theme="system",
-        density="comfortable",
-        landing_page="overview",
-        reduced_motion=False,
-        semantics=(
-            "User preference persistence is not stored yet. "
-            "These values are explicit defaults, not fabricated saved settings."
+        persistence="stored",
+        theme=row.theme,
+        density=row.density,
+        landing_page=row.landing_page,
+        reduced_motion=row.reduced_motion,
+        semantics=STORED_PREFERENCES_SEMANTICS,
+        updated_at=row.updated_at,
+    )
+
+
+def update_preferences(
+    session: Session,
+    principal: AuthenticatedPrincipal,
+    patch: AccountPreferencesUpdate,
+) -> AccountPreferences:
+    payload = patch.model_dump(exclude_unset=True)
+    if not payload:
+        raise ApiError(422, "validation_error", "At least one preference field is required.")
+
+    row = session.scalar(
+        select(UserPreferences).where(UserPreferences.user_id == principal.user_id)
+    )
+    created = row is None
+    if row is None:
+        row = UserPreferences(
+            user_id=principal.user_id,
+            theme=DEFAULT_THEME,
+            density=DEFAULT_DENSITY,
+            landing_page=DEFAULT_LANDING_PAGE,
+            reduced_motion=DEFAULT_REDUCED_MOTION,
+        )
+        session.add(row)
+
+    changed: list[str] = []
+    for field in ("theme", "density", "landing_page", "reduced_motion"):
+        if field not in payload:
+            continue
+        new_value = payload[field]
+        if getattr(row, field) != new_value:
+            setattr(row, field, new_value)
+            changed.append(field)
+
+    settings = get_settings()
+    record_audit_event(
+        session,
+        organization_id=_org_id(session, principal),
+        action="PREFERENCES_UPDATE",
+        object_type="user_preferences",
+        object_id=principal.human_id,
+        result="success",
+        actor_user_id=principal.user_id,
+        actor_label=principal.human_id,
+        environment_name=settings.app_env,
+        detail=(
+            f"{'Created' if created else 'Updated'} preference fields: "
+            f"{', '.join(changed) if changed else 'none'}."
         ),
     )
+    session.commit()
+    session.refresh(row)
+    return get_preferences(session, principal)
 
 
 def get_workspace(principal: AuthenticatedPrincipal) -> AccountWorkspace:
@@ -110,3 +192,10 @@ def user_has_password(session: Session, user: User) -> bool:
         session.scalar(select(UserCredential.id).where(UserCredential.user_id == user.id))
         is not None
     )
+
+
+def _org_id(session: Session, principal: AuthenticatedPrincipal):
+    user = session.get(User, principal.user_id)
+    if user is None:
+        raise ApiError(401, "unauthenticated", "Authentication is required.")
+    return user.organization_id

@@ -1,6 +1,6 @@
 # API contracts
 
-Base path: `/api/v1`. Domain GET routes require an authenticated session cookie and capability-based permissions (see `docs/security/AUTHENTICATION_AND_RBAC.md`). Health and `POST /auth/login` / `GET /auth/session` remain public. No SSO, MFA enrollment, email delivery, CSRF-protected domain writes, or remote lab control.
+Base path: `/api/v1`. Domain GET routes require an authenticated session cookie and capability-based permissions. Authenticated writes use synchronizer CSRF (`X-CSRF-Token`; see `docs/security/AUTHENTICATION_AND_RBAC.md`). Health and `POST /auth/login` / `GET /auth/session` remain public. No SSO, MFA, email delivery, broader domain writes, or remote lab control.
 
 Human-readable IDs are the public identifiers (`AST-0007`, `RISK-0021`, `VULN-0041`, `AL-0107`, `INC-0001`, `USR-0001`). Internal UUIDs are not returned. Timestamps are ISO 8601. Absent values are JSON `null`. Details: `docs/security/AUTHENTICATION_AND_RBAC.md`.
 
@@ -8,13 +8,14 @@ Human-readable IDs are the public identifiers (`AST-0007`, `RISK-0021`, `VULN-00
 
 | Method | Path | Notes |
 |---|---|---|
-| POST | `/auth/login` | Email + password. Sets HttpOnly `aegis_session` cookie. Generic credential errors. |
-| POST | `/auth/logout` | Revokes current session; clears cookie. Safe if already logged out. |
-| POST | `/auth/logout-all` | Authenticated. Revokes all sessions for the current user. |
+| POST | `/auth/login` | Email + password. Sets HttpOnly `aegis_session`. Returns user fields + `csrf_token` (not the session cookie). |
+| POST | `/auth/logout` | CSRF when session present. Revokes session; clears cookie. |
+| POST | `/auth/logout-all` | Authenticated + CSRF. Revokes all sessions for the current user. |
+| GET | `/auth/csrf` | Authenticated. Rotates/returns synchronizer CSRF token + `header_name`. |
 | GET | `/auth/session` | `{authenticated, user?, session_id?, expires_at?, last_seen_at?}` |
 | GET | `/auth/me` | Current user. `401` when unauthenticated. |
 
-Login body: `{ "email", "password" }`. Responses never include password hashes, raw tokens, or digests.
+Login body: `{ "email", "password" }`. Responses never include password hashes, session digests, or CSRF digests.
 
 ## Account endpoints (authenticated)
 
@@ -22,8 +23,15 @@ Login body: `{ "email", "password" }`. Responses never include password hashes, 
 |---|---|---|
 | GET | `/account/profile` | Safe profile fields for the current user |
 | GET | `/account/security` | Password configured flag, session counts/metadata, MFA `not_configured` |
-| GET | `/account/preferences` | Explicit defaults; `persistence: not_stored` |
+| GET | `/account/preferences` | `persistence: default` or `stored`; optional `updated_at` |
+| PATCH | `/account/preferences` | CSRF. Partial update of `theme`, `density`, `landing_page`, `reduced_motion`. Current user only. |
 | GET | `/account/workspace` | Organization, roles, permissions, privileged flag |
+
+## Domain write endpoints (first slice)
+
+| Method | Path | Permission | Notes |
+|---|---|---|---|
+| PATCH | `/risks/{risk_id}/treatment` | `risk.manage` + CSRF | Partial update of `strategy`, `status`, `notes`. Optional `expected_updated_at` → `409` on stale. |
 
 ## Domain read endpoints
 

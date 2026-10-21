@@ -1,15 +1,20 @@
-"""Risk register queries."""
+"""Risk register queries and treatment updates."""
+
+from datetime import UTC, datetime
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.errors import not_found
+from app.api.errors import ApiError, not_found
+from app.core.config import get_settings
 from app.models.assets import Asset
 from app.models.evidence import Evidence, EvidenceRiskLink
 from app.models.identity import User
 from app.models.risk import Risk, RiskAssessment, RiskReview, RiskTreatment
 from app.schemas.common import Page, RelatedRecord
-from app.schemas.risks import RiskDetail, RiskListItem
+from app.schemas.risks import RiskDetail, RiskListItem, RiskTreatmentUpdate
+from app.security.rbac import AuthenticatedPrincipal
+from app.services.audit_write import record_audit_event
 from app.services.support import (
     RISK_LEVELS,
     RISK_METHODOLOGY_LABEL,
@@ -21,6 +26,9 @@ from app.services.support import (
     require_choice,
     risk_level,
 )
+
+TREATMENT_STRATEGIES = frozenset({"accept", "avoid", "mitigate", "transfer"})
+TREATMENT_STATUSES = frozenset({"planned", "in_progress", "complete", "deferred", "cancelled"})
 
 
 def list_risks(
@@ -109,6 +117,7 @@ def get_risk(session: Session, risk_id: str) -> RiskDetail:
         **item.model_dump(),
         statement=risk.statement,
         treatment_notes=None if treatment is None else treatment.notes,
+        treatment_updated_at=None if treatment is None else treatment.updated_at,
         evidence=[
             RelatedRecord(
                 id=evidence.human_id,
@@ -127,6 +136,87 @@ def get_risk(session: Session, risk_id: str) -> RiskDetail:
             for review in risk.reviews
         ],
     )
+
+
+def update_risk_treatment(
+    session: Session,
+    principal: AuthenticatedPrincipal,
+    risk_id: str,
+    patch: RiskTreatmentUpdate,
+) -> RiskDetail:
+    payload = patch.model_dump(exclude_unset=True)
+    expected = payload.pop("expected_updated_at", None)
+    if not payload:
+        raise ApiError(422, "validation_error", "At least one treatment field is required.")
+
+    risk = session.scalar(
+        select(Risk)
+        .where(Risk.human_id == risk_id)
+        .options(selectinload(Risk.treatments))
+        .with_for_update()
+    )
+    if risk is None:
+        raise not_found("Risk", risk_id)
+
+    treatment = _treatment(risk)
+    created = treatment is None
+    if treatment is None:
+        if "strategy" not in payload or "status" not in payload:
+            raise ApiError(
+                422,
+                "validation_error",
+                "Creating a treatment requires strategy and status.",
+            )
+        treatment = RiskTreatment(
+            risk_id=risk.id,
+            strategy=payload["strategy"],
+            status=payload["status"],
+            notes=payload.get("notes"),
+        )
+        session.add(treatment)
+        changed = sorted(payload.keys())
+    else:
+        if expected is not None:
+            current = treatment.updated_at
+            if current.tzinfo is None:
+                current = current.replace(tzinfo=UTC)
+            provided = expected
+            if provided.tzinfo is None:
+                provided = provided.replace(tzinfo=UTC)
+            if current != provided:
+                raise ApiError(
+                    409,
+                    "conflict",
+                    "The risk treatment was modified by another request.",
+                )
+        changed = []
+        for field in ("strategy", "status", "notes"):
+            if field not in payload:
+                continue
+            new_value = payload[field]
+            if getattr(treatment, field) != new_value:
+                setattr(treatment, field, new_value)
+                changed.append(field)
+        treatment.updated_at = datetime.now(UTC)
+
+    settings = get_settings()
+    record_audit_event(
+        session,
+        organization_id=risk.organization_id,
+        action="RISK_TREATMENT_UPDATE",
+        object_type="risk",
+        object_id=risk.human_id,
+        result="success",
+        actor_user_id=principal.user_id,
+        actor_label=principal.human_id,
+        environment_name=settings.app_env,
+        detail=(
+            f"{'Created' if created else 'Updated'} treatment fields: "
+            f"{', '.join(changed) if changed else 'none'}."
+        ),
+    )
+    session.commit()
+    return get_risk(session, risk_id)
 
 
 def _list_item(risk: Risk) -> RiskListItem:

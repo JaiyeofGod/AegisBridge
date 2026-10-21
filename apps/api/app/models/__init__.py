@@ -56,6 +56,7 @@ from app.models.incident import (
 from app.models.integration import Integration, SyncJob, SyncState
 from app.models.organization import BusinessProcess, Department, Organization
 from app.models.policy import Policy, PolicyAcknowledgement, PolicyVersion
+from app.models.preferences import UserPreferences
 from app.models.report import ReportDefinition
 from app.models.risk import Risk, RiskAssessment, RiskReview, RiskTreatment
 from app.models.soc import AlertReference, Investigation
@@ -143,6 +144,7 @@ __all__ = [
     "ThreatIntelSource",
     "User",
     "UserCredential",
+    "UserPreferences",
     "UserRole",
     "ValidationRun",
     "Vendor",

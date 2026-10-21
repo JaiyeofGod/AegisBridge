@@ -1,6 +1,6 @@
 # Domain model
 
-Phase 2 relational foundation. SQLAlchemy models live in `apps/api/app/models/`. Domain tables are `migrations/versions/20261020_0002_add_domain_schema.py`. Threat-intelligence tables and `integrations.human_id` are `migrations/versions/20261020_0003_add_threat_intel.py`. Report definitions and dataset registry metadata are `migrations/versions/20261020_0004_add_reports_and_dataset_metadata.py`. Cyber-range catalog tables and detection metadata columns are `migrations/versions/20261020_0005_add_cyber_range_catalog.py`. Local credentials and sessions are `migrations/versions/20261020_0006_add_auth_sessions.py`. Development rows are loaded by `python -m app.db.seed` and are not part of the migration.
+Phase 2 relational foundation. SQLAlchemy models live in `apps/api/app/models/`. Domain tables are `migrations/versions/20261020_0002_add_domain_schema.py`. Threat-intelligence tables and `integrations.human_id` are `migrations/versions/20261020_0003_add_threat_intel.py`. Report definitions and dataset registry metadata are `migrations/versions/20261020_0004_add_reports_and_dataset_metadata.py`. Cyber-range catalog tables and detection metadata columns are `migrations/versions/20261020_0005_add_cyber_range_catalog.py`. Local credentials and sessions are `migrations/versions/20261020_0006_add_auth_sessions.py`. CSRF digests and `user_preferences` are `migrations/versions/20261020_0007_add_csrf_and_user_preferences.py`. Development rows are loaded by `python -m app.db.seed` and are not part of the migration.
 
 Internal primary keys are UUIDs. Operational records also have a unique `human_id`. Closed value sets are strings with check constraints. There is no combined vulnerability score.
 
@@ -10,7 +10,8 @@ Internal primary keys are UUIDs. Operational records also have a unique `human_i
 |---|---|---|
 | Organization | Tenant, departments, business processes | Workspace display name from the UI |
 | Identity | Users, role catalog, permission labels, entitlements, access reviews | Machine/API credentials (`api_credentials` deferred) |
-| Auth | `user_credentials` (Argon2id hashes), `sessions` (token digests only) | Raw session tokens, plaintext passwords, MFA secrets |
+| Auth | `user_credentials` (Argon2id hashes), `sessions` (token + CSRF digests only) | Raw session/CSRF tokens, plaintext passwords, MFA secrets |
+| Preferences | `user_preferences` (theme, density, landing_page, reduced_motion) | Server-side theme application |
 | Assets | Inventory, software, data-asset relationships, criticality, exposure | Vulnerability findings |
 | Risk | Likelihood, impact, generated score, treatment, reviews | CVSS, EPSS, KEV, SSVC |
 | GRC | Framework versions, controls, mappings, implementations, tests | Control findings |

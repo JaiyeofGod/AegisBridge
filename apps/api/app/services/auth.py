@@ -13,6 +13,7 @@ from app.models.auth import AuthSession, UserCredential
 from app.models.identity import User, UserRole
 from app.models.organization import Organization
 from app.schemas.auth import CurrentUser, SessionStatus
+from app.security.csrf import digest_csrf_token, generate_csrf_token
 from app.security.passwords import hash_password, needs_rehash, verify_password_or_dummy
 from app.security.rbac import (
     AuthenticatedPrincipal,
@@ -47,8 +48,11 @@ def authenticate_and_create_session(
     user_agent: str | None,
     client_host: str | None,
     settings: Settings | None = None,
-) -> tuple[str, AuthSession, CurrentUser]:
-    """Verify credentials and create a server session. Returns (raw_token, row, user)."""
+) -> tuple[str, AuthSession, CurrentUser, str]:
+    """Verify credentials and create a session.
+
+    Returns ``(raw_session_token, row, user, csrf_token)``.
+    """
     cfg = settings or get_settings()
     normalized = normalize_email(email)
     user = session.scalar(
@@ -96,11 +100,13 @@ def authenticate_and_create_session(
         credential.password_hash = hash_password(password)
 
     raw_token = generate_session_token()
+    csrf_token = generate_csrf_token()
     now = datetime.now(UTC)
     auth_session = AuthSession(
         human_id=new_session_human_id(),
         user_id=user.id,
         token_digest=digest_session_token(raw_token),
+        csrf_token_digest=digest_csrf_token(csrf_token),
         created_at=now,
         expires_at=session_expiry(cfg, now=now),
         last_seen_at=now,
@@ -122,7 +128,26 @@ def authenticate_and_create_session(
     )
     session.commit()
     session.refresh(auth_session)
-    return raw_token, auth_session, to_current_user(user)
+    return raw_token, auth_session, to_current_user(user), csrf_token
+
+
+def issue_csrf_token(session: Session, *, principal: AuthenticatedPrincipal) -> str:
+    """Rotate the synchronizer CSRF token for the caller's active session."""
+    auth_session = session.scalar(
+        select(AuthSession).where(AuthSession.human_id == principal.session_human_id)
+    )
+    if auth_session is None or auth_session.revoked_at is not None:
+        raise ApiError(401, "unauthenticated", "Authentication is required.")
+    now = datetime.now(UTC)
+    expires = auth_session.expires_at
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=UTC)
+    if expires <= now:
+        raise ApiError(401, "unauthenticated", "Authentication is required.")
+    raw = generate_csrf_token()
+    auth_session.csrf_token_digest = digest_csrf_token(raw)
+    session.commit()
+    return raw
 
 
 def logout_session(

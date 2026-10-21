@@ -1,12 +1,13 @@
-"""Authenticated account reads for the current user."""
+"""Authenticated account reads and preference writes for the current user."""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Response
 
-from app.api.deps import CurrentPrincipal, DbSession
+from app.api.deps import CurrentPrincipal, DbSession, RequireCsrf
 from app.schemas.account import (
     AccountPreferences,
+    AccountPreferencesUpdate,
     AccountProfile,
     AccountSecurity,
     AccountWorkspace,
@@ -39,10 +40,24 @@ def read_security(
 
 
 @router.get("/preferences", response_model=AccountPreferences)
-def read_preferences(response: Response, principal: CurrentPrincipal) -> AccountPreferences:
-    _ = principal
+def read_preferences(
+    response: Response,
+    session: DbSession,
+    principal: CurrentPrincipal,
+) -> AccountPreferences:
     _no_store(response)
-    return account_service.get_preferences()
+    return account_service.get_preferences(session, principal)
+
+
+@router.patch("/preferences", response_model=AccountPreferences)
+def patch_preferences(
+    body: AccountPreferencesUpdate,
+    response: Response,
+    session: DbSession,
+    principal: RequireCsrf,
+) -> AccountPreferences:
+    _no_store(response)
+    return account_service.update_preferences(session, principal, body)
 
 
 @router.get("/workspace", response_model=AccountWorkspace)

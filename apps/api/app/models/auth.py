@@ -54,5 +54,6 @@ class AuthSession(UUIDMixin, Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     user_agent: Mapped[str | None] = mapped_column(String(300))
     client_host: Mapped[str | None] = mapped_column(String(64))
+    csrf_token_digest: Mapped[str | None] = mapped_column(String(64))
 
     user: Mapped[User] = relationship()
