@@ -1,8 +1,8 @@
 # AegisBridge Project Status
 
 **Last updated:** October 20, 2026  
-**Current phase:** Phase 2 — read-only API contracts + frontend auth session wiring  
-**Next:** Backend domain authorization enforcement on GET/write routes (frontend guards are UX only). MFA, SSO, password reset, and CSRF-protected writes remain out of scope until authorized.
+**Current phase:** Phase 2 — read-only API contracts + auth session + domain GET RBAC enforcement  
+**Next:** CSRF-protected authenticated writes (when authorized). MFA, SSO, password reset, and rate limiting remain out of scope until authorized. Frontend guards stay UX only.
 
 ---
 
@@ -17,8 +17,8 @@
 | Application code | API domain schema + web UI on local mocks |
 | Domain schema | Through `20261020_0005` including cyber-range catalog tables |
 | Read API | `/api/v1` through reports, datasets, experiments, and cyber-range |
-| Authentication | Backend sessions + frontend wiring: login/logout/session/me, account reads, SPA route guards (UX only) |
-| Write API | Not started |
+| Authentication | Sessions + frontend wiring; domain GET routes enforce permissions server-side |
+| Write API | Not started (deferred until CSRF) |
 | Frontend API connection | Overview through Reports, Cyber Range, Account, and sign-in/session |
 | Package installs | API via uv; web via pnpm (`apps/web`) |
 | Cyber range | Not started |

@@ -1,8 +1,8 @@
 """Read-only cyber-range catalog. No remote control or inbound lab management."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from app.api.deps import DbSession, PageQuery
+from app.api.deps import DbSession, PageQuery, require_permissions
 from app.schemas.common import ErrorBody, Page
 from app.schemas.cyber_range import (
     CyberRangeSummary,
@@ -16,7 +16,11 @@ from app.schemas.cyber_range import (
 )
 from app.services import cyber_range as service
 
-router = APIRouter(prefix="/cyber-range", tags=["cyber-range"])
+router = APIRouter(
+    prefix="/cyber-range",
+    tags=["cyber-range"],
+    dependencies=[Depends(require_permissions("cyber_range.read"))],
+)
 
 
 @router.get("/summary", response_model=CyberRangeSummary)

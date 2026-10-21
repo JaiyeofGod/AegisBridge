@@ -1,6 +1,6 @@
 # API contracts
 
-Base path: `/api/v1`. Domain GET routes read the Phase 2 tables and remain **unauthenticated** until the frontend auth wiring slice. Authentication and Account routes require a server session cookie. No SSO, MFA enrollment, email delivery, or remote lab control.
+Base path: `/api/v1`. Domain GET routes require an authenticated session cookie and capability-based permissions (see `docs/security/AUTHENTICATION_AND_RBAC.md`). Health and `POST /auth/login` / `GET /auth/session` remain public. No SSO, MFA enrollment, email delivery, CSRF-protected domain writes, or remote lab control.
 
 Human-readable IDs are the public identifiers (`AST-0007`, `RISK-0021`, `VULN-0041`, `AL-0107`, `INC-0001`, `USR-0001`). Internal UUIDs are not returned. Timestamps are ISO 8601. Absent values are JSON `null`. Details: `docs/security/AUTHENTICATION_AND_RBAC.md`.
 
@@ -27,9 +27,11 @@ Login body: `{ "email", "password" }`. Responses never include password hashes, 
 
 ## Domain read endpoints
 
+All domain rows require a valid session (`401` otherwise) and the permission listed in `AUTHENTICATION_AND_RBAC.md` (`403` when missing). Overview is authenticated-only; response sections are filtered by the caller's effective permissions.
+
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/overview` | Separate counts. No security score. |
+| GET | `/overview` | Separate counts. No security score. Permission-filtered sections. |
 | GET | `/assets` | Filters: `search`, `asset_type`, `criticality`, `environment`, `telemetry_status` |
 | GET | `/assets/{asset_id}` | Vulnerabilities, alerts, risks, controls, and evidence summaries |
 | GET | `/risks` | Filters: `search`, `risk_level`, `treatment_status`, `owner` |

@@ -358,7 +358,8 @@ def test_empty_dev_password_does_not_create_credential(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("APP_ENV", "test")
-    monkeypatch.delenv("AEGIS_DEV_ADMIN_PASSWORD", raising=False)
+    # Empty string must win over a repo-root `.env` value after cache clear.
+    monkeypatch.setenv("AEGIS_DEV_ADMIN_PASSWORD", "")
     get_settings.cache_clear()
     hash_calls: list[str] = []
     monkeypatch.setattr(

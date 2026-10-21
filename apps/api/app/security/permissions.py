@@ -1,6 +1,7 @@
 """Deterministic permission catalog and seven-role mapping.
 
-Capability codes are the authorization source of truth for upcoming enforcement.
+Capability codes are the authorization source of truth for domain route
+enforcement via ``require_permissions`` / ``require_any_permission``.
 `access_entitlements` remain stored labels aligned to this catalog; they are not
 an independent policy engine.
 """

@@ -1,13 +1,15 @@
 """Read-only report definition contracts."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from app.api.deps import DbSession, PageQuery
+from app.api.deps import DbSession, PageQuery, require_permissions
 from app.schemas.common import ErrorBody, Page
 from app.schemas.reports import ReportDefinitionDetail, ReportDefinitionListItem, ReportsSummary
 from app.services.reports import get_definition, get_summary, list_definitions
 
-router = APIRouter(prefix="/reports", tags=["reports"])
+router = APIRouter(
+    prefix="/reports", tags=["reports"], dependencies=[Depends(require_permissions("report.read"))]
+)
 
 
 @router.get("/summary", response_model=ReportsSummary)

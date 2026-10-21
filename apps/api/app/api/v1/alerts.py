@@ -1,13 +1,15 @@
 """Read-only alert references."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from app.api.deps import DbSession, PageQuery
+from app.api.deps import DbSession, PageQuery, require_permissions
 from app.schemas.alerts import AlertDetail, AlertListItem
 from app.schemas.common import ErrorBody, Page
 from app.services.alerts import get_alert, list_alerts
 
-router = APIRouter(prefix="/alerts", tags=["alerts"])
+router = APIRouter(
+    prefix="/alerts", tags=["alerts"], dependencies=[Depends(require_permissions("alert.read"))]
+)
 
 
 @router.get("", response_model=Page[AlertListItem])

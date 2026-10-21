@@ -1,13 +1,17 @@
 """Read-only incidents."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from app.api.deps import DbSession, PageQuery
+from app.api.deps import DbSession, PageQuery, require_permissions
 from app.schemas.common import ErrorBody, Page
 from app.schemas.incidents import IncidentDetail, IncidentListItem
 from app.services.incidents import get_incident, list_incidents
 
-router = APIRouter(prefix="/incidents", tags=["incidents"])
+router = APIRouter(
+    prefix="/incidents",
+    tags=["incidents"],
+    dependencies=[Depends(require_permissions("incident.read"))],
+)
 
 
 @router.get("", response_model=Page[IncidentListItem])

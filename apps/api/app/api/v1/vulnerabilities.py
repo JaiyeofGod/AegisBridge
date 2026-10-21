@@ -1,13 +1,17 @@
 """Read-only vulnerabilities."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from app.api.deps import DbSession, PageQuery
+from app.api.deps import DbSession, PageQuery, require_permissions
 from app.schemas.common import ErrorBody, Page
 from app.schemas.vulnerabilities import VulnerabilityDetail, VulnerabilityListItem
 from app.services.vulnerabilities import get_vulnerability, list_vulnerabilities
 
-router = APIRouter(prefix="/vulnerabilities", tags=["vulnerabilities"])
+router = APIRouter(
+    prefix="/vulnerabilities",
+    tags=["vulnerabilities"],
+    dependencies=[Depends(require_permissions("vulnerability.read"))],
+)
 
 
 @router.get(

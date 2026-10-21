@@ -1,6 +1,6 @@
 # Authentication and RBAC
 
-**Status:** Backend foundation (Phase 2). Frontend wiring, SSO/OIDC, MFA, email reset, and global route enforcement are deferred.
+**Status:** Backend authentication and **domain read authorization are enforced**. Frontend route guards remain UX only. SSO/OIDC, MFA, email reset, rate limiting, and CSRF-protected authenticated writes are deferred.
 
 ## Authentication model
 
@@ -87,7 +87,7 @@ Capability codes live in `app/security/permissions.py` (`PERMISSION_CATALOG`). T
 
 `risk.accept`, `control.update`, `evidence.download`, `incident.close`, `integration.manage`, `user.role.manage`, `detection.manage`
 
-plus domain `.read` / `.manage` capabilities used for upcoming enforcement.
+plus domain `.read` / `.manage` capabilities enforced on current read routes.
 
 Effective permissions for a principal are the **union** of permissions for their assigned roles from `ROLE_PERMISSIONS`. Stored `access_entitlements` remain labels aligned to the catalog; they are not a second policy engine.
 
@@ -131,34 +131,48 @@ Preferences return explicit **defaults** with `persistence: not_stored` (no pref
 
 ## Current API enforcement
 
-**Existing domain read APIs remain unauthenticated** so the current frontend continues to work until sign-in wiring lands.
+**Backend authorization is the security boundary.** Frontend route guards are UX only.
 
-Protected now:
+Public (no session):
 
-- `/api/v1/auth/me`, `/api/v1/auth/logout-all`
+- `/api/v1/health`, `/api/v1/health/live`, `/api/v1/health/ready`
+- `POST /api/v1/auth/login`
+- `GET /api/v1/auth/session` (reports anonymous or authenticated state)
+
+Authenticated session required (401 without a valid cookie):
+
+- `/api/v1/auth/me`, `/api/v1/auth/logout`, `/api/v1/auth/logout-all`
 - `/api/v1/account/*`
+- All domain read routes below
 
-### Authorization matrix (next enforcement phase)
+### Authorization matrix (enforced)
 
-| Area | Intended permission(s) | Enforced now |
+| Area | Required permission(s) | Enforced |
 |---|---|---|
-| Overview | authenticated (any role) | No |
-| Assets | `asset.read` | No |
-| Risks | `risk.read` (+ `risk.accept` / `risk.manage` for writes later) | No |
-| Controls / governance | `control.read` (+ manage/update for writes) | No |
-| Evidence | `evidence.read` (+ manage/download for writes) | No |
-| Vulnerabilities | `vulnerability.read` (+ manage for writes) | No |
-| Alerts | `alert.read` | No |
-| Detections | `detection.read` (+ manage for writes) | No |
-| Incidents | `incident.read` (+ manage/close for writes) | No |
-| Threat intelligence | `threat_intel.read` | No |
-| Reports | `report.read` (+ manage for writes) | No |
-| Datasets / experiments | `dataset.read` (+ manage for writes) | No |
-| Cyber range | `cyber_range.read` | No |
-| Administration reads | `administration.read` / `audit.read` / `integration.read` | No |
-| Administration writes / role assignment | `administration.manage`, `user.role.manage`, `integration.manage` | No |
-| Auth session/me | authenticated | Yes (`/me`) |
+| Overview | Authenticated session (any role). Sections omit data the caller lacks `*.read` for. | Yes |
+| Assets | `asset.read` | Yes |
+| Risks | `risk.read` (+ `risk.accept` / `risk.manage` for writes later) | Yes (read) |
+| Controls / governance | `control.read` (+ manage/update for writes later) | Yes (read) |
+| Evidence | `evidence.read` (+ manage/download for writes later) | No dedicated list route yet |
+| Vulnerabilities | `vulnerability.read` (+ manage for writes later) | Yes (read) |
+| Alerts | `alert.read` | Yes |
+| Detections | `detection.read` (+ manage for writes later) | No dedicated list route yet |
+| Incidents | `incident.read` (+ manage/close for writes later) | Yes (read) |
+| Threat intelligence | `threat_intel.read` | Yes |
+| Reports | `report.read` (+ manage for writes later) | Yes (read) |
+| Datasets / experiments | `dataset.read` (+ manage for writes later) | Yes (read) |
+| Cyber range | `cyber_range.read` | Yes (read-only; no execution) |
+| Administration summary/users/roles/access-reviews | `administration.read` | Yes |
+| Administration integrations | `administration.read` **and** `integration.read` | Yes |
+| Administration audit events | `administration.read` **and** `audit.read` | Yes |
+| Administration writes / role assignment | `administration.manage`, `user.role.manage`, `integration.manage` | No (writes deferred; need CSRF) |
+| Auth session/me | authenticated (`/me`); `/session` public | Yes |
 | Account | authenticated | Yes |
+
+**401** = no valid session (missing, revoked, expired, or inactive user).  
+**403** = authenticated session without the required permission(s). Error bodies use `code: forbidden` without listing missing capability codes.
+
+Authenticated **domain writes** remain deferred until CSRF protection is implemented.
 
 ## Audit behavior
 
@@ -187,7 +201,6 @@ Never commit the real password. Production must not rely on this variable.
 - MFA/TOTP
 - Password reset email flows
 - SSO/OIDC
-- Enforce the authorization matrix on domain routes
 - Hosted HTTPS + Secure cookies + HSTS
 - Session fixation / concurrent session policy review
 - Secrets rotation for `SESSION_SECRET`

@@ -1,13 +1,17 @@
 """Read-only dataset registry contracts."""
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
-from app.api.deps import DbSession, PageQuery
+from app.api.deps import DbSession, PageQuery, require_permissions
 from app.schemas.common import ErrorBody, Page
 from app.schemas.datasets import DatasetDetail, DatasetListItem
 from app.services.datasets import get_dataset, list_datasets
 
-router = APIRouter(prefix="/datasets", tags=["datasets"])
+router = APIRouter(
+    prefix="/datasets",
+    tags=["datasets"],
+    dependencies=[Depends(require_permissions("dataset.read"))],
+)
 
 
 @router.get("", response_model=Page[DatasetListItem])

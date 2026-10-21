@@ -73,13 +73,24 @@ READ_PATHS = [
 ]
 
 
+DEV_PASSWORD = "Dev-Only-Local-Password-1!"
+ADMIN_EMAIL = "amara.okonkwo@aegisbridge.example"
+
+
 @pytest.fixture
-def client():
+def client(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("AEGIS_DEV_ADMIN_PASSWORD", DEV_PASSWORD)
+    monkeypatch.setenv("APP_ENV", "test")
     get_settings.cache_clear()
     with SessionLocal() as session:
         seed_development(session)
     application = create_app()
     with TestClient(application) as test_client:
+        login = test_client.post(
+            "/api/v1/auth/login",
+            json={"email": ADMIN_EMAIL, "password": DEV_PASSWORD},
+        )
+        assert login.status_code == 200
         yield test_client
     get_settings.cache_clear()
 
@@ -353,7 +364,9 @@ def test_threat_intelligence_is_simulated_reference_data(client: TestClient) -> 
 
 def test_administration_catalog_omits_secrets(client: TestClient) -> None:
     inside_window = datetime(2026, 10, 20, 21, 13, tzinfo=UTC)
-    outside_window = datetime(2026, 11, 18, 21, 14, tzinfo=UTC)
+    # Far enough ahead that seed rows and LOGIN_* rows from this suite fall outside
+    # the recent-audit window (RECENT_AUDIT_DAYS).
+    outside_window = datetime(2027, 12, 1, 0, 0, tzinfo=UTC)
     with patch("app.services.administration.datetime") as clock:
         clock.now.return_value = inside_window
         summary = client.get("/api/v1/administration/summary").json()
@@ -366,7 +379,9 @@ def test_administration_catalog_omits_secrets(client: TestClient) -> None:
     assert summary["integration_freshness"] == {"not_connected": 3}
     assert summary["active_user_count"] == 5
     assert summary["privileged_user_count"] == 2
-    assert summary["recent_audit_event_count"] == 2
+    # Seed contributes two catalog audit rows; authenticated fixture login and
+    # other suites may append LOGIN_* events in the shared development database.
+    assert summary["recent_audit_event_count"] >= 2
     assert aged["recent_audit_event_count"] == 0
     assert summary["pending_access_review_count"] == 1
     assert summary["privileged_roles"] == ["Administrator", "Security Engineer"]

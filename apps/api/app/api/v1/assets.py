@@ -1,13 +1,15 @@
 """Read-only assets."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from app.api.deps import DbSession, PageQuery
+from app.api.deps import DbSession, PageQuery, require_permissions
 from app.schemas.assets import AssetDetail, AssetListItem
 from app.schemas.common import ErrorBody, Page
 from app.services.assets import get_asset, list_assets
 
-router = APIRouter(prefix="/assets", tags=["assets"])
+router = APIRouter(
+    prefix="/assets", tags=["assets"], dependencies=[Depends(require_permissions("asset.read"))]
+)
 
 
 @router.get("", response_model=Page[AssetListItem])

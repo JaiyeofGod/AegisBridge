@@ -28,6 +28,7 @@ from app.schemas.overview import (
     TelemetryPosture,
     WorkItem,
 )
+from app.security.rbac import AuthenticatedPrincipal
 from app.services.support import ACTIVE_TELEMETRY, CLOSED_INCIDENT, person
 
 KEV_SEMANTICS = (
@@ -43,29 +44,107 @@ TELEMETRY_SEMANTICS = (
     "reference_only and not_connected are absences, not healthy agents."
 )
 
+_WORK_KIND_PERMISSION = {
+    "remediation": "vulnerability.read",
+    "risk": "risk.read",
+    "incident": "incident.read",
+    "investigation": "alert.read",
+    "access_review": "administration.read",
+}
 
-def get_overview(session: Session) -> OverviewResponse:
+
+def get_overview(session: Session, principal: AuthenticatedPrincipal) -> OverviewResponse:
     organization = session.scalar(select(Organization).order_by(Organization.name))
-    exposed_assets, cve_ids = _kev_exposure(session)
+    can_vuln = principal.has_permission("vulnerability.read")
+    can_incident = principal.has_permission("incident.read")
+    can_control = principal.has_permission("control.read")
+    can_asset = principal.has_permission("asset.read")
+    can_alert = principal.has_permission("alert.read")
+    can_integration = principal.has_permission("integration.read")
+
+    exposed_assets: list[str] = []
+    cve_ids: list[str] = []
+    if can_vuln:
+        exposed_assets, cve_ids = _kev_exposure(session)
+
     return OverviewResponse(
         generated_at=datetime.now(UTC),
         organization_name=None if organization is None else organization.name,
         data_origin=None if organization is None else organization.data_origin,
         environment_label=None if organization is None else organization.environment_label,
-        kev_exposure=KevExposure(
-            exposed_asset_count=len(exposed_assets),
-            distinct_cve_count=len(cve_ids),
-            asset_ids=exposed_assets,
-            cve_ids=cve_ids,
-            semantics=KEV_SEMANTICS,
+        kev_exposure=(
+            KevExposure(
+                exposed_asset_count=len(exposed_assets),
+                distinct_cve_count=len(cve_ids),
+                asset_ids=exposed_assets,
+                cve_ids=cve_ids,
+                semantics=KEV_SEMANTICS,
+            )
+            if can_vuln
+            else KevExposure(
+                exposed_asset_count=0,
+                distinct_cve_count=0,
+                asset_ids=[],
+                cve_ids=[],
+                semantics=KEV_SEMANTICS,
+            )
         ),
-        open_incidents=_open_incident_count(session),
-        control_posture=_control_posture(session),
-        telemetry=_telemetry(session),
-        my_work=_my_work(session),
-        security_highlights=_highlights(session, exposed_assets, cve_ids),
-        executive_notes=_executive_notes(session, organization),
+        open_incidents=_open_incident_count(session) if can_incident else 0,
+        control_posture=(
+            _control_posture(session)
+            if can_control
+            else ControlPosture(passed=0, assessed_applicable=0, semantics=CONTROL_SEMANTICS)
+        ),
+        telemetry=(
+            _telemetry(session)
+            if can_asset
+            else TelemetryPosture(active=0, expected=0, semantics=TELEMETRY_SEMANTICS)
+        ),
+        my_work=_filter_work(_my_work(session), principal),
+        security_highlights=_filter_highlights(
+            _highlights(session, exposed_assets, cve_ids, include_alerts=can_alert),
+            can_vuln=can_vuln,
+            can_alert=can_alert,
+            can_incident=can_incident,
+        ),
+        executive_notes=_executive_notes(
+            session,
+            organization,
+            include_wazuh=can_integration,
+            include_coverage=can_control,
+        ),
     )
+
+
+def _filter_work(items: list[WorkItem], principal: AuthenticatedPrincipal) -> list[WorkItem]:
+    filtered: list[WorkItem] = []
+    for item in items:
+        required = _WORK_KIND_PERMISSION.get(item.kind)
+        if required is None or principal.has_permission(required):
+            filtered.append(item)
+    return filtered
+
+
+def _filter_highlights(
+    notes: list[SummaryNote],
+    *,
+    can_vuln: bool,
+    can_alert: bool,
+    can_incident: bool,
+) -> list[SummaryNote]:
+    kept: list[SummaryNote] = []
+    for note in notes:
+        if note.id == "kev-exposure":
+            if can_vuln:
+                kept.append(note)
+            continue
+        if note.id == "telemetry-not-connected":
+            if can_alert:
+                kept.append(note)
+            continue
+        if can_incident:
+            kept.append(note)
+    return kept
 
 
 def _kev_exposure(session: Session) -> tuple[list[str], list[str]]:
@@ -194,7 +273,13 @@ def _my_work(session: Session) -> list[WorkItem]:
     return items
 
 
-def _highlights(session: Session, asset_ids: list[str], cve_ids: list[str]) -> list[SummaryNote]:
+def _highlights(
+    session: Session,
+    asset_ids: list[str],
+    cve_ids: list[str],
+    *,
+    include_alerts: bool,
+) -> list[SummaryNote]:
     notes: list[SummaryNote] = []
     if asset_ids and cve_ids:
         notes.append(
@@ -207,18 +292,19 @@ def _highlights(session: Session, asset_ids: list[str], cve_ids: list[str]) -> l
                 ),
             )
         )
-    alert_count = session.scalar(select(func.count()).select_from(AlertReference)) or 0
-    if alert_count:
-        notes.append(
-            SummaryNote(
-                id="telemetry-not-connected",
-                title="Alert references are not a live Wazuh feed",
-                detail=(
-                    "Stored alert rows are selected metadata. "
-                    "telemetry_source not_connected means Wazuh was not queried."
-                ),
+    if include_alerts:
+        alert_count = session.scalar(select(func.count()).select_from(AlertReference)) or 0
+        if alert_count:
+            notes.append(
+                SummaryNote(
+                    id="telemetry-not-connected",
+                    title="Alert references are not a live Wazuh feed",
+                    detail=(
+                        "Stored alert rows are selected metadata. "
+                        "telemetry_source not_connected means Wazuh was not queried."
+                    ),
+                )
             )
-        )
     incident = session.scalar(select(Incident).order_by(Incident.human_id))
     if incident is not None:
         notes.append(
@@ -231,14 +317,16 @@ def _highlights(session: Session, asset_ids: list[str], cve_ids: list[str]) -> l
     return notes
 
 
-def _executive_notes(session: Session, organization: Organization | None) -> list[SummaryNote]:
+def _executive_notes(
+    session: Session,
+    organization: Organization | None,
+    *,
+    include_wazuh: bool,
+    include_coverage: bool,
+) -> list[SummaryNote]:
     origin = "unknown" if organization is None else organization.data_origin
     environment = "unspecified" if organization is None else organization.environment_label
-    integration = session.scalar(select(Integration).where(Integration.name == "Wazuh"))
-    wazuh_status = "not_recorded" if integration is None else integration.status
-    control_count = session.scalar(select(func.count()).select_from(Control)) or 0
-    finding_count = session.scalar(select(func.count()).select_from(AccessReviewFinding)) or 0
-    return [
+    notes = [
         SummaryNote(
             id="data-origin",
             title="Data origin",
@@ -252,20 +340,31 @@ def _executive_notes(session: Session, organization: Organization | None) -> lis
                 "It is an internal AegisBridge method, not a combined security score."
             ),
         ),
-        SummaryNote(
-            id="wazuh",
-            title="Wazuh",
-            detail=(
-                f"Integration status is {wazuh_status}. "
-                "No connector credentials are returned by this API."
-            ),
-        ),
-        SummaryNote(
-            id="coverage",
-            title="Record coverage",
-            detail=(
-                f"{control_count} control record(s) and {finding_count} access-review "
-                "finding(s) are stored. Empty sections are absences, not healthy zeros."
-            ),
-        ),
     ]
+    if include_wazuh:
+        integration = session.scalar(select(Integration).where(Integration.name == "Wazuh"))
+        wazuh_status = "not_recorded" if integration is None else integration.status
+        notes.append(
+            SummaryNote(
+                id="wazuh",
+                title="Wazuh",
+                detail=(
+                    f"Integration status is {wazuh_status}. "
+                    "No connector credentials are returned by this API."
+                ),
+            )
+        )
+    if include_coverage:
+        control_count = session.scalar(select(func.count()).select_from(Control)) or 0
+        finding_count = session.scalar(select(func.count()).select_from(AccessReviewFinding)) or 0
+        notes.append(
+            SummaryNote(
+                id="coverage",
+                title="Record coverage",
+                detail=(
+                    f"{control_count} control record(s) and {finding_count} access-review "
+                    "finding(s) are stored. Empty sections are absences, not healthy zeros."
+                ),
+            )
+        )
+    return notes

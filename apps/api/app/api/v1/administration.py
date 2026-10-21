@@ -1,8 +1,8 @@
 """Read-only administration contracts. No credentials are returned."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from app.api.deps import DbSession, PageQuery
+from app.api.deps import DbSession, PageQuery, require_permissions
 from app.schemas.administration import (
     AccessReviewItem,
     AdministrationSummary,
@@ -21,7 +21,11 @@ from app.services.administration import (
     list_users,
 )
 
-router = APIRouter(prefix="/administration", tags=["administration"])
+router = APIRouter(
+    prefix="/administration",
+    tags=["administration"],
+    dependencies=[Depends(require_permissions("administration.read"))],
+)
 
 
 @router.get("/summary", response_model=AdministrationSummary)
@@ -29,7 +33,11 @@ def read_summary(session: DbSession) -> AdministrationSummary:
     return get_summary(session)
 
 
-@router.get("/integrations", response_model=Page[IntegrationListItem])
+@router.get(
+    "/integrations",
+    response_model=Page[IntegrationListItem],
+    dependencies=[Depends(require_permissions("integration.read"))],
+)
 def read_integrations(session: DbSession, page: PageQuery) -> Page[IntegrationListItem]:
     return list_integrations(session, page)
 
@@ -44,7 +52,11 @@ def read_roles(session: DbSession, page: PageQuery) -> Page[RoleListItem]:
     return list_roles(session, page)
 
 
-@router.get("/audit-events", response_model=Page[AuditEventItem])
+@router.get(
+    "/audit-events",
+    response_model=Page[AuditEventItem],
+    dependencies=[Depends(require_permissions("audit.read"))],
+)
 def read_audit_events(session: DbSession, page: PageQuery) -> Page[AuditEventItem]:
     return list_audit_events(session, page)
 

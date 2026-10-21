@@ -1,8 +1,8 @@
 """Read-only threat-intelligence contracts."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from app.api.deps import DbSession, PageQuery
+from app.api.deps import DbSession, PageQuery, require_permissions
 from app.schemas.common import ErrorBody, Page
 from app.schemas.threat_intel import (
     AdvisoryListItem,
@@ -19,7 +19,11 @@ from app.services.threat_intel import (
     list_sources,
 )
 
-router = APIRouter(prefix="/threat-intelligence", tags=["threat-intelligence"])
+router = APIRouter(
+    prefix="/threat-intelligence",
+    tags=["threat-intelligence"],
+    dependencies=[Depends(require_permissions("threat_intel.read"))],
+)
 
 
 @router.get("/summary", response_model=ThreatIntelSummary)
