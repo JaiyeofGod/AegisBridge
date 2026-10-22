@@ -250,7 +250,7 @@ def test_governance_summary_omits_licensed_text(client: TestClient) -> None:
     assert body["evidence_freshness"]["with_sha256"] >= 1
     assert body["assessment_work"]["tests_recorded"] >= 0
     assert body["policies"][0]["id"] == "POL-0001"
-    assert body["policies"][0]["status"] == "draft"
+    assert body["policies"][0]["status"] == "published"
     assert body["access_reviews"][0]["id"] == "ARV-0001"
     assert body["access_reviews"][0]["open_findings"] == 1
     assert_safe(body)
@@ -444,11 +444,18 @@ def test_administration_catalog_omits_secrets(client: TestClient) -> None:
     assert "asset.read" in by_role["Read Only"]["permissions"]
     assert_safe(roles)
 
-    audits = client.get(
-        "/api/v1/administration/audit-events",
-        params={"page_size": 100},
-    ).json()
-    by_audit = {item["id"]: item for item in audits["items"]}
+    audit_items: list[dict] = []
+    page_num = 1
+    while True:
+        audits = client.get(
+            "/api/v1/administration/audit-events",
+            params={"page": page_num, "page_size": 100},
+        ).json()
+        audit_items.extend(audits["items"])
+        if len(audit_items) >= audits["total"] or not audits["items"]:
+            break
+        page_num += 1
+    by_audit = {item["id"]: item for item in audit_items}
     assert {"AUD-0001", "AUD-0002"} <= set(by_audit)
     assert by_audit["AUD-0002"]["actor"]["id"] == "USR-0001"
     assert by_audit["AUD-0002"]["action"] == "Recorded Security Engineer catalog role"

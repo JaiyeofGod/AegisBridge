@@ -598,14 +598,16 @@ def seed_development(session: Session) -> None:
         owner_user_id=users["USR-0003"].id,
         human_id="POL-0001",
         title="Access control policy",
-        status="draft",
+        status="published",
     )
     session.add(policy)
     session.flush()
     version = PolicyVersion(
         policy_id=policy.id,
-        version_label="0.1",
-        body_summary="Simulated policy summary. Full text is not stored.",
+        version_label="1.0",
+        body_summary="Simulated access control policy summary. Development seeded text only.",
+        change_summary="Initial published seed version.",
+        status="published",
         is_current=True,
     )
     session.add(version)
@@ -856,6 +858,36 @@ def _ensure_contract_records(session: Session, org: Organization) -> None:
     detections = _ensure_lab_detections(session, org)
     systems = _ensure_lab_zones_and_systems(session, org)
     _ensure_lab_scenarios(session, org, systems, detections)
+    _ensure_policy_seed_shape(session, org)
+
+
+def _ensure_policy_seed_shape(session: Session, org: Organization) -> None:
+    """Align POL-0001 with published lifecycle semantics used by acknowledgement demos."""
+    policy = session.scalar(
+        select(Policy)
+        .options(selectinload(Policy.versions))
+        .where(Policy.organization_id == org.id, Policy.human_id == "POL-0001")
+    )
+    if policy is None:
+        return
+    policy.status = "published"
+    current = next((version for version in policy.versions if version.is_current), None)
+    if current is None and policy.versions:
+        current = policy.versions[0]
+        current.is_current = True
+    if current is not None:
+        if current.version_label == "0.1":
+            current.version_label = "1.0"
+        current.status = "published"
+        current.is_current = True
+        if current.change_summary is None:
+            current.change_summary = "Initial published seed version."
+        for other in policy.versions:
+            if other.id == current.id:
+                continue
+            other.is_current = False
+            if other.status == "published":
+                other.status = "superseded"
 
 
 def _ensure_report_definitions(session: Session, org: Organization) -> None:

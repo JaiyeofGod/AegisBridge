@@ -29,7 +29,10 @@ class Policy(UUIDMixin, TimestampMixin, Base):
 
     organization: Mapped[Organization] = relationship()
     owner: Mapped[User | None] = relationship()
-    versions: Mapped[list[PolicyVersion]] = relationship(back_populates="policy")
+    versions: Mapped[list[PolicyVersion]] = relationship(
+        back_populates="policy",
+        order_by="PolicyVersion.created_at",
+    )
 
 
 class PolicyVersion(UUIDMixin, TimestampMixin, Base):
@@ -39,6 +42,8 @@ class PolicyVersion(UUIDMixin, TimestampMixin, Base):
     policy_id: Mapped[UUID] = mapped_column(ForeignKey("policies.id"), nullable=False, index=True)
     version_label: Mapped[str] = mapped_column(String(32), nullable=False)
     body_summary: Mapped[str] = mapped_column(Text, nullable=False)
+    change_summary: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, server_default=text("'draft'"))
     is_current: Mapped[bool] = mapped_column(nullable=False, server_default=text("false"))
 
     policy: Mapped[Policy] = relationship(back_populates="versions")

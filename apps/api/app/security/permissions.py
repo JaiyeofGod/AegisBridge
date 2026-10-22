@@ -20,6 +20,7 @@ SENSITIVE_PERMISSIONS: Final[frozenset[str]] = frozenset(
         "integration.manage",
         "user.role.manage",
         "detection.manage",
+        "policy.approve",
     }
 )
 
@@ -31,6 +32,9 @@ PERMISSION_CATALOG: Final[dict[str, str]] = {
     "control.read": "Read control catalog and implementations.",
     "control.manage": "Update control implementations outside dedicated update.",
     "control.update": "Update control status and implementation fields.",
+    "policy.read": "Read policy library metadata and versions.",
+    "policy.manage": "Create and edit policy drafts and metadata.",
+    "policy.approve": "Approve, publish, or retire policies.",
     "evidence.read": "Read evidence metadata.",
     "evidence.manage": "Upload or link evidence metadata.",
     "evidence.download": "Download evidence objects.",
@@ -63,6 +67,8 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             "asset.read",
             "risk.read",
             "control.read",
+            "policy.read",
+            "policy.approve",
             "evidence.read",
             "vulnerability.read",
             "alert.read",
@@ -86,6 +92,8 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             "control.read",
             "control.manage",
             "control.update",
+            "policy.read",
+            "policy.manage",
             "evidence.read",
             "evidence.manage",
             "evidence.download",
@@ -99,6 +107,7 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
     "SOC Analyst": frozenset(
         {
             "asset.read",
+            "policy.read",
             "alert.read",
             "detection.read",
             "incident.read",
@@ -113,6 +122,7 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
     "Security Engineer": frozenset(
         {
             "asset.read",
+            "policy.read",
             "vulnerability.read",
             "vulnerability.manage",
             "detection.read",
@@ -135,6 +145,7 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             "asset.read",
             "risk.read",
             "control.read",
+            "policy.read",
             "evidence.read",
             "evidence.download",
             "vulnerability.read",
@@ -150,6 +161,7 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             "asset.read",
             "risk.read",
             "control.read",
+            "policy.read",
             "vulnerability.read",
             "alert.read",
             "detection.read",

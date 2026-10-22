@@ -117,9 +117,9 @@ A user is **privileged** when they hold **Administrator** or **Security Engineer
 
 Capability codes live in `app/security/permissions.py` (`PERMISSION_CATALOG`). They include the sensitive actions required by `SECURITY_REQUIREMENTS.md` / master §103:
 
-`risk.accept`, `control.update`, `evidence.download`, `incident.close`, `integration.manage`, `user.role.manage`, `detection.manage`
+`risk.accept`, `control.update`, `evidence.download`, `incident.close`, `integration.manage`, `user.role.manage`, `detection.manage`, `policy.approve`
 
-plus domain `.read` / `.manage` capabilities enforced on current read routes.
+plus domain `.read` / `.manage` capabilities enforced on current routes (including `policy.read` / `policy.manage`).
 
 Effective permissions for a principal are the **union** of permissions for their assigned roles from `ROLE_PERMISSIONS`. Stored `access_entitlements` remain labels aligned to the catalog; they are not a second policy engine.
 
@@ -128,12 +128,12 @@ Effective permissions for a principal are the **union** of permissions for their
 | Role | Permissions |
 |---|---|
 | Administrator | All catalog permissions |
-| CISO | Broad `*.read` across domains + `audit.read` (no sensitive accept/close/manage) |
-| GRC Analyst | Risk/control/evidence/report/dataset + `risk.accept`, `control.update`, `evidence.download` |
-| SOC Analyst | Alert/detection/incident/threat intel reads + `incident.manage`, `incident.close` |
-| Security Engineer | Detection/vuln/integration/cyber-range/dataset technical set + `detection.manage`, `integration.manage` |
-| Auditor | Read-heavy GRC/evidence/audit + `evidence.download` |
-| Read Only | Limited reads (assets, risk, control, vuln, alert, detection, incident, threat intel, report, dataset, cyber range) |
+| CISO | Broad `*.read` across domains + `audit.read` + `policy.approve` (no draft `policy.manage`) |
+| GRC Analyst | Risk/control/policy/evidence/report/dataset + `risk.accept`, `control.update`, `evidence.download`, `policy.manage` |
+| SOC Analyst | Alert/detection/incident/threat intel/policy reads + `incident.manage`, `incident.close` |
+| Security Engineer | Detection/vuln/integration/cyber-range/dataset/policy reads + `detection.manage`, `integration.manage` |
+| Auditor | Read-heavy GRC/policy/evidence/audit + `evidence.download` |
+| Read Only | Limited reads (assets, risk, control, policy, vuln, alert, detection, incident, threat intel, report, dataset, cyber range) |
 
 See `ROLE_PERMISSIONS` in code for the authoritative set.
 
@@ -216,7 +216,9 @@ Authenticated session required (401 without a valid cookie):
 **403** = missing permission (`forbidden`) or CSRF failure (`csrf_failed`). Error bodies do not list capability codes or tokens.  
 **409** = stale `expected_updated_at` concurrency conflict.
 
-**Remaining authenticated domain writes** (incident tasks, integration credentials, reports, cyber-range control, policy writes, access-review findings) remain deferred. No Cyber Range remote control.
+**Policy lifecycle** (`policy.read` / `policy.manage` / `policy.approve` + CSRF on mutations): create/edit drafts, transition/publish, self-acknowledge published versions. Published versions are immutable; replacements create new drafts. External e-signature, email notification, and policy↔control mapping writes are not implemented (no mapping table yet).
+
+**Remaining authenticated domain writes** (incident tasks, integration credentials, reports, cyber-range control, access-review findings) remain deferred. No Cyber Range remote control.
 
 ### Incident mutation scope (`incident.manage`)
 
