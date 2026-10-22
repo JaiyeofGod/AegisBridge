@@ -11,15 +11,29 @@ import { PageContainer } from "@/components/navigation/PageContainer";
 import { PageHeader } from "@/components/navigation/PageHeader";
 import { StatusBadge } from "@/components/status/StatusBadge";
 import { StaleDataIndicator } from "@/components/status/StaleDataIndicator";
+import { useAuthStatus } from "@/features/auth/useAuthSession";
 import { SEEDED_DATA_LABEL, SEEDED_DATA_NOTE } from "@/features/data-origin";
 import { AssessmentWorkTable } from "@/features/governance/AssessmentWorkTable";
+import { ControlEvidencePanel } from "@/features/governance/ControlEvidencePanel";
+import { ControlImplementationEditor } from "@/features/governance/ControlImplementationEditor";
+import { ControlTestPanel } from "@/features/governance/ControlTestPanel";
 import { GovernanceSectionNav } from "@/features/governance/GovernanceSectionNav";
 import { mapGovernanceSummary, type GovernanceView } from "@/features/governance/mapGovernance";
-import { useGovernanceSummary } from "@/features/governance/useGovernanceData";
+import {
+  useGovernanceControl,
+  useGovernanceControls,
+  useGovernanceSummary,
+} from "@/features/governance/useGovernanceData";
+import { cn } from "@/lib/cn";
 import { formatTimestamp } from "@/lib/format";
 import type { GovernanceSectionId } from "@/types/governance";
 
 export function GovernancePage() {
+  const auth = useAuthStatus();
+  const permissions = auth.user?.permissions ?? [];
+  const canManageControls = permissions.includes("control.manage");
+  const canManageEvidence = permissions.includes("evidence.manage");
+  const canLinkEvidence = canManageControls && canManageEvidence;
   const governance = useGovernanceSummary();
   const [section, setSection] = useState<GovernanceSectionId>("summary");
   const generatedAt = governance.dataUpdatedAt
@@ -86,7 +100,14 @@ export function GovernancePage() {
           >
             {section === "summary" ? <SummarySection data={view} /> : null}
             {section === "frameworks" ? <FrameworksSection data={view} /> : null}
-            {section === "controls" ? <ControlsSection data={view} /> : null}
+            {section === "controls" ? (
+              <ControlsSection
+                data={view}
+                canManageControls={canManageControls}
+                canManageEvidence={canManageEvidence}
+                canLinkEvidence={canLinkEvidence}
+              />
+            ) : null}
             {section === "evidence" ? <EvidenceSection data={view} /> : null}
             {section === "policies" ? <PoliciesSection data={view} /> : null}
             {section === "access-reviews" ? <AccessReviewsSection data={view} /> : null}
@@ -220,40 +241,185 @@ function FrameworksSection({ data }: { data: GovernanceView }) {
   );
 }
 
-function ControlsSection({ data }: { data: GovernanceView }) {
+function ControlsSection({
+  data,
+  canManageControls,
+  canManageEvidence,
+  canLinkEvidence,
+}: {
+  data: GovernanceView;
+  canManageControls: boolean;
+  canManageEvidence: boolean;
+  canLinkEvidence: boolean;
+}) {
+  const controls = useGovernanceControls();
+  const items = controls.data?.items ?? [];
+  const [selectedId, setSelectedId] = useState(items[0]?.id ?? "");
+  const activeId = items.some((item) => item.id === selectedId) ? selectedId : (items[0]?.id ?? "");
+  const detail = useGovernanceControl(activeId || null);
+
   return (
-    <Panel
-      title="Control implementation status"
-      description="Status counts returned by the summary. CIS entries, when stored, are identifiers and status only."
-      action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
-    >
-      <ul className="space-y-3" data-testid="controls-list">
-        {data.statusCounts.length === 0 ? (
-          <li className="text-sm text-[var(--muted)]">
-            No control implementation status is stored.
-          </li>
-        ) : (
-          data.statusCounts.map((item) => (
-            <li
-              key={item.status}
-              className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
-            >
-              <p className="font-medium text-[var(--text)]">{item.status}</p>
-              <p className="text-sm text-[var(--muted)]">{item.count}</p>
+    <div className="space-y-6">
+      <Panel
+        title="Control implementation status"
+        description="Status counts returned by the summary. CIS entries, when stored, are identifiers and status only."
+        action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
+      >
+        <ul className="space-y-3" data-testid="controls-list">
+          {data.statusCounts.length === 0 ? (
+            <li className="text-sm text-[var(--muted)]">
+              No control implementation status is stored.
             </li>
-          ))
-        )}
-        <li className="text-sm text-[var(--muted)]">
-          {data.testsRecorded === 0
-            ? "No control test results stored."
-            : `${data.testsPassed} passed of ${data.testsRecorded} stored control tests.`}
-        </li>
-      </ul>
-      <p className="mt-4 text-xs text-[var(--muted)]">
-        {data.assessedApplicable} assessed applicable. Status labels are textual. There is no
-        aggregate security score.
-      </p>
-    </Panel>
+          ) : (
+            data.statusCounts.map((item) => (
+              <li
+                key={item.status}
+                className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
+              >
+                <p className="font-medium text-[var(--text)]">{item.status}</p>
+                <p className="text-sm text-[var(--muted)]">{item.count}</p>
+              </li>
+            ))
+          )}
+          <li className="text-sm text-[var(--muted)]">
+            {data.testsRecorded === 0
+              ? "No control test results stored."
+              : `${data.testsPassed} passed of ${data.testsRecorded} stored control tests.`}
+          </li>
+        </ul>
+        <p className="mt-4 text-xs text-[var(--muted)]">
+          {data.assessedApplicable} assessed applicable. Status labels are textual. There is no
+          aggregate security score.
+        </p>
+      </Panel>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,17rem)_minmax(0,1fr)]">
+        <Panel
+          title="Controls"
+          description="Select a control to review implementation, tests, and evidence."
+        >
+          {controls.isPending ? <LoadingState label="Loading controls" rows={3} /> : null}
+          {controls.isError ? (
+            <ErrorState
+              title="Controls unavailable"
+              description="The control list could not be loaded."
+              onRetry={() => void controls.refetch()}
+            />
+          ) : null}
+          {controls.isSuccess ? (
+            <ul className="space-y-2" data-testid="governance-control-catalog">
+              {items.length === 0 ? (
+                <li className="text-sm text-[var(--muted)]">No controls are stored.</li>
+              ) : (
+                items.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      className={cn(
+                        "w-full rounded-[var(--radius-control)] border px-3 py-3 text-left transition",
+                        item.id === activeId
+                          ? "border-[var(--accent)] bg-[var(--raised)]"
+                          : "border-[var(--border)] bg-[var(--canvas)] hover:border-[var(--accent)]",
+                      )}
+                      data-testid={`governance-control-${item.id}`}
+                      onClick={() => setSelectedId(item.id)}
+                    >
+                      <p className="text-sm font-medium text-[var(--text)]">
+                        {item.id} · {item.control_code}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--muted)]">{item.title}</p>
+                      <p className="mt-1 text-xs text-[var(--muted)]">
+                        {(item.implementation_status ?? "not stored").replaceAll("_", " ")} ·{" "}
+                        {item.test_count} tests · {item.evidence_count} evidence
+                      </p>
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+          ) : null}
+        </Panel>
+
+        <div className="space-y-4">
+          {!activeId ? (
+            <Panel title="Control detail" description="Select a control to continue.">
+              <p className="text-sm text-[var(--muted)]">No control selected.</p>
+            </Panel>
+          ) : (
+            <>
+              {detail.isPending ? <LoadingState label="Loading control" rows={4} /> : null}
+              {detail.isError ? (
+                <ErrorState
+                  title="Control unavailable"
+                  description="The selected control could not be loaded."
+                  onRetry={() => void detail.refetch()}
+                />
+              ) : null}
+              {detail.isSuccess && detail.data ? (
+                <>
+                  <Panel
+                    title={`${detail.data.id} · ${detail.data.control_code}`}
+                    description={detail.data.title}
+                    action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
+                  >
+                    <dl className="grid gap-2 text-sm">
+                      <div>
+                        <dt className="text-[var(--muted)]">Framework</dt>
+                        <dd className="text-[var(--text)]">
+                          {detail.data.framework_code ?? "Not stored"}{" "}
+                          {detail.data.framework_version ?? ""}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-[var(--muted)]">Family</dt>
+                        <dd className="text-[var(--text)]">{detail.data.family ?? "Not stored"}</dd>
+                      </div>
+                    </dl>
+                    <p className="mt-3 text-xs text-[var(--muted)]">
+                      Licensed control text is not included
+                      {detail.data.licensed_text_included
+                        ? " (API unexpectedly marked licensed text present)."
+                        : "."}
+                    </p>
+                  </Panel>
+
+                  <Panel
+                    title="Implementation"
+                    description="Update stored implementation status and notes."
+                  >
+                    <ControlImplementationEditor
+                      controlId={detail.data.id}
+                      implementation={detail.data.implementation}
+                      canManage={canManageControls}
+                    />
+                  </Panel>
+
+                  <Panel title="Control tests" description="Manual development recordings only.">
+                    <ControlTestPanel
+                      controlId={detail.data.id}
+                      tests={detail.data.tests}
+                      canManage={canManageControls}
+                    />
+                  </Panel>
+
+                  <Panel
+                    title="Evidence"
+                    description="Metadata records and control associations. Binary upload is not available."
+                  >
+                    <ControlEvidencePanel
+                      controlId={detail.data.id}
+                      evidence={detail.data.evidence}
+                      canManageEvidence={canManageEvidence}
+                      canLink={canLinkEvidence}
+                    />
+                  </Panel>
+                </>
+              ) : null}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

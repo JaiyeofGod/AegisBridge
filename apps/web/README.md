@@ -28,23 +28,27 @@ Requires Node.js 24 LTS. Dev server: `http://127.0.0.1:5173` (proxies `/api` to 
 ### CSRF (synchronizer token)
 
 - `GET /api/v1/auth/csrf` (or login `csrf_token`) fills an **in-memory** token only.
-- Authenticated mutations use `apiMutate` / `apiPatch` / `apiPut` / `apiPostCsrf`, which attach `X-CSRF-Token`.
+- Authenticated mutations use `apiMutate` / `apiPatch` / `apiPut` / `apiPostCsrf` / `apiDelete`, which attach `X-CSRF-Token`.
 - On `csrf_failed`, the client refreshes the token once and retries once.
 - CSRF is not authentication and must never be treated as a session substitute.
 
 ### First write APIs
 
-| Action                | Endpoint                                           | Notes                                                                                                      |
-| --------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Save preferences      | `PATCH /api/v1/account/preferences`                | Fields: theme, density, landing_page, reduced_motion. UI shows Default vs Stored.                          |
-| Update risk treatment | `PATCH /api/v1/risks/{id}/treatment`               | Requires server permission `risk.manage`. Uses `expected_updated_at` when present.                         |
-| Update incident       | `PATCH /api/v1/incidents/{id}`                     | Requires `incident.manage` (+ `incident.close` to resolve/close). Owner read-only in UI.                   |
-| Update remediation    | `PATCH /api/v1/vulnerabilities/{id}/remediation`   | Requires `vulnerability.manage`. CVSS/EPSS/KEV/action_decision immutable. `asset_id` is a selector only.   |
-| Update access review  | `PATCH /api/v1/administration/access-reviews/{id}` | Requires `administration.manage`. Name/status only. Findings deferred.                                     |
-| Update user status    | `PATCH /api/v1/administration/users/{id}`          | Requires `administration.manage`. `active`/`inactive` only; inactive confirmation in UI. Last-admin → 409. |
-| Replace user roles    | `PUT /api/v1/administration/users/{id}/roles`      | Requires `user.role.manage`. Seven-role catalog only. Last-admin demotion → 409.                           |
+| Action                        | Endpoint                                                 | Notes                                                                                                      |
+| ----------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Save preferences              | `PATCH /api/v1/account/preferences`                      | Fields: theme, density, landing_page, reduced_motion. UI shows Default vs Stored.                          |
+| Update risk treatment         | `PATCH /api/v1/risks/{id}/treatment`                     | Requires server permission `risk.manage`. Uses `expected_updated_at` when present.                         |
+| Update incident               | `PATCH /api/v1/incidents/{id}`                           | Requires `incident.manage` (+ `incident.close` to resolve/close). Owner read-only in UI.                   |
+| Update remediation            | `PATCH /api/v1/vulnerabilities/{id}/remediation`         | Requires `vulnerability.manage`. CVSS/EPSS/KEV/action_decision immutable. `asset_id` is a selector only.   |
+| Update access review          | `PATCH /api/v1/administration/access-reviews/{id}`       | Requires `administration.manage`. Name/status only. Findings deferred.                                     |
+| Update user status            | `PATCH /api/v1/administration/users/{id}`                | Requires `administration.manage`. `active`/`inactive` only; inactive confirmation in UI. Last-admin → 409. |
+| Replace user roles            | `PUT /api/v1/administration/users/{id}/roles`            | Requires `user.role.manage`. Seven-role catalog only. Last-admin demotion → 409.                           |
+| Update control implementation | `PATCH /api/v1/governance/controls/{id}/implementation`  | Requires `control.manage`. Status/notes/owner; `expected_updated_at` when present.                         |
+| Record/update control test    | `POST .../tests`, `PATCH /control-tests/{id}`            | Requires `control.manage`. Manual development recordings only; not automated validation.                   |
+| Create evidence metadata      | `POST /api/v1/evidence`                                  | Requires `evidence.manage`. Metadata only; no file upload / object URI.                                    |
+| Link/unlink evidence          | `POST`/`DELETE .../controls/{id}/evidence/{evidence_id}` | Requires `control.manage` + `evidence.manage`. Unlink removes association only.                            |
 
-Backend remains the authorization boundary. Integration credential writes, reports, Cyber Range control, and incident tasks stay disabled in the UI.
+Backend remains the authorization boundary. Binary evidence upload, integration credential writes, reports, Cyber Range control, and incident tasks stay disabled in the UI.
 
 ### Route guards (UX only)
 

@@ -16,6 +16,9 @@ import type {
   DatasetListItem,
   ExperimentDetail,
   ExperimentListItem,
+  ControlDetail,
+  ControlListItem,
+  EvidenceDetail,
   GovernanceSummary,
   IncidentDetailResponse,
   IncidentListItem,
@@ -65,6 +68,10 @@ export const currentUserFixture = {
     "asset.read",
     "risk.read",
     "risk.manage",
+    "control.read",
+    "control.manage",
+    "evidence.read",
+    "evidence.manage",
     "incident.read",
     "incident.manage",
     "incident.close",
@@ -565,6 +572,58 @@ export const emptyGovernanceSummary: GovernanceSummary = {
   assessment_work: { tests_recorded: 0, items: [] },
   policies: [],
   access_reviews: [],
+};
+
+export const controlListItem: ControlListItem = {
+  id: "CTRL-0002",
+  control_code: "AC-2",
+  title: "Account Management",
+  family: "Access Control",
+  framework_code: "NIST-800-53",
+  framework_version: "Rev. 5",
+  implementation_status: "partial",
+  test_count: 0,
+  evidence_count: 1,
+};
+
+export const controlDetailSeed: ControlDetail = {
+  ...controlListItem,
+  implementation: {
+    status: "partial",
+    notes: "Simulated implementation label.",
+    owner: { id: "USR-0003", display_name: "Priya Shah" },
+    updated_at: "2026-10-20T18:00:00+00:00",
+  },
+  tests: [],
+  evidence: [
+    {
+      id: "EVID-0041",
+      title: "Privileged account export note",
+      sha256: "a".repeat(64),
+      collected_at: "2026-10-19T21:00:00+00:00",
+    },
+  ],
+  licensed_text_included: false,
+  updated_at: "2026-10-20T18:00:00+00:00",
+};
+
+const evidenceDetailSeed: EvidenceDetail = {
+  id: "EVID-0041",
+  title: "Privileged account export note",
+  description: "Seeded evidence metadata.",
+  version_label: "1",
+  sha256: "a".repeat(64),
+  size_bytes: null,
+  mime_type: null,
+  data_classification: "simulated",
+  collected_at: "2026-10-19T21:00:00+00:00",
+  collected_by: { id: "USR-0003", display_name: "Priya Shah" },
+  control_ids: ["CTRL-0002"],
+  updated_at: "2026-10-19T21:00:00+00:00",
+  object_stored: false,
+  integrity_verified: false,
+  semantics:
+    "Metadata only. File bytes are not stored in the API. A SHA-256 value is caller-supplied metadata and is not verified against object storage.",
 };
 
 const internalSource = {
@@ -1868,6 +1927,61 @@ export function installApiFetch(
   }));
   let adminSummaryState: AdministrationSummary = { ...administrationSummary };
   let auditEventsState: AuditEventListItem[] = [...auditEvents];
+  let controlDetailState: ControlDetail = {
+    ...controlDetailSeed,
+    implementation: controlDetailSeed.implementation
+      ? { ...controlDetailSeed.implementation }
+      : null,
+    tests: [...controlDetailSeed.tests],
+    evidence: controlDetailSeed.evidence.map((item) => ({ ...item })),
+  };
+  let controlListState: ControlListItem = { ...controlListItem };
+  let governanceSummaryState: GovernanceSummary = {
+    ...governanceSummary,
+    frameworks: [...governanceSummary.frameworks],
+    control_implementations: { ...governanceSummary.control_implementations },
+    evidence_freshness: { ...governanceSummary.evidence_freshness },
+    assessment_work: {
+      ...governanceSummary.assessment_work,
+      items: [...governanceSummary.assessment_work.items],
+    },
+    policies: [...governanceSummary.policies],
+    access_reviews: [...governanceSummary.access_reviews],
+  };
+  let evidenceCounter = 42;
+  let controlTestCounter = 1;
+  const evidenceStore = new Map<string, EvidenceDetail>([
+    ["EVID-0041", { ...evidenceDetailSeed, control_ids: [...evidenceDetailSeed.control_ids] }],
+  ]);
+
+  function syncGovernanceWriteCounts() {
+    controlListState = {
+      ...controlListState,
+      implementation_status: controlDetailState.implementation?.status ?? null,
+      test_count: controlDetailState.tests.length,
+      evidence_count: controlDetailState.evidence.length,
+    };
+    governanceSummaryState = {
+      ...governanceSummaryState,
+      control_implementations: {
+        by_status: {
+          [controlDetailState.implementation?.status ?? "partial"]: 1,
+        },
+        tests_recorded: controlDetailState.tests.length,
+        tests_passed: controlDetailState.tests.filter((test) => test.result === "pass").length,
+        assessed_applicable: 1,
+      },
+      assessment_work: {
+        tests_recorded: controlDetailState.tests.length,
+        items: controlDetailState.tests.map((test) => test.result),
+      },
+      evidence_freshness: {
+        ...governanceSummaryState.evidence_freshness,
+        recorded: evidenceStore.size,
+        with_sha256: [...evidenceStore.values()].filter((item) => item.sha256).length,
+      },
+    };
+  }
 
   function syncAdminSummaryCounts() {
     adminSummaryState = {
@@ -2105,7 +2219,244 @@ export function installApiFetch(
       return jsonResponse(incidentDetailState);
     }
     if (/\/api\/v1\/incidents\/[^?]+/.test(url)) return jsonResponse(incidentDetailState);
-    if (url.includes("/api/v1/governance/summary")) return jsonResponse(governanceSummary);
+
+    if (
+      /\/api\/v1\/governance\/controls\/[^/?]+\/implementation/.test(url) &&
+      init?.method === "PATCH"
+    ) {
+      const provided = headerValue(init, "X-CSRF-Token");
+      if (!provided) {
+        return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+      }
+      const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+      const allowed = ["status", "notes", "owner", "expected_updated_at"];
+      if (Object.keys(body).some((key) => !allowed.includes(key))) {
+        return jsonResponse({ code: "validation_error", message: "Unexpected fields." }, 422);
+      }
+      if (
+        typeof body.expected_updated_at === "string" &&
+        controlDetailState.implementation?.updated_at &&
+        body.expected_updated_at !== controlDetailState.implementation.updated_at
+      ) {
+        return jsonResponse(
+          {
+            code: "conflict",
+            message: "The control implementation was modified by another request.",
+          },
+          409,
+        );
+      }
+      const nextStatus =
+        typeof body.status === "string" ? body.status : controlDetailState.implementation?.status;
+      const nextNotes =
+        typeof body.notes === "string"
+          ? body.notes
+          : body.notes === null
+            ? null
+            : (controlDetailState.implementation?.notes ?? null);
+      let nextOwner = controlDetailState.implementation?.owner ?? null;
+      if (body.owner === null) nextOwner = null;
+      if (typeof body.owner === "string") {
+        nextOwner = { id: body.owner, display_name: body.owner };
+      }
+      controlDetailState = {
+        ...controlDetailState,
+        implementation: {
+          status: nextStatus ?? "partial",
+          notes: nextNotes,
+          owner: nextOwner,
+          updated_at: "2026-10-21T19:00:00+00:00",
+        },
+        updated_at: "2026-10-21T19:00:00+00:00",
+      };
+      syncGovernanceWriteCounts();
+      return jsonResponse(controlDetailState);
+    }
+
+    if (/\/api\/v1\/governance\/controls\/[^/?]+\/tests/.test(url) && init?.method === "POST") {
+      const provided = headerValue(init, "X-CSRF-Token");
+      if (!provided) {
+        return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+      }
+      const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+      const id = `CTEST-${String(controlTestCounter).padStart(4, "0")}`;
+      controlTestCounter += 1;
+      const created = {
+        id,
+        control_id: "CTRL-0002",
+        result: typeof body.result === "string" ? body.result : "inconclusive",
+        tested_at: "2026-10-21T19:05:00+00:00",
+        tester: { id: "USR-0001", display_name: "Amara Okonkwo" },
+        notes: `[manual development recording] ${
+          typeof body.notes === "string" ? body.notes : "Manually recorded control test."
+        }`,
+        updated_at: "2026-10-21T19:05:00+00:00",
+        recording_mode: "manual",
+      };
+      controlDetailState = {
+        ...controlDetailState,
+        tests: [...controlDetailState.tests, created],
+      };
+      syncGovernanceWriteCounts();
+      return jsonResponse(created);
+    }
+
+    if (/\/api\/v1\/governance\/control-tests\/[^/?]+/.test(url) && init?.method === "PATCH") {
+      const provided = headerValue(init, "X-CSRF-Token");
+      if (!provided) {
+        return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+      }
+      const testId = decodeURIComponent(url.split("/control-tests/")[1]?.split("?")[0] ?? "");
+      const current = controlDetailState.tests.find((test) => test.id === testId);
+      if (!current) {
+        return jsonResponse({ code: "not_found", message: "Control test was not found." }, 404);
+      }
+      const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+      if (
+        typeof body.expected_updated_at === "string" &&
+        current.updated_at &&
+        body.expected_updated_at !== current.updated_at
+      ) {
+        return jsonResponse(
+          { code: "conflict", message: "The control test was modified by another request." },
+          409,
+        );
+      }
+      const updated = {
+        ...current,
+        result: typeof body.result === "string" ? body.result : current.result,
+        notes:
+          typeof body.notes === "string"
+            ? body.notes.includes("[manual development recording]")
+              ? body.notes
+              : `[manual development recording] ${body.notes}`
+            : current.notes,
+        updated_at: "2026-10-21T19:10:00+00:00",
+      };
+      controlDetailState = {
+        ...controlDetailState,
+        tests: controlDetailState.tests.map((test) => (test.id === testId ? updated : test)),
+      };
+      syncGovernanceWriteCounts();
+      return jsonResponse(updated);
+    }
+
+    if (
+      /\/api\/v1\/governance\/controls\/[^/?]+\/evidence\/[^/?]+/.test(url) &&
+      (init?.method === "POST" || init?.method === "DELETE")
+    ) {
+      const provided = headerValue(init, "X-CSRF-Token");
+      if (!provided) {
+        return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+      }
+      const parts = url.split("/evidence/");
+      const evidenceId = decodeURIComponent(parts[1]?.split("?")[0] ?? "");
+      const controlId = decodeURIComponent(
+        url.split("/controls/")[1]?.split("/evidence/")[0] ?? "",
+      );
+      if (init.method === "POST") {
+        if (!evidenceStore.has(evidenceId)) {
+          return jsonResponse({ code: "not_found", message: "Evidence was not found." }, 404);
+        }
+        if (!controlDetailState.evidence.some((item) => item.id === evidenceId)) {
+          const evidence = evidenceStore.get(evidenceId)!;
+          controlDetailState = {
+            ...controlDetailState,
+            evidence: [
+              ...controlDetailState.evidence,
+              {
+                id: evidence.id,
+                title: evidence.title,
+                sha256: evidence.sha256,
+                collected_at: evidence.collected_at,
+              },
+            ],
+          };
+          evidence.control_ids = [...new Set([...evidence.control_ids, controlId])];
+          evidenceStore.set(evidenceId, evidence);
+          syncGovernanceWriteCounts();
+        }
+        return jsonResponse({ control_id: controlId, evidence_id: evidenceId, linked: true });
+      }
+      if (!controlDetailState.evidence.some((item) => item.id === evidenceId)) {
+        return jsonResponse({ code: "not_found", message: "Evidence is not linked." }, 404);
+      }
+      controlDetailState = {
+        ...controlDetailState,
+        evidence: controlDetailState.evidence.filter((item) => item.id !== evidenceId),
+      };
+      const evidence = evidenceStore.get(evidenceId);
+      if (evidence) {
+        evidence.control_ids = evidence.control_ids.filter((id) => id !== controlId);
+        evidenceStore.set(evidenceId, evidence);
+      }
+      syncGovernanceWriteCounts();
+      return jsonResponse({ control_id: controlId, evidence_id: evidenceId, linked: false });
+    }
+
+    if (url.includes("/api/v1/evidence") && init?.method === "POST") {
+      const provided = headerValue(init, "X-CSRF-Token");
+      if (!provided) {
+        return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+      }
+      const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+      if ("object_uri" in body || "permissions" in body || "roles" in body) {
+        return jsonResponse({ code: "validation_error", message: "Unexpected fields." }, 422);
+      }
+      if (typeof body.sha256 === "string" && !/^[0-9a-fA-F]{64}$/.test(body.sha256)) {
+        return jsonResponse(
+          {
+            code: "validation_error",
+            message: "sha256 must be exactly 64 hexadecimal characters.",
+          },
+          422,
+        );
+      }
+      const id = `EVID-${String(evidenceCounter).padStart(4, "0")}`;
+      evidenceCounter += 1;
+      const created: EvidenceDetail = {
+        id,
+        title: typeof body.title === "string" ? body.title : "Untitled",
+        description: typeof body.description === "string" ? body.description : null,
+        version_label: typeof body.version_label === "string" ? body.version_label : "1",
+        sha256: typeof body.sha256 === "string" ? body.sha256.toLowerCase() : null,
+        size_bytes: typeof body.size_bytes === "number" ? body.size_bytes : null,
+        mime_type: typeof body.mime_type === "string" ? body.mime_type : null,
+        data_classification:
+          typeof body.data_classification === "string" ? body.data_classification : "simulated",
+        collected_at: null,
+        collected_by: { id: "USR-0001", display_name: "Amara Okonkwo" },
+        control_ids: [],
+        updated_at: "2026-10-21T19:15:00+00:00",
+        object_stored: false,
+        integrity_verified: false,
+        semantics: evidenceDetailSeed.semantics,
+      };
+      evidenceStore.set(id, created);
+      syncGovernanceWriteCounts();
+      return jsonResponse(created);
+    }
+
+    if (/\/api\/v1\/evidence\/[^/?]+/.test(url)) {
+      const id = decodeURIComponent(url.split("/evidence/")[1]?.split("?")[0] ?? "");
+      const evidence = evidenceStore.get(id);
+      if (!evidence) {
+        return jsonResponse({ code: "not_found", message: "Evidence was not found." }, 404);
+      }
+      return jsonResponse(evidence);
+    }
+
+    if (/\/api\/v1\/governance\/controls\/[^/?]+/.test(url)) {
+      const id = decodeURIComponent(url.split("/controls/")[1]?.split("?")[0] ?? "");
+      if (id !== controlDetailState.id) {
+        return jsonResponse({ code: "not_found", message: "Control was not found." }, 404);
+      }
+      return jsonResponse(controlDetailState);
+    }
+    if (url.includes("/api/v1/governance/controls")) {
+      return jsonResponse(assetPage([controlListState]));
+    }
+    if (url.includes("/api/v1/governance/summary")) return jsonResponse(governanceSummaryState);
     if (/\/api\/v1\/threat-intelligence\/indicators\/[^/?]+/.test(url)) {
       const id = url.split("/indicators/")[1]?.split("?")[0] ?? "";
       return jsonResponse(indicatorDetail(decodeURIComponent(id)));

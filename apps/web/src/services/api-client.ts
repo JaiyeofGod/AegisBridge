@@ -159,4 +159,8 @@ export async function apiPostCsrf<T>(path: string, body?: unknown): Promise<T> {
   return apiMutate<T>("POST", path, body);
 }
 
+export async function apiDelete<T>(path: string, body?: unknown): Promise<T> {
+  return apiMutate<T>("DELETE", path, body);
+}
+
 export { clearCsrfToken, getCsrfToken, setCsrfToken };

@@ -365,6 +365,116 @@ export type GovernanceSummary = {
   access_reviews: AccessReviewStatusItem[];
 };
 
+export type ControlImplementationStatusValue =
+  "planned" | "partial" | "implemented" | "not_implemented" | "not_applicable";
+
+export type ControlTestResultValue = "pass" | "fail" | "partial" | "inconclusive";
+
+export type EvidenceClassificationValue = "simulated" | "internal" | "confidential" | "restricted";
+
+export type ControlListItem = {
+  id: string;
+  control_code: string;
+  title: string;
+  family: string | null;
+  framework_code: string | null;
+  framework_version: string | null;
+  implementation_status: string | null;
+  test_count: number;
+  evidence_count: number;
+};
+
+export type ControlImplementationDetail = {
+  status: string;
+  notes: string | null;
+  owner: PersonRef | null;
+  updated_at: string | null;
+};
+
+export type ControlTestItem = {
+  id: string;
+  control_id: string;
+  result: string;
+  tested_at: string;
+  tester: PersonRef | null;
+  notes: string | null;
+  updated_at: string | null;
+  recording_mode: string;
+};
+
+export type ControlEvidenceItem = {
+  id: string;
+  title: string;
+  sha256: string | null;
+  collected_at: string | null;
+};
+
+export type ControlDetail = ControlListItem & {
+  implementation: ControlImplementationDetail | null;
+  tests: ControlTestItem[];
+  evidence: ControlEvidenceItem[];
+  licensed_text_included: boolean;
+  updated_at: string | null;
+};
+
+export type ControlImplementationUpdate = {
+  status?: ControlImplementationStatusValue;
+  notes?: string | null;
+  owner?: string | null;
+  expected_updated_at?: string | null;
+};
+
+export type ControlTestCreate = {
+  result: ControlTestResultValue;
+  tested_at?: string | null;
+  tester?: string | null;
+  notes?: string | null;
+};
+
+export type ControlTestUpdate = {
+  result?: ControlTestResultValue;
+  tested_at?: string | null;
+  tester?: string | null;
+  notes?: string | null;
+  expected_updated_at?: string | null;
+};
+
+export type EvidenceDetail = {
+  id: string;
+  title: string;
+  description: string | null;
+  version_label: string;
+  sha256: string | null;
+  size_bytes: number | null;
+  mime_type: string | null;
+  data_classification: string;
+  collected_at: string | null;
+  collected_by: PersonRef | null;
+  control_ids: string[];
+  updated_at: string | null;
+  object_stored: boolean;
+  integrity_verified: boolean;
+  semantics: string;
+};
+
+export type EvidenceCreate = {
+  title: string;
+  description?: string | null;
+  version_label?: string;
+  sha256?: string | null;
+  size_bytes?: number | null;
+  mime_type?: string | null;
+  data_classification?: EvidenceClassificationValue;
+  collected_at?: string | null;
+  collected_by?: string | null;
+};
+
+export type ControlEvidenceLinkResult = {
+  control_id: string;
+  evidence_id: string;
+  linked: boolean;
+};
+
 export type ThreatSourceRef = {
   id: string;
   name: string;
