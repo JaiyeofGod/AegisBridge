@@ -41,7 +41,9 @@ describe("Sign-in page", () => {
     await renderWithProviders(<AppRouter />, { initialEntries: ["/signin"] });
     const visual = screen.getByTestId("signin-visual");
     expect(visual).toHaveAttribute("data-visual-mode", "static-fallback");
-    expect(within(visual).getByTestId("signin-scene-fallback")).toBeInTheDocument();
+    const card = within(visual).getByTestId("signin-visual-card");
+    expect(card).toBeInTheDocument();
+    expect(within(card).getByTestId("signin-scene-fallback")).toBeInTheDocument();
   });
 
   it("signs in with credentials include and navigates to overview", async () => {

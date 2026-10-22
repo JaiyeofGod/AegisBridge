@@ -11,6 +11,7 @@ import { PageContainer } from "@/components/navigation/PageContainer";
 import { PageHeader } from "@/components/navigation/PageHeader";
 import { StatusBadge } from "@/components/status/StatusBadge";
 import { StaleDataIndicator } from "@/components/status/StaleDataIndicator";
+import { AccessReviewEditor } from "@/features/administration/AccessReviewEditor";
 import {
   mapAccessReview,
   mapAdminRole,
@@ -18,8 +19,12 @@ import {
   mapAdministrationSummary,
   mapAuditEvent,
   mapIntegration,
+  type AccessReviewView,
+  type AdminUserView,
 } from "@/features/administration/mapAdministration";
 import { IntegrationTable } from "@/features/administration/IntegrationTable";
+import { UserRolesEditor } from "@/features/administration/UserRolesEditor";
+import { UserStatusEditor } from "@/features/administration/UserStatusEditor";
 import {
   useAccessReviews,
   useAdminRoles,
@@ -28,6 +33,7 @@ import {
   useAuditEvents,
   useIntegrations,
 } from "@/features/administration/useAdministrationData";
+import { useAuthStatus } from "@/features/auth/useAuthSession";
 import { SEEDED_DATA_LABEL, SEEDED_DATA_NOTE } from "@/features/data-origin";
 import { cn } from "@/lib/cn";
 import { formatTimestamp } from "@/lib/format";
@@ -44,6 +50,10 @@ const sections: { id: AdminSectionId; label: string }[] = [
 ];
 
 export function AdministrationPage() {
+  const auth = useAuthStatus();
+  const permissions = auth.user?.permissions ?? [];
+  const canManageAdmin = permissions.includes("administration.manage");
+  const canManageRoles = permissions.includes("user.role.manage");
   const summary = useAdministrationSummary();
   const integrations = useIntegrations();
   const users = useAdminUsers();
@@ -52,6 +62,8 @@ export function AdministrationPage() {
   const reviews = useAccessReviews();
   const [section, setSection] = useState<AdminSectionId>("integrations");
   const [selectedId, setSelectedId] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedReviewId, setSelectedReviewId] = useState("");
   const generatedAt = summary.dataUpdatedAt
     ? new Date(summary.dataUpdatedAt).toISOString()
     : new Date().toISOString();
@@ -60,9 +72,12 @@ export function AdministrationPage() {
     integrationItems.find((item) => item.id === selectedId) ?? integrationItems[0] ?? null;
   const metrics = summary.data ? mapAdministrationSummary(summary.data) : null;
   const userItems = users.data?.items.map(mapAdminUser) ?? [];
+  const selectedUser = userItems.find((item) => item.id === selectedUserId) ?? userItems[0] ?? null;
   const roleItems = roles.data?.items.map(mapAdminRole) ?? [];
   const auditItems = audits.data?.items.map(mapAuditEvent) ?? [];
   const reviewItems = reviews.data?.items.map(mapAccessReview) ?? [];
+  const selectedReview =
+    reviewItems.find((item) => item.id === selectedReviewId) ?? reviewItems[0] ?? null;
   const refreshing =
     summary.isFetching ||
     integrations.isFetching ||
@@ -220,67 +235,102 @@ export function AdministrationPage() {
             ) : null}
 
             {section === "users" ? (
-              <Panel
-                title="Users"
-                description="Stored accounts. Sign-in and MFA enrollment are not connected."
-                action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
-              >
-                {users.isPending ? <LoadingState label="Updating" rows={2} /> : null}
-                {users.isError ? (
-                  <ErrorState
-                    title="Users unavailable"
-                    description="The user request failed. Fixture accounts are not substituted."
-                    onRetry={() => void users.refetch()}
-                  />
-                ) : null}
-                {users.isSuccess && userItems.length === 0 ? (
-                  <p className="text-sm text-[var(--muted)]" data-testid="admin-users">
-                    No users are stored.
-                  </p>
-                ) : null}
-                {users.isSuccess && userItems.length > 0 ? (
-                  <div className="overflow-x-auto" data-testid="admin-users">
-                    <table className="min-w-full border-collapse text-left text-sm">
-                      <caption className="sr-only">
-                        Stored users with display name, email, status, department, roles, and the
-                        privileged flag returned by the API
-                      </caption>
-                      <thead className="text-[var(--muted)]">
-                        <tr>
-                          {["User", "Email", "Status", "Department", "Roles", "Privileged"].map(
-                            (heading) => (
-                              <th
-                                key={heading}
-                                scope="col"
-                                className="px-3 py-3 font-medium whitespace-nowrap"
-                              >
-                                {heading}
-                              </th>
-                            ),
-                          )}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {userItems.map((user) => (
-                          <tr key={user.id} className="border-t border-[var(--border)]">
-                            <td className="px-3 py-3 text-[var(--text)]">
-                              {user.id}
-                              <span className="mt-1 block text-xs text-[var(--muted)]">
-                                {user.displayName}
-                              </span>
-                            </td>
-                            <td className="px-3 py-3 text-[var(--muted)]">{user.email}</td>
-                            <td className="px-3 py-3 text-[var(--text)]">{user.status}</td>
-                            <td className="px-3 py-3 text-[var(--muted)]">{user.department}</td>
-                            <td className="px-3 py-3 text-[var(--text)]">{user.roles}</td>
-                            <td className="px-3 py-3 text-[var(--text)]">{user.privilegedLabel}</td>
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
+                <Panel
+                  title="Users"
+                  description="Stored accounts. Sign-in and MFA enrollment are not connected."
+                  action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
+                >
+                  {users.isPending ? <LoadingState label="Updating" rows={2} /> : null}
+                  {users.isError ? (
+                    <ErrorState
+                      title="Users unavailable"
+                      description="The user request failed. Fixture accounts are not substituted."
+                      onRetry={() => void users.refetch()}
+                    />
+                  ) : null}
+                  {users.isSuccess && userItems.length === 0 ? (
+                    <p className="text-sm text-[var(--muted)]" data-testid="admin-users">
+                      No users are stored.
+                    </p>
+                  ) : null}
+                  {users.isSuccess && userItems.length > 0 ? (
+                    <div className="overflow-x-auto" data-testid="admin-users">
+                      <table className="min-w-full border-collapse text-left text-sm">
+                        <caption className="sr-only">
+                          Stored users with display name, email, status, department, roles, and the
+                          privileged flag returned by the API
+                        </caption>
+                        <thead className="text-[var(--muted)]">
+                          <tr>
+                            {["User", "Email", "Status", "Department", "Roles", "Privileged"].map(
+                              (heading) => (
+                                <th
+                                  key={heading}
+                                  scope="col"
+                                  className="px-3 py-3 font-medium whitespace-nowrap"
+                                >
+                                  {heading}
+                                </th>
+                              ),
+                            )}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : null}
-              </Panel>
+                        </thead>
+                        <tbody>
+                          {userItems.map((user) => {
+                            const active = selectedUser?.id === user.id;
+                            return (
+                              <tr
+                                key={user.id}
+                                className={cn(
+                                  "border-t border-[var(--border)]",
+                                  active ? "bg-[var(--raised)]" : undefined,
+                                )}
+                              >
+                                <td className="px-3 py-3 text-[var(--text)]">
+                                  <button
+                                    type="button"
+                                    className="text-left font-medium text-[var(--accent)] underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                                    onClick={() => setSelectedUserId(user.id)}
+                                    aria-pressed={active}
+                                    data-testid={`admin-user-select-${user.id}`}
+                                  >
+                                    {user.id}
+                                  </button>
+                                  <span className="mt-1 block text-xs text-[var(--muted)]">
+                                    {user.displayName}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-3 text-[var(--muted)]">{user.email}</td>
+                                <td className="px-3 py-3 text-[var(--text)]">{user.status}</td>
+                                <td className="px-3 py-3 text-[var(--muted)]">{user.department}</td>
+                                <td className="px-3 py-3 text-[var(--text)]">{user.roles}</td>
+                                <td className="px-3 py-3 text-[var(--text)]">
+                                  {user.privilegedLabel}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : null}
+                </Panel>
+                <Panel
+                  title="Selected user"
+                  description="Status and role changes use server permissions. Credentials are not editable."
+                >
+                  {selectedUser ? (
+                    <UserAdminDetail
+                      user={selectedUser}
+                      canManageAdmin={canManageAdmin}
+                      canManageRoles={canManageRoles}
+                    />
+                  ) : (
+                    <p className="text-sm text-[var(--muted)]">No user is selected.</p>
+                  )}
+                </Panel>
+              </div>
             ) : null}
 
             {section === "roles" ? (
@@ -396,45 +446,70 @@ export function AdministrationPage() {
             ) : null}
 
             {section === "access-reviews" ? (
-              <Panel
-                title="Access reviews"
-                description="Stored review records. Owner and due date appear only when the API returns them."
-                action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
-              >
-                {reviews.isPending ? <LoadingState label="Updating" rows={2} /> : null}
-                {reviews.isError ? (
-                  <ErrorState
-                    title="Access reviews unavailable"
-                    description="The access-review request failed. Fixture reviews are not substituted."
-                    onRetry={() => void reviews.refetch()}
-                  />
-                ) : null}
-                {reviews.isSuccess && reviewItems.length === 0 ? (
-                  <p className="text-sm text-[var(--muted)]" data-testid="admin-access-reviews">
-                    No access reviews are stored.
-                  </p>
-                ) : null}
-                {reviews.isSuccess && reviewItems.length > 0 ? (
-                  <ul className="space-y-3" data-testid="admin-access-reviews">
-                    {reviewItems.map((review) => (
-                      <li
-                        key={review.id}
-                        className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
-                      >
-                        <p className="font-medium text-[var(--text)]">
-                          {review.id} · {review.name}
-                        </p>
-                        <p className="mt-1 text-sm text-[var(--muted)]">
-                          {review.status} · {review.owner} · {review.dueAt}
-                        </p>
-                        <p className="mt-1 text-sm text-[var(--text)]">
-                          Open findings {review.openFindingCount} / {review.totalFindingCount}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </Panel>
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] xl:items-start">
+                <Panel
+                  title="Access reviews"
+                  description="Stored review records. Owner and due date appear only when the API returns them."
+                  action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
+                >
+                  {reviews.isPending ? <LoadingState label="Updating" rows={2} /> : null}
+                  {reviews.isError ? (
+                    <ErrorState
+                      title="Access reviews unavailable"
+                      description="The access-review request failed. Fixture reviews are not substituted."
+                      onRetry={() => void reviews.refetch()}
+                    />
+                  ) : null}
+                  {reviews.isSuccess && reviewItems.length === 0 ? (
+                    <p className="text-sm text-[var(--muted)]" data-testid="admin-access-reviews">
+                      No access reviews are stored.
+                    </p>
+                  ) : null}
+                  {reviews.isSuccess && reviewItems.length > 0 ? (
+                    <ul className="space-y-3" data-testid="admin-access-reviews">
+                      {reviewItems.map((review) => {
+                        const active = selectedReview?.id === review.id;
+                        return (
+                          <li key={review.id}>
+                            <button
+                              type="button"
+                              className={cn(
+                                "w-full rounded-[var(--radius-control)] border px-4 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",
+                                active
+                                  ? "border-[var(--accent)] bg-[var(--raised)]"
+                                  : "border-[var(--border)] bg-[var(--raised)]",
+                              )}
+                              onClick={() => setSelectedReviewId(review.id)}
+                              aria-pressed={active}
+                              data-testid={`admin-review-select-${review.id}`}
+                            >
+                              <p className="font-medium text-[var(--text)]">
+                                {review.id} · {review.name}
+                              </p>
+                              <p className="mt-1 text-sm text-[var(--muted)]">
+                                {review.status} · {review.owner} · {review.dueAt}
+                              </p>
+                              <p className="mt-1 text-sm text-[var(--text)]">
+                                Open findings {review.openFindingCount} / {review.totalFindingCount}
+                              </p>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : null}
+                </Panel>
+                <Panel
+                  title="Selected access review"
+                  description="Name and status only. Findings are not editable in this phase."
+                >
+                  {selectedReview ? (
+                    <AccessReviewDetail review={selectedReview} canManage={canManageAdmin} />
+                  ) : (
+                    <p className="text-sm text-[var(--muted)]">No access review is selected.</p>
+                  )}
+                </Panel>
+              </div>
             ) : null}
 
             {section === "workspace" ? (
@@ -502,6 +577,77 @@ function IntegrationDetail({ integration }: { integration: ReturnType<typeof map
         <p className="text-[var(--muted)]">Notes</p>
         <p className="mt-1 text-[var(--text)]">{integration.notes}</p>
       </div>
+    </div>
+  );
+}
+
+function UserAdminDetail({
+  user,
+  canManageAdmin,
+  canManageRoles,
+}: {
+  user: AdminUserView;
+  canManageAdmin: boolean;
+  canManageRoles: boolean;
+}) {
+  return (
+    <div className="space-y-6 text-sm" data-testid="admin-user-detail">
+      <div>
+        <p className="text-[var(--muted)]">User</p>
+        <p className="mt-1 text-[var(--text)]">
+          {user.id} · {user.displayName} · {user.email}
+        </p>
+        <p className="mt-1 text-xs text-[var(--muted)]">
+          {user.department} · {user.privilegedLabel}
+        </p>
+      </div>
+      <div>
+        <p className="mb-2 text-[var(--muted)]">Account status</p>
+        <UserStatusEditor
+          userId={user.id}
+          status={user.status}
+          updatedAt={user.updatedAt}
+          canManage={canManageAdmin}
+        />
+      </div>
+      <div>
+        <p className="mb-2 text-[var(--muted)]">Role assignment</p>
+        <UserRolesEditor
+          userId={user.id}
+          roleNames={user.roleNames}
+          updatedAt={user.updatedAt}
+          canManageRoles={canManageRoles}
+        />
+      </div>
+    </div>
+  );
+}
+
+function AccessReviewDetail({
+  review,
+  canManage,
+}: {
+  review: AccessReviewView;
+  canManage: boolean;
+}) {
+  return (
+    <div className="space-y-4 text-sm" data-testid="admin-access-review-detail">
+      <div>
+        <p className="text-[var(--muted)]">Review</p>
+        <p className="mt-1 text-[var(--text)]">
+          {review.id} · Open findings {review.openFindingCount} / {review.totalFindingCount}
+        </p>
+        <p className="mt-1 text-xs text-[var(--muted)]">
+          {review.owner} · {review.dueAt}
+        </p>
+      </div>
+      <AccessReviewEditor
+        reviewId={review.id}
+        name={review.name}
+        status={review.status}
+        updatedAt={review.updatedAt}
+        canManage={canManage}
+      />
     </div>
   );
 }

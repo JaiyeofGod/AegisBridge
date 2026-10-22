@@ -19,7 +19,7 @@
 | Read API | `/api/v1` through reports, datasets, experiments, and cyber-range |
 | Authentication | Sessions + CSRF synchronizer tokens; domain GET RBAC enforced |
 | Write API | Preferences, risk treatment, incident, vulnerability remediation, access-review, user status, user role assignment; integration/report/cyber-range writes deferred |
-| Frontend API connection | Reads + CSRF client + preferences, risk treatment, incident, and vulnerability remediation writes; administration writes not yet wired in SPA |
+| Frontend API connection | Reads + CSRF client + preferences, risk, incident, vulnerability remediation, and administration (access review / user status / roles) writes; integration/report/cyber-range writes still disabled |
 | Package installs | API via uv; web via pnpm (`apps/web`) |
 | Cyber range | Not started |
 | Hosting | Not started |

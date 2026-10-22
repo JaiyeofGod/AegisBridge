@@ -1,6 +1,6 @@
 # Frontend audit
 
-Audit date: 21 Oct 2026 (updated after incident + vulnerability remediation write integration). Scope is the implemented web client.
+Audit date: 21 Oct 2026 (updated after administration write integration). Scope is the implemented web client.
 
 ## Auth / session / CSRF (current)
 
@@ -16,17 +16,20 @@ Audit date: 21 Oct 2026 (updated after incident + vulnerability remediation writ
 | Risk treatment | `PATCH /api/v1/risks/{id}/treatment` when `risk.manage` (CSRF). Read-only without it. |
 | Incident update | `PATCH /api/v1/incidents/{id}` when `incident.manage` (CSRF). Close/resolve also needs `incident.close`. Owner stays read-only (no user catalog on page). |
 | Vulnerability remediation | `PATCH /api/v1/vulnerabilities/{id}/remediation` when `vulnerability.manage` (CSRF). CVSS/EPSS/KEV/action_decision immutable. `asset_id` selector only. |
+| Access review update | `PATCH /api/v1/administration/access-reviews/{id}` when `administration.manage` (CSRF). Name/status only. Findings deferred. |
+| User status update | `PATCH /api/v1/administration/users/{id}` when `administration.manage` (CSRF). `active`/`inactive` only; inactive requires confirmation. |
+| User role assignment | `PUT /api/v1/administration/users/{id}/roles` when `user.role.manage` (CSRF). Seven-role catalog only. |
 | Credentials | `credentials: "include"` on all API client fetches. CSRF token never in localStorage/sessionStorage. |
 | Route guards | `RequireAuth` / `GuestOnly` — **UX only**. Not the security boundary. |
 | Domain GET authz | Enforced on the backend. Frontend still uses server permission labels for UX. |
-| Remaining writes / MFA / SSO | Admin, integrations, reports, cyber-range, incident tasks still deferred. |
+| Remaining writes / MFA / SSO | Integration credentials, reports, cyber-range, incident tasks still deferred. |
 
 Development sign-in hint shows seeded email `amara.okonkwo@aegisbridge.example` only. The development password is never rendered.
 
 ### CSRF client rules
 
 - Token lives in application memory only (`services/csrf.ts`).
-- Mutations use `apiMutate` / `apiPatch` / `apiPostCsrf`, which attach `X-CSRF-Token`.
+- Mutations use `apiMutate` / `apiPatch` / `apiPut` / `apiPostCsrf`, which attach `X-CSRF-Token`.
 - On `403` + `csrf_failed`, the client refreshes once via `GET /auth/csrf` and retries once (no loops).
 - CSRF is not authentication; the HttpOnly session cookie remains the auth credential.
 
@@ -46,7 +49,7 @@ Development sign-in hint shows seeded email `amara.okonkwo@aegisbridge.example` 
 | `/threat-intelligence` | Protected (UX). |
 | `/cyber-range` | Protected (UX). Controls still disabled. |
 | `/reports` | Protected (UX). |
-| `/administration` | Protected (UX). User/role writes still disabled. |
+| `/administration` | Protected (UX). Access-review / user status / role assignment wired; integration credential writes still disabled. |
 | `/account/profile` | Protected (UX). API profile fields; save still disabled. |
 | `/account/security` | Protected (UX). MFA honestly not configured; logout-all CSRF-protected. |
 | `/account/preferences` | Protected (UX). Persisted via PATCH; shows Default vs Stored. |
@@ -56,7 +59,7 @@ Unknown paths redirect to `/signin`. Auth status unknown shows a session loading
 
 ## Issues intentionally deferred
 
-- Incident task writes, administration writes, Cyber Range control, integrations, reports.
+- Incident task writes, integration credential writes, Cyber Range control, reports.
 - MFA enrollment, SSO/OIDC, password reset.
 - Profile/security field writes beyond preferences.
 - Incident/vulnerability owner selectors (no user catalog on those pages yet).
@@ -73,4 +76,4 @@ Route-level lazy loading remains. Auth adds a small session query on protected a
 
 ## Readiness assessment
 
-Frontend CSRF handling, preferences, risk treatment, incident updates, and vulnerability remediation are wired. **Backend remains the authorization boundary.** Remaining write APIs stay disabled in the UI.
+Frontend CSRF handling, preferences, risk treatment, incident updates, vulnerability remediation, and administration (access reviews, user status, role assignment) are wired. **Backend remains the authorization boundary.** Last-admin safeguards are server-enforced. Integration/credential and remaining write APIs stay disabled in the UI.

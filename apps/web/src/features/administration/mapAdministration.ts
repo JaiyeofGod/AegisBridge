@@ -29,9 +29,11 @@ export type AdminUserView = {
   email: string;
   status: string;
   department: string;
+  roleNames: string[];
   roles: string;
   privileged: boolean;
   privilegedLabel: string;
+  updatedAt: string | null;
 };
 
 export type AdminRoleView = {
@@ -62,6 +64,7 @@ export type AccessReviewView = {
   openFindingCount: number;
   totalFindingCount: number;
   dueAt: string;
+  updatedAt: string | null;
 };
 
 const statusLabels: Record<string, string> = {
@@ -150,9 +153,11 @@ export function mapAdminUser(item: AdminUserListItem): AdminUserView {
     email: item.email,
     status: item.status,
     department: item.department ?? "Not stored",
+    roleNames: [...item.roles],
     roles: item.roles.length > 0 ? item.roles.join(", ") : "No role stored",
     privileged: item.privileged,
     privilegedLabel: item.privileged ? "Privileged" : "Not privileged",
+    updatedAt: item.updated_at ?? null,
   };
 }
 
@@ -189,6 +194,7 @@ export function mapAccessReview(item: AccessReviewListItem): AccessReviewView {
     openFindingCount: item.open_finding_count,
     totalFindingCount: item.total_finding_count,
     dueAt: item.due_at ? formatTimestamp(item.due_at) : "Due date not stored",
+    updatedAt: item.updated_at ?? null,
   };
 }
 

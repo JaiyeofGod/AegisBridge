@@ -1,11 +1,16 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { AppRouter } from "@/app/router";
+import { setCsrfToken } from "@/services/csrf";
 import {
+  accessReviewItems,
   administrationSummary,
+  adminUsers,
   assetPage,
+  authenticatedSessionFixture,
+  currentUserFixture,
   emptyAdministrationSummary,
   installApiFetch,
   jsonResponse,
@@ -210,5 +215,266 @@ describe("Administration", () => {
     expect(within(page).getByTestId("admin-access-reviews")).toHaveTextContent(
       "No access reviews are stored.",
     );
+  });
+
+  it("allows administration.manage users to update access reviews with CSRF", async () => {
+    setCsrfToken("admin-csrf");
+    const { calls, inits } = installApiFetch();
+    const user = userEvent.setup();
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/administration"] });
+    const page = screen.getByTestId("administration-page");
+    await user.click(await within(page).findByRole("tab", { name: "Access reviews" }));
+    expect(await within(page).findByTestId("access-review-editor")).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByTestId("access-review-status"), "completed");
+    await user.click(screen.getByTestId("access-review-save"));
+
+    expect(await screen.findByTestId("access-review-success")).toHaveTextContent(
+      "Access review updated",
+    );
+    const patchIndex = calls.findIndex(
+      (url, index) =>
+        url.includes("/api/v1/administration/access-reviews/ARV-0001") &&
+        inits[index]?.method === "PATCH",
+    );
+    expect(patchIndex).toBeGreaterThanOrEqual(0);
+    const body = JSON.parse(String(inits[patchIndex]?.body)) as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual(["expected_updated_at", "status"].sort());
+    expect(body.status).toBe("completed");
+    expect(body.expected_updated_at).toBe(accessReviewItems[0]?.updated_at);
+    expect(body).not.toHaveProperty("owner");
+    expect(body).not.toHaveProperty("due_at");
+    expect((inits[patchIndex]?.headers as Headers).get("X-CSRF-Token")).toBe("admin-csrf");
+    expect(inits[patchIndex]?.credentials).toBe("include");
+  });
+
+  it("keeps access reviews read-only without administration.manage", async () => {
+    const readOnlyUser = {
+      ...currentUserFixture,
+      permissions: ["administration.read", "audit.read"],
+    };
+    installApiFetch(
+      (url) => {
+        if (url.includes("/api/v1/auth/session")) {
+          return jsonResponse({ ...authenticatedSessionFixture, user: readOnlyUser });
+        }
+        if (url.includes("/api/v1/auth/me")) {
+          return jsonResponse(readOnlyUser);
+        }
+        return undefined;
+      },
+      { authenticated: true, allowAuthOverride: true },
+    );
+    const user = userEvent.setup();
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/administration"] });
+    const page = screen.getByTestId("administration-page");
+    await user.click(await within(page).findByRole("tab", { name: "Access reviews" }));
+    expect(await within(page).findByTestId("access-review-editor-readonly")).toBeInTheDocument();
+    expect(screen.queryByTestId("access-review-save")).not.toBeInTheDocument();
+  });
+
+  it("handles access-review 409 and 422 without claiming success", async () => {
+    setCsrfToken("admin-csrf");
+    installApiFetch((url, init) => {
+      if (url.includes("/access-reviews/") && init?.method === "PATCH") {
+        const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+        if (body.status === "cancelled") {
+          return jsonResponse({ code: "validation_error", message: "Invalid status." }, 422);
+        }
+        return jsonResponse(
+          { code: "conflict", message: "The access review was modified by another request." },
+          409,
+        );
+      }
+      return undefined;
+    });
+    const user = userEvent.setup();
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/administration"] });
+    const page = screen.getByTestId("administration-page");
+    await user.click(await within(page).findByRole("tab", { name: "Access reviews" }));
+    await screen.findByTestId("access-review-editor");
+
+    await user.selectOptions(screen.getByTestId("access-review-status"), "closed");
+    await user.click(screen.getByTestId("access-review-save"));
+    expect(await screen.findByTestId("access-review-error")).toHaveTextContent(
+      "modified by another request",
+    );
+    expect(screen.queryByTestId("access-review-success")).not.toBeInTheDocument();
+    expect(screen.getByTestId("access-review-reload")).toBeInTheDocument();
+  });
+
+  it("updates user status with confirmation and refreshes summary", async () => {
+    setCsrfToken("admin-csrf");
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { calls, inits } = installApiFetch();
+    const user = userEvent.setup();
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/administration"] });
+    const page = screen.getByTestId("administration-page");
+    await user.click(await within(page).findByRole("tab", { name: "Users" }));
+    await user.click(within(page).getByTestId("admin-user-select-USR-0004"));
+    expect(await within(page).findByTestId("user-status-editor")).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByTestId("user-status-select"), "inactive");
+    await user.click(screen.getByTestId("user-status-save"));
+
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(await screen.findByTestId("user-status-success")).toHaveTextContent(
+      "User status updated",
+    );
+    const patchIndex = calls.findIndex(
+      (url, index) =>
+        url.includes("/api/v1/administration/users/USR-0004") &&
+        !url.includes("/roles") &&
+        inits[index]?.method === "PATCH",
+    );
+    expect(patchIndex).toBeGreaterThanOrEqual(0);
+    const body = JSON.parse(String(inits[patchIndex]?.body)) as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual(["expected_updated_at", "status"].sort());
+    expect(body.status).toBe("inactive");
+    expect(body).not.toHaveProperty("email");
+    expect(body).not.toHaveProperty("permissions");
+    expect(body.expected_updated_at).toBe(
+      adminUsers.find((item) => item.id === "USR-0004")?.updated_at,
+    );
+    confirmSpy.mockRestore();
+  });
+
+  it("shows last-admin protection on user status 409", async () => {
+    setCsrfToken("admin-csrf");
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    installApiFetch((url, init) => {
+      if (url.includes("/users/USR-0001") && init?.method === "PATCH") {
+        return jsonResponse(
+          {
+            code: "conflict",
+            message: "Cannot disable the last active Administrator account.",
+          },
+          409,
+        );
+      }
+      return undefined;
+    });
+    const user = userEvent.setup();
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/administration"] });
+    const page = screen.getByTestId("administration-page");
+    await user.click(await within(page).findByRole("tab", { name: "Users" }));
+    await user.click(within(page).getByTestId("admin-user-select-USR-0001"));
+    await user.selectOptions(screen.getByTestId("user-status-select"), "inactive");
+    await user.click(screen.getByTestId("user-status-save"));
+    expect(await screen.findByTestId("user-status-error")).toHaveTextContent(
+      "last active Administrator",
+    );
+    expect(screen.queryByTestId("user-status-success")).not.toBeInTheDocument();
+  });
+
+  it("keeps status and roles read-only without mutation permissions", async () => {
+    const readOnlyUser = {
+      ...currentUserFixture,
+      permissions: ["administration.read"],
+    };
+    installApiFetch(
+      (url) => {
+        if (url.includes("/api/v1/auth/session")) {
+          return jsonResponse({ ...authenticatedSessionFixture, user: readOnlyUser });
+        }
+        if (url.includes("/api/v1/auth/me")) {
+          return jsonResponse(readOnlyUser);
+        }
+        return undefined;
+      },
+      { authenticated: true, allowAuthOverride: true },
+    );
+    const user = userEvent.setup();
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/administration"] });
+    const page = screen.getByTestId("administration-page");
+    await user.click(await within(page).findByRole("tab", { name: "Users" }));
+    expect(await within(page).findByTestId("user-status-editor-readonly")).toBeInTheDocument();
+    expect(within(page).getByTestId("user-roles-editor-readonly")).toBeInTheDocument();
+    expect(screen.queryByTestId("user-status-save")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("user-roles-save")).not.toBeInTheDocument();
+  });
+
+  it("requires user.role.manage for role editing even with administration.manage", async () => {
+    const manageOnly = {
+      ...currentUserFixture,
+      permissions: ["administration.read", "administration.manage"],
+    };
+    installApiFetch(
+      (url) => {
+        if (url.includes("/api/v1/auth/session")) {
+          return jsonResponse({ ...authenticatedSessionFixture, user: manageOnly });
+        }
+        if (url.includes("/api/v1/auth/me")) {
+          return jsonResponse(manageOnly);
+        }
+        return undefined;
+      },
+      { authenticated: true, allowAuthOverride: true },
+    );
+    const user = userEvent.setup();
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/administration"] });
+    const page = screen.getByTestId("administration-page");
+    await user.click(await within(page).findByRole("tab", { name: "Users" }));
+    expect(await within(page).findByTestId("user-status-editor")).toBeInTheDocument();
+    expect(within(page).getByTestId("user-roles-editor-readonly")).toBeInTheDocument();
+    expect(screen.queryByTestId("user-roles-save")).not.toBeInTheDocument();
+  });
+
+  it("replaces user roles from the seven-role catalog with CSRF", async () => {
+    setCsrfToken("admin-csrf");
+    const { calls, inits } = installApiFetch();
+    const user = userEvent.setup();
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/administration"] });
+    const page = screen.getByTestId("administration-page");
+    await user.click(await within(page).findByRole("tab", { name: "Users" }));
+    await user.click(within(page).getByTestId("admin-user-select-USR-0004"));
+    expect(await within(page).findByTestId("user-roles-editor")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("user-role-soc-analyst"));
+    await user.click(screen.getByTestId("user-role-auditor"));
+    await user.click(screen.getByTestId("user-role-read-only"));
+    await user.click(screen.getByTestId("user-roles-save"));
+
+    expect(await screen.findByTestId("user-roles-success")).toHaveTextContent("User roles updated");
+    const putIndex = calls.findIndex(
+      (url, index) =>
+        url.includes("/api/v1/administration/users/USR-0004/roles") &&
+        inits[index]?.method === "PUT",
+    );
+    expect(putIndex).toBeGreaterThanOrEqual(0);
+    const body = JSON.parse(String(inits[putIndex]?.body)) as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual(["expected_updated_at", "roles"].sort());
+    expect(body.roles).toEqual(["Auditor", "Read Only"]);
+    expect(body).not.toHaveProperty("permissions");
+    expect(body).not.toHaveProperty("privileged");
+    expect((inits[putIndex]?.headers as Headers).get("X-CSRF-Token")).toBe("admin-csrf");
+  });
+
+  it("surfaces last-admin role-removal conflict", async () => {
+    setCsrfToken("admin-csrf");
+    installApiFetch((url, init) => {
+      if (url.includes("/users/USR-0001/roles") && init?.method === "PUT") {
+        return jsonResponse(
+          {
+            code: "conflict",
+            message: "Cannot remove Administrator from the last active Administrator account.",
+          },
+          409,
+        );
+      }
+      return undefined;
+    });
+    const user = userEvent.setup();
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/administration"] });
+    const page = screen.getByTestId("administration-page");
+    await user.click(await within(page).findByRole("tab", { name: "Users" }));
+    await user.click(within(page).getByTestId("admin-user-select-USR-0001"));
+    await user.click(screen.getByTestId("user-role-administrator"));
+    await user.click(screen.getByTestId("user-role-read-only"));
+    await user.click(screen.getByTestId("user-roles-save"));
+    expect(await screen.findByTestId("user-roles-error")).toHaveTextContent(
+      "last active Administrator",
+    );
+    expect(screen.queryByTestId("user-roles-success")).not.toBeInTheDocument();
   });
 });

@@ -151,6 +151,10 @@ export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
   return apiMutate<T>("PATCH", path, body);
 }
 
+export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
+  return apiMutate<T>("PUT", path, body);
+}
+
 export async function apiPostCsrf<T>(path: string, body?: unknown): Promise<T> {
   return apiMutate<T>("POST", path, body);
 }

@@ -813,6 +813,7 @@ export const adminUsers: AdminUserListItem[] = [
     department: "Security",
     roles: ["Administrator"],
     privileged: true,
+    updated_at: "2026-10-21T12:00:00+00:00",
   },
   {
     id: "USR-0002",
@@ -822,6 +823,7 @@ export const adminUsers: AdminUserListItem[] = [
     department: "Security",
     roles: ["Security Engineer"],
     privileged: true,
+    updated_at: "2026-10-21T12:00:00+00:00",
   },
   {
     id: "USR-0004",
@@ -831,6 +833,7 @@ export const adminUsers: AdminUserListItem[] = [
     department: "Security",
     roles: ["SOC Analyst"],
     privileged: false,
+    updated_at: "2026-10-21T12:00:00+00:00",
   },
 ];
 
@@ -917,6 +920,7 @@ export const accessReviewItems: AccessReviewListItem[] = [
     open_finding_count: 1,
     total_finding_count: 1,
     due_at: null,
+    updated_at: "2026-10-21T12:00:00+00:00",
   },
 ];
 
@@ -1855,6 +1859,47 @@ export function installApiFetch(
     ...vulnDetail,
     assets: vulnDetail.assets.map((asset) => ({ ...asset })),
   };
+  let adminUsersState: AdminUserListItem[] = adminUsers.map((user) => ({
+    ...user,
+    roles: [...user.roles],
+  }));
+  let accessReviewState: AccessReviewListItem[] = accessReviewItems.map((review) => ({
+    ...review,
+  }));
+  let adminSummaryState: AdministrationSummary = { ...administrationSummary };
+  let auditEventsState: AuditEventListItem[] = [...auditEvents];
+
+  function syncAdminSummaryCounts() {
+    adminSummaryState = {
+      ...adminSummaryState,
+      active_user_count: adminUsersState.filter((user) => user.status === "active").length,
+      privileged_user_count: adminUsersState.filter((user) => user.privileged).length,
+      pending_access_review_count: accessReviewState.filter(
+        (review) => !["closed", "completed", "cancelled"].includes(review.status),
+      ).length,
+      recent_audit_event_count: auditEventsState.length,
+    };
+  }
+
+  function appendAdminAudit(action: string, objectType: string, objectId: string, detail: string) {
+    auditEventsState = [
+      {
+        id: `AUD-${String(auditEventsState.length + 1).padStart(4, "0")}`,
+        occurred_at: "2026-10-21T18:00:00+00:00",
+        actor: { id: "USR-0001", display_name: "Amara Okonkwo" },
+        actor_label: "USR-0001",
+        action,
+        object_type: objectType,
+        object_id: objectId,
+        result: "success",
+        source: "api",
+        environment_name: "test",
+        detail,
+      },
+      ...auditEventsState,
+    ];
+    syncAdminSummaryCounts();
+  }
 
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
@@ -2077,17 +2122,205 @@ export function installApiFetch(
     if (url.includes("/api/v1/threat-intelligence/sources")) {
       return jsonResponse(assetPage(threatSources));
     }
-    if (url.includes("/api/v1/administration/summary")) return jsonResponse(administrationSummary);
+    if (/\/api\/v1\/administration\/access-reviews\/[^/?]+/.test(url) && init?.method === "PATCH") {
+      const provided = headerValue(init, "X-CSRF-Token");
+      if (!provided) {
+        return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+      }
+      const reviewId = decodeURIComponent(url.split("/access-reviews/")[1]?.split("?")[0] ?? "");
+      const index = accessReviewState.findIndex((review) => review.id === reviewId);
+      if (index < 0) {
+        return jsonResponse({ code: "not_found", message: "Access review was not found." }, 404);
+      }
+      const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+      const forbidden = Object.keys(body).filter(
+        (key) => !["name", "status", "expected_updated_at"].includes(key),
+      );
+      if (forbidden.length > 0) {
+        return jsonResponse({ code: "validation_error", message: "Unexpected fields." }, 422);
+      }
+      if (
+        typeof body.status === "string" &&
+        !["in_progress", "closed", "completed", "cancelled"].includes(body.status)
+      ) {
+        return jsonResponse({ code: "validation_error", message: "Invalid status." }, 422);
+      }
+      const current = accessReviewState[index];
+      if (
+        typeof body.expected_updated_at === "string" &&
+        body.expected_updated_at !== current.updated_at
+      ) {
+        return jsonResponse(
+          { code: "conflict", message: "The access review was modified by another request." },
+          409,
+        );
+      }
+      const next = {
+        ...current,
+        name: typeof body.name === "string" ? body.name : current.name,
+        status: typeof body.status === "string" ? body.status : current.status,
+        updated_at: "2026-10-21T18:00:00+00:00",
+      };
+      accessReviewState = accessReviewState.map((review, i) => (i === index ? next : review));
+      appendAdminAudit("ACCESS_REVIEW_UPDATE", "access_review", reviewId, "Updated access review.");
+      return jsonResponse(next);
+    }
+    if (/\/api\/v1\/administration\/users\/[^/?]+\/roles/.test(url) && init?.method === "PUT") {
+      const provided = headerValue(init, "X-CSRF-Token");
+      if (!provided) {
+        return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+      }
+      const userId = decodeURIComponent(
+        url.split("/users/")[1]?.split("/roles")[0]?.split("?")[0] ?? "",
+      );
+      const index = adminUsersState.findIndex((user) => user.id === userId);
+      if (index < 0) {
+        return jsonResponse({ code: "not_found", message: "User was not found." }, 404);
+      }
+      const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+      const forbidden = Object.keys(body).filter(
+        (key) => !["roles", "expected_updated_at"].includes(key),
+      );
+      if (forbidden.length > 0) {
+        return jsonResponse({ code: "validation_error", message: "Unexpected fields." }, 422);
+      }
+      if (!Array.isArray(body.roles)) {
+        return jsonResponse({ code: "validation_error", message: "Roles are required." }, 422);
+      }
+      const catalog = new Set(adminRoles.map((role) => role.name));
+      const roles = Array.from(
+        new Set(
+          body.roles.filter((role): role is string => typeof role === "string" && role.length > 0),
+        ),
+      );
+      if (roles.some((role) => !catalog.has(role))) {
+        return jsonResponse({ code: "validation_error", message: "Unknown role." }, 422);
+      }
+      if (roles.length === 0) {
+        return jsonResponse(
+          { code: "validation_error", message: "At least one role is required." },
+          422,
+        );
+      }
+      const current = adminUsersState[index];
+      if (
+        typeof body.expected_updated_at === "string" &&
+        body.expected_updated_at !== current.updated_at
+      ) {
+        return jsonResponse(
+          { code: "conflict", message: "The user was modified by another request." },
+          409,
+        );
+      }
+      if (
+        current.roles.includes("Administrator") &&
+        !roles.includes("Administrator") &&
+        adminUsersState.filter(
+          (user) =>
+            user.id !== userId && user.status === "active" && user.roles.includes("Administrator"),
+        ).length === 0
+      ) {
+        return jsonResponse(
+          {
+            code: "conflict",
+            message: "Cannot remove Administrator from the last active Administrator account.",
+          },
+          409,
+        );
+      }
+      const next = {
+        ...current,
+        roles: [...roles].sort((a, b) => a.localeCompare(b)),
+        privileged: roles.some((role) => role === "Administrator" || role === "Security Engineer"),
+        updated_at: "2026-10-21T18:00:00+00:00",
+      };
+      adminUsersState = adminUsersState.map((user, i) => (i === index ? next : user));
+      appendAdminAudit("USER_ROLE_UPDATE", "user", userId, "Updated user roles.");
+      return jsonResponse({
+        ...next,
+        permissions: next.roles.flatMap(
+          (role) => adminRoles.find((item) => item.name === role)?.permissions ?? [],
+        ),
+      });
+    }
+    if (
+      /\/api\/v1\/administration\/users\/[^/?]+$/.test(url.split("?")[0] ?? "") &&
+      init?.method === "PATCH"
+    ) {
+      const provided = headerValue(init, "X-CSRF-Token");
+      if (!provided) {
+        return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+      }
+      const userId = decodeURIComponent(url.split("/users/")[1]?.split("?")[0] ?? "");
+      const index = adminUsersState.findIndex((user) => user.id === userId);
+      if (index < 0) {
+        return jsonResponse({ code: "not_found", message: "User was not found." }, 404);
+      }
+      const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+      const forbidden = Object.keys(body).filter(
+        (key) => !["status", "expected_updated_at"].includes(key),
+      );
+      if (forbidden.length > 0) {
+        return jsonResponse({ code: "validation_error", message: "Unexpected fields." }, 422);
+      }
+      if (typeof body.status === "string" && !["active", "inactive"].includes(body.status)) {
+        return jsonResponse({ code: "validation_error", message: "Invalid status." }, 422);
+      }
+      const current = adminUsersState[index];
+      if (
+        typeof body.expected_updated_at === "string" &&
+        body.expected_updated_at !== current.updated_at
+      ) {
+        return jsonResponse(
+          { code: "conflict", message: "The user was modified by another request." },
+          409,
+        );
+      }
+      if (
+        typeof body.status === "string" &&
+        body.status === "inactive" &&
+        current.status === "active" &&
+        current.roles.includes("Administrator") &&
+        adminUsersState.filter(
+          (user) =>
+            user.id !== userId && user.status === "active" && user.roles.includes("Administrator"),
+        ).length === 0
+      ) {
+        return jsonResponse(
+          {
+            code: "conflict",
+            message: "Cannot disable the last active Administrator account.",
+          },
+          409,
+        );
+      }
+      const next = {
+        ...current,
+        status: typeof body.status === "string" ? body.status : current.status,
+        updated_at: "2026-10-21T18:00:00+00:00",
+      };
+      adminUsersState = adminUsersState.map((user, i) => (i === index ? next : user));
+      appendAdminAudit("USER_STATUS_UPDATE", "user", userId, "Updated user status.");
+      return jsonResponse({
+        ...next,
+        permissions: next.roles.flatMap(
+          (role) => adminRoles.find((item) => item.name === role)?.permissions ?? [],
+        ),
+      });
+    }
+    if (url.includes("/api/v1/administration/summary")) return jsonResponse(adminSummaryState);
     if (url.includes("/api/v1/administration/integrations")) {
       return jsonResponse(assetPage(integrationItems));
     }
-    if (url.includes("/api/v1/administration/users")) return jsonResponse(assetPage(adminUsers));
+    if (url.includes("/api/v1/administration/users")) {
+      return jsonResponse(assetPage(adminUsersState));
+    }
     if (url.includes("/api/v1/administration/roles")) return jsonResponse(assetPage(adminRoles));
     if (url.includes("/api/v1/administration/audit-events")) {
-      return jsonResponse(assetPage(auditEvents));
+      return jsonResponse(assetPage(auditEventsState));
     }
     if (url.includes("/api/v1/administration/access-reviews")) {
-      return jsonResponse(assetPage(accessReviewItems));
+      return jsonResponse(assetPage(accessReviewState));
     }
     if (url.includes("/api/v1/reports/summary")) return jsonResponse(reportsSummary);
     if (/\/api\/v1\/reports\/definitions\/[^/?]+/.test(url)) {

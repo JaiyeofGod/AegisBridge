@@ -1,12 +1,16 @@
-import { apiGet } from "@/services/api-client";
+import { apiGet, apiPatch, apiPut } from "@/services/api-client";
 import type {
   AccessReviewListItem,
+  AccessReviewUpdate,
   AdministrationSummary,
   AdminRoleListItem,
   AdminUserListItem,
   AuditEventListItem,
   IntegrationListItem,
   PageResponse,
+  UserAdminDetail,
+  UserRolesUpdate,
+  UserStatusUpdate,
 } from "@/services/api-types";
 
 const page = "page=1&page_size=100";
@@ -34,5 +38,26 @@ export function fetchAuditEvents() {
 export function fetchAccessReviews() {
   return apiGet<PageResponse<AccessReviewListItem>>(
     `/api/v1/administration/access-reviews?${page}`,
+  );
+}
+
+export function updateAccessReview(reviewId: string, patch: AccessReviewUpdate) {
+  return apiPatch<AccessReviewListItem>(
+    `/api/v1/administration/access-reviews/${encodeURIComponent(reviewId)}`,
+    patch,
+  );
+}
+
+export function updateUserStatus(userId: string, patch: UserStatusUpdate) {
+  return apiPatch<UserAdminDetail>(
+    `/api/v1/administration/users/${encodeURIComponent(userId)}`,
+    patch,
+  );
+}
+
+export function replaceUserRoles(userId: string, body: UserRolesUpdate) {
+  return apiPut<UserAdminDetail>(
+    `/api/v1/administration/users/${encodeURIComponent(userId)}/roles`,
+    body,
   );
 }

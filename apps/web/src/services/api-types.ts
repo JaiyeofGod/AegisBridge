@@ -470,6 +470,32 @@ export type AdminUserListItem = {
   department: string | null;
   roles: string[];
   privileged: boolean;
+  updated_at?: string | null;
+};
+
+/** User row returned by administration user mutations. */
+export type UserAdminDetail = AdminUserListItem & {
+  permissions: string[];
+};
+
+export type AdminAccountStatus = "active" | "inactive";
+
+export type AccessReviewStatusValue = "in_progress" | "closed" | "completed" | "cancelled";
+
+export type AccessReviewUpdate = {
+  name?: string;
+  status?: AccessReviewStatusValue;
+  expected_updated_at?: string | null;
+};
+
+export type UserStatusUpdate = {
+  status?: AdminAccountStatus;
+  expected_updated_at?: string | null;
+};
+
+export type UserRolesUpdate = {
+  roles: string[];
+  expected_updated_at?: string | null;
 };
 
 export type AdminRoleListItem = {
@@ -501,6 +527,7 @@ export type AccessReviewListItem = {
   open_finding_count: number;
   total_finding_count: number;
   due_at: string | null;
+  updated_at?: string | null;
 };
 
 export type ReportsSummary = {
