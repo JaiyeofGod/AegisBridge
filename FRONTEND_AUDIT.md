@@ -1,6 +1,6 @@
 # Frontend audit
 
-Audit date: 21 Oct 2026 (updated after CSRF + preferences + risk treatment write integration). Scope is the implemented web client.
+Audit date: 21 Oct 2026 (updated after incident + vulnerability remediation write integration). Scope is the implemented web client.
 
 ## Auth / session / CSRF (current)
 
@@ -14,10 +14,12 @@ Audit date: 21 Oct 2026 (updated after CSRF + preferences + risk treatment write
 | `POST /api/v1/auth/logout-all` | Same CSRF rules from Account Security. |
 | Account preferences | `GET` + `PATCH /api/v1/account/preferences` (CSRF). Persistence `default` \| `stored`. |
 | Risk treatment | `PATCH /api/v1/risks/{id}/treatment` when `risk.manage` (CSRF). Read-only without it. |
+| Incident update | `PATCH /api/v1/incidents/{id}` when `incident.manage` (CSRF). Close/resolve also needs `incident.close`. Owner stays read-only (no user catalog on page). |
+| Vulnerability remediation | `PATCH /api/v1/vulnerabilities/{id}/remediation` when `vulnerability.manage` (CSRF). CVSS/EPSS/KEV/action_decision immutable. `asset_id` selector only. |
 | Credentials | `credentials: "include"` on all API client fetches. CSRF token never in localStorage/sessionStorage. |
 | Route guards | `RequireAuth` / `GuestOnly` — **UX only**. Not the security boundary. |
 | Domain GET authz | Enforced on the backend. Frontend still uses server permission labels for UX. |
-| Broader writes / MFA / SSO | Still deferred. |
+| Remaining writes / MFA / SSO | Admin, integrations, reports, cyber-range, incident tasks still deferred. |
 
 Development sign-in hint shows seeded email `amara.okonkwo@aegisbridge.example` only. The development password is never rendered.
 
@@ -38,9 +40,9 @@ Development sign-in hint shows seeded email `amara.okonkwo@aegisbridge.example` 
 | `/risks` | Protected (UX). Treatment editable with `risk.manage`; read-only with `risk.read`. |
 | `/assets` | Protected (UX). |
 | `/assets/FIN-APP-01` | Protected (UX). |
-| `/vulnerabilities` | Protected (UX). |
+| `/vulnerabilities` | Protected (UX). Remediation editable with `vulnerability.manage`; enrichment fields read-only. |
 | `/soc` | Protected (UX). |
-| `/incidents` | Protected (UX). Writes still disabled. |
+| `/incidents` | Protected (UX). Editable with `incident.manage`; task writes deferred. |
 | `/threat-intelligence` | Protected (UX). |
 | `/cyber-range` | Protected (UX). Controls still disabled. |
 | `/reports` | Protected (UX). |
@@ -54,9 +56,10 @@ Unknown paths redirect to `/signin`. Auth status unknown shows a session loading
 
 ## Issues intentionally deferred
 
-- Broader domain mutations (incidents, vulnerability remediation, administration writes, Cyber Range control).
+- Incident task writes, administration writes, Cyber Range control, integrations, reports.
 - MFA enrollment, SSO/OIDC, password reset.
 - Profile/security field writes beyond preferences.
+- Incident/vulnerability owner selectors (no user catalog on those pages yet).
 - Tab widget a11y consolidation across modules.
 - Spline runtime chunk size.
 
@@ -70,4 +73,4 @@ Route-level lazy loading remains. Auth adds a small session query on protected a
 
 ## Readiness assessment
 
-Frontend CSRF handling, preference persistence, and risk treatment update are wired. **Backend remains the authorization boundary.** Remaining write APIs stay disabled in the UI.
+Frontend CSRF handling, preferences, risk treatment, incident updates, and vulnerability remediation are wired. **Backend remains the authorization boundary.** Remaining write APIs stay disabled in the UI.

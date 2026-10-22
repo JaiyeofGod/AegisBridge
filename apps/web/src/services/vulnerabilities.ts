@@ -1,9 +1,10 @@
-import { apiGet } from "@/services/api-client";
+import { apiGet, apiPatch } from "@/services/api-client";
 import type {
   PageResponse,
   VulnerabilityDetailResponse,
   VulnerabilityListItem,
   VulnerabilityQuery,
+  VulnerabilityRemediationUpdate,
 } from "@/services/api-types";
 
 export function fetchVulnerabilities(query: VulnerabilityQuery = {}) {
@@ -24,5 +25,15 @@ export function fetchVulnerabilities(query: VulnerabilityQuery = {}) {
 export function fetchVulnerability(vulnerabilityId: string) {
   return apiGet<VulnerabilityDetailResponse>(
     `/api/v1/vulnerabilities/${encodeURIComponent(vulnerabilityId)}`,
+  );
+}
+
+export function updateVulnerabilityRemediation(
+  vulnerabilityId: string,
+  patch: VulnerabilityRemediationUpdate,
+) {
+  return apiPatch<VulnerabilityDetailResponse>(
+    `/api/v1/vulnerabilities/${encodeURIComponent(vulnerabilityId)}/remediation`,
+    patch,
   );
 }

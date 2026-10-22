@@ -189,7 +189,9 @@ Authenticated session required (401 without a valid cookie):
 | Administration summary/users/roles/access-reviews | `administration.read` | Yes |
 | Administration integrations | `administration.read` **and** `integration.read` | Yes |
 | Administration audit events | `administration.read` **and** `audit.read` | Yes |
-| Administration writes / role assignment | `administration.manage`, `user.role.manage`, `integration.manage` | No (writes deferred; need CSRF) |
+| Access-review / user-status writes | `administration.manage` + CSRF | Yes |
+| User role assignment | `administration.manage` **and** `user.role.manage` + CSRF | Yes (Administrator only in matrix) |
+| Integration credential / connection writes | `integration.manage` | No (deferred) |
 | Auth session/me | authenticated (`/me`); `/session` public | Yes |
 | Account | authenticated; preferences PATCH + CSRF | Yes |
 | Risk treatment PATCH | `risk.manage` + CSRF | Yes |
@@ -200,7 +202,7 @@ Authenticated session required (401 without a valid cookie):
 **403** = missing permission (`forbidden`) or CSRF failure (`csrf_failed`). Error bodies do not list capability codes or tokens.  
 **409** = stale `expected_updated_at` concurrency conflict.
 
-**Remaining authenticated domain writes** (incident tasks, admin, integrations, reports, cyber-range control, exception workflows beyond remediation) remain deferred. No Cyber Range remote control.
+**Remaining authenticated domain writes** (incident tasks, integration credentials, reports, cyber-range control, exception workflows beyond remediation) remain deferred. No Cyber Range remote control.
 
 ### Incident mutation scope (`incident.manage`)
 
@@ -212,6 +214,18 @@ Closing (`resolved` / `closed`) additionally requires `incident.close`.
 
 Writable on the latest `RemediationTask` for a selected asset finding: `status`, `title`, `due_on`, `owner`.  
 Immutable: CVSS, EPSS, KEV, CVE metadata, asset criticality/exposure, SSVC `action_decision` / rationale.
+
+### Administration mutation scope
+
+**Access reviews** (`administration.manage` + CSRF): writable `name`, `status`. Not stored / not writable: owner, due date, notes. Finding PATCH deferred — `access_review_findings` have no public human id.
+
+**User status** (`administration.manage` + CSRF): writable `status` ∈ `{active, inactive}` only (matches auth: non-`active` cannot authenticate). Not writable: email, password/credentials, human id, internal UUID, permissions.
+
+**User roles** (`administration.manage` **and** `user.role.manage` + CSRF): replace with names from the seven-role catalog only. No client-created roles, no direct permission assignment. Only **Administrator** holds both permissions in the matrix; Security Engineer cannot assign roles (including Administrator).
+
+**Self-admin / lockout safeguards:** refusing to set the last active Administrator to `inactive`, and refusing to remove the Administrator role from that account (`409`). Organization-wide quorum is not implemented. Multi-admin disable of a non-last Administrator is allowed (including self-disable when another active Administrator exists).
+
+**Still disabled:** integration credential/connection writes, role definition create/delete, permission catalog mutation, audit-event mutation, user deletion, password reset/change, MFA/SSO.
 
 ## Audit behavior
 
@@ -225,8 +239,11 @@ Security-relevant actions write `audit_events` rows:
 - `RISK_TREATMENT_UPDATE`
 - `INCIDENT_UPDATE`
 - `VULNERABILITY_REMEDIATION_UPDATE`
+- `ACCESS_REVIEW_UPDATE`
+- `USER_STATUS_UPDATE`
+- `USER_ROLE_UPDATE`
 
-Metadata may include actor human id, action, object human id, and changed field names. Metadata must not include passwords, hashes, session/CSRF tokens, or digests.
+Metadata may include actor human id, target human id, action, object human id, changed field names, and safe old/new status or role names. Privileged role changes note whether Administrator remains assigned. Metadata must not include passwords, hashes, session/CSRF tokens, or digests.
 
 ## Development login setup
 
@@ -240,7 +257,7 @@ Never commit the real password. Production must not rely on this variable.
 ## Production hardening still required
 
 - Login rate limiting / lockout (structure is ready; not implemented)
-- Remaining CSRF-protected domain writes (admin, integrations, reports, cyber-range, incident tasks)
+- Remaining CSRF-protected domain writes (integrations, reports, cyber-range, incident tasks)
 - MFA/TOTP
 - Password reset email flows
 - SSO/OIDC

@@ -1,6 +1,6 @@
 # AegisBridge API (`apps/api`)
 
-FastAPI service with Phase 2 domain models, session authentication, enforced RBAC on domain reads, synchronizer CSRF, and authenticated writes for account preferences, risk treatment, incidents, and vulnerability remediation. Frontend guards are UX only. Remaining writes, SSO/MFA, and rate limiting remain deferred.
+FastAPI service with Phase 2 domain models, session authentication, enforced RBAC on domain reads, synchronizer CSRF, and authenticated writes for account preferences, risk treatment, incidents, vulnerability remediation, and administration (access reviews, user status, role assignment). Frontend guards are UX only. Integration/report/cyber-range writes, SSO/MFA, and rate limiting remain deferred.
 
 ## Commands
 
@@ -62,6 +62,9 @@ See `docs/security/AUTHENTICATION_AND_RBAC.md`. Never commit a real password. Pr
 - `PATCH /api/v1/risks/{risk_id}/treatment` (`risk.manage` + CSRF)
 - `PATCH /api/v1/incidents/{incident_id}` (`incident.manage` + CSRF; `incident.close` to resolve/close)
 - `PATCH /api/v1/vulnerabilities/{vulnerability_id}/remediation` (`vulnerability.manage` + CSRF)
+- `PATCH /api/v1/administration/access-reviews/{review_id}` (`administration.manage` + CSRF)
+- `PATCH /api/v1/administration/users/{user_id}` (`administration.manage` + CSRF; status only)
+- `PUT /api/v1/administration/users/{user_id}/roles` (`administration.manage` + `user.role.manage` + CSRF)
 
 ## Domain read API
 

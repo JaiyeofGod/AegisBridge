@@ -153,6 +153,20 @@ export type VulnerabilityAssetContext = {
   due_on: string | null;
   owner: PersonRef | null;
   mitigating_controls: RelatedRecord[];
+  remediation_updated_at?: string | null;
+};
+
+export type RemediationStatusValue =
+  "open" | "in_progress" | "complete" | "deferred" | "cancelled" | "accepted";
+
+export type VulnerabilityRemediationUpdate = {
+  status?: RemediationStatusValue;
+  title?: string;
+  due_on?: string | null;
+  owner?: string | null;
+  /** Selector only — must already be associated with the vulnerability. */
+  asset_id?: string;
+  expected_updated_at?: string | null;
 };
 
 export type VulnerabilityListItem = {
@@ -271,6 +285,21 @@ export type IncidentDetailResponse = IncidentListItem & {
   evidence: IncidentEvidenceItem[];
   related_alerts: RelatedRecord[];
   affected_assets: RelatedRecord[];
+  updated_at?: string | null;
+};
+
+export type IncidentSeverityValue = "critical" | "high" | "medium" | "low" | "informational";
+
+export type IncidentStatusValue =
+  "new" | "investigating" | "contained" | "mitigated" | "resolved" | "closed";
+
+export type IncidentUpdate = {
+  title?: string;
+  severity?: IncidentSeverityValue;
+  status?: IncidentStatusValue;
+  summary?: string;
+  owner?: string | null;
+  expected_updated_at?: string | null;
 };
 
 export type IncidentQuery = {

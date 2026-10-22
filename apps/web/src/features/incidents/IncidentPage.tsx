@@ -26,14 +26,16 @@ import {
   tasksFrom,
   timelineFrom,
 } from "@/features/incidents/mapIncident";
+import { IncidentEditor } from "@/features/incidents/IncidentEditor";
 import {
   useIncidentCatalog,
   useIncidentDetail,
   useIncidentList,
 } from "@/features/incidents/useIncidentData";
+import { useAuthStatus } from "@/features/auth/useAuthSession";
 import { cn } from "@/lib/cn";
 import { formatTimestamp } from "@/lib/format";
-import type { IncidentQuery } from "@/services/api-types";
+import type { IncidentDetailResponse, IncidentQuery } from "@/services/api-types";
 import type { IncidentRecord, IncidentSectionId, TimelineEvent } from "@/types/incident";
 
 const sections: { id: IncidentSectionId; label: string }[] = [
@@ -225,6 +227,7 @@ export function IncidentPage() {
                     {selected ? (
                       <IncidentContext
                         incident={selected}
+                        detail={detail.data ?? null}
                         timeline={timeline}
                         openTasks={tasks.filter((item) => item.status.toLowerCase() !== "done")}
                         evidenceIds={evidence.map((item) => item.evidenceId)}
@@ -452,15 +455,21 @@ function uniqueOptions(values: string[]): IncidentFilterOption[] {
 
 function IncidentContext({
   incident,
+  detail,
   timeline,
   openTasks,
   evidenceIds,
 }: {
   incident: IncidentRecord;
+  detail: IncidentDetailResponse | null;
   timeline: TimelineEvent[];
   openTasks: { taskId: string; title: string }[];
   evidenceIds: string[];
 }) {
+  const auth = useAuthStatus();
+  const permissions = auth.user?.permissions ?? [];
+  const canManage = permissions.includes("incident.manage");
+  const canClose = permissions.includes("incident.close");
   const latest = timeline[timeline.length - 1];
   return (
     <div className="space-y-4 text-sm" data-testid="incident-context">
@@ -473,6 +482,22 @@ function IncidentContext({
         <p className="mt-1 text-[var(--text)]">
           {incident.severity} severity · {incident.status} status
         </p>
+      </div>
+      <div>
+        <p className="text-[var(--muted)]">Edit incident</p>
+        <div className="mt-2">
+          <IncidentEditor
+            incidentId={incident.incidentId}
+            title={detail?.title ?? incident.title}
+            severity={detail?.severity ?? incident.severity}
+            status={detail?.status ?? incident.status}
+            summary={detail?.summary ?? incident.summary}
+            ownerLabel={incident.owner}
+            updatedAt={detail?.updated_at ?? null}
+            canManage={canManage}
+            canClose={canClose}
+          />
+        </div>
       </div>
       <div>
         <p className="text-[var(--muted)]">Owner</p>

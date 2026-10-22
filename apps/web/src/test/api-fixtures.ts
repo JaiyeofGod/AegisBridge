@@ -65,6 +65,11 @@ export const currentUserFixture = {
     "asset.read",
     "risk.read",
     "risk.manage",
+    "incident.read",
+    "incident.manage",
+    "incident.close",
+    "vulnerability.read",
+    "vulnerability.manage",
   ],
   privileged: true,
   organization: "AegisBridge Technologies",
@@ -328,6 +333,7 @@ const finAsset = {
   remediation_status: "open",
   remediation_title: "Patch FIN-APP-01",
   due_on: "2026-10-20",
+  remediation_updated_at: "2026-10-20T12:00:00+00:00",
   owner,
   mitigating_controls: [
     { id: "CTRL-0002", title: "AC-2 Account management", status: null, summary: null },
@@ -464,6 +470,7 @@ export const incidentItems = [incidentPrimary, incidentOther];
 
 export const incidentDetail: IncidentDetailResponse = {
   ...incidentPrimary,
+  updated_at: "2026-10-20T12:00:00+00:00",
   timeline: [
     {
       occurred_at: "2026-10-20T12:00:00Z",
@@ -1843,6 +1850,11 @@ export function installApiFetch(
     updated_at: string | null;
   } = { ...accountPreferencesFixture };
   let riskDetailState: RiskDetailResponse = { ...riskDetail };
+  let incidentDetailState: IncidentDetailResponse = { ...incidentDetail };
+  let vulnDetailState: VulnerabilityDetailResponse = {
+    ...vulnDetail,
+    assets: vulnDetail.assets.map((asset) => ({ ...asset })),
+  };
 
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
@@ -1985,7 +1997,37 @@ export function installApiFetch(
       if (url.includes("risk_level=critical")) return jsonResponse(assetPage([riskCritical]));
       return jsonResponse(assetPage(riskItems));
     }
-    if (/\/api\/v1\/vulnerabilities\/[^?]+/.test(url)) return jsonResponse(vulnDetail);
+    if (/\/api\/v1\/vulnerabilities\/[^/?]+\/remediation/.test(url) && init?.method === "PATCH") {
+      const provided = headerValue(init, "X-CSRF-Token");
+      if (!provided) {
+        return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+      }
+      const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+      const assetId =
+        typeof body.asset_id === "string" ? body.asset_id : vulnDetailState.assets[0]?.asset_id;
+      vulnDetailState = {
+        ...vulnDetailState,
+        assets: vulnDetailState.assets.map((asset) => {
+          if (asset.asset_id !== assetId) return asset;
+          return {
+            ...asset,
+            remediation_status:
+              typeof body.status === "string" ? body.status : asset.remediation_status,
+            remediation_title:
+              typeof body.title === "string" ? body.title : asset.remediation_title,
+            due_on:
+              body.due_on === null
+                ? null
+                : typeof body.due_on === "string"
+                  ? body.due_on
+                  : asset.due_on,
+            remediation_updated_at: "2026-10-21T17:00:00+00:00",
+          };
+        }),
+      };
+      return jsonResponse(vulnDetailState);
+    }
+    if (/\/api\/v1\/vulnerabilities\/[^?]+/.test(url)) return jsonResponse(vulnDetailState);
     if (url.includes("/api/v1/vulnerabilities")) {
       if (url.includes("severity=critical")) return jsonResponse(assetPage([vulnCritical]));
       return jsonResponse(assetPage(vulnItems));
@@ -2001,7 +2043,23 @@ export function installApiFetch(
       }
       return jsonResponse(assetPage(alertItems));
     }
-    if (/\/api\/v1\/incidents\/[^?]+/.test(url)) return jsonResponse(incidentDetail);
+    if (/\/api\/v1\/incidents\/[^/?]+/.test(url) && init?.method === "PATCH") {
+      const provided = headerValue(init, "X-CSRF-Token");
+      if (!provided) {
+        return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+      }
+      const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+      incidentDetailState = {
+        ...incidentDetailState,
+        title: typeof body.title === "string" ? body.title : incidentDetailState.title,
+        severity: typeof body.severity === "string" ? body.severity : incidentDetailState.severity,
+        status: typeof body.status === "string" ? body.status : incidentDetailState.status,
+        summary: typeof body.summary === "string" ? body.summary : incidentDetailState.summary,
+        updated_at: "2026-10-21T17:00:00+00:00",
+      };
+      return jsonResponse(incidentDetailState);
+    }
+    if (/\/api\/v1\/incidents\/[^?]+/.test(url)) return jsonResponse(incidentDetailState);
     if (url.includes("/api/v1/governance/summary")) return jsonResponse(governanceSummary);
     if (/\/api\/v1\/threat-intelligence\/indicators\/[^/?]+/.test(url)) {
       const id = url.split("/indicators/")[1]?.split("?")[0] ?? "";

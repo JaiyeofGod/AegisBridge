@@ -1,6 +1,6 @@
 # API contracts
 
-Base path: `/api/v1`. Domain GET routes require an authenticated session cookie and capability-based permissions. Authenticated writes use synchronizer CSRF (`X-CSRF-Token`; see `docs/security/AUTHENTICATION_AND_RBAC.md`). Health and `POST /auth/login` / `GET /auth/session` remain public. No SSO, MFA, email delivery, administration/integration/report/cyber-range writes, or remote lab control.
+Base path: `/api/v1`. Domain GET routes require an authenticated session cookie and capability-based permissions. Authenticated writes use synchronizer CSRF (`X-CSRF-Token`; see `docs/security/AUTHENTICATION_AND_RBAC.md`). Health and `POST /auth/login` / `GET /auth/session` remain public. No SSO, MFA, email delivery, integration credential writes, report writes, cyber-range control, or remote lab control.
 
 Human-readable IDs are the public identifiers (`AST-0007`, `RISK-0021`, `VULN-0041`, `AL-0107`, `INC-0001`, `USR-0001`). Internal UUIDs are not returned. Timestamps are ISO 8601. Absent values are JSON `null`. Details: `docs/security/AUTHENTICATION_AND_RBAC.md`.
 
@@ -34,6 +34,9 @@ Login body: `{ "email", "password" }`. Responses never include password hashes, 
 | PATCH | `/risks/{risk_id}/treatment` | `risk.manage` + CSRF | Partial update of `strategy`, `status`, `notes`. Optional `expected_updated_at` → `409` on stale. |
 | PATCH | `/incidents/{incident_id}` | `incident.manage` + CSRF | Partial update of `title`, `severity`, `status`, `summary`, `owner` (user human id). Setting `status` to `resolved`/`closed` also requires `incident.close`. Optional `expected_updated_at` → `409`. `containment_state` is not stored and cannot be written. Incident task PATCH is deferred (tasks lack public ids). |
 | PATCH | `/vulnerabilities/{vulnerability_id}/remediation` | `vulnerability.manage` + CSRF | Partial update of remediation `status`, `title`, `due_on`, `owner`. Optional `asset_id` (required when multiple asset findings). Optional `expected_updated_at` → `409`. CVSS, EPSS, KEV, SSVC/`action_decision`, and source enrichment are immutable. |
+| PATCH | `/administration/access-reviews/{review_id}` | `administration.manage` + CSRF | Partial update of `name`, `status` (`in_progress` / `closed` / `completed` / `cancelled`). Optional `expected_updated_at` → `409`. Owner/due/notes are not stored. Finding updates deferred (findings lack public ids). |
+| PATCH | `/administration/users/{user_id}` | `administration.manage` + CSRF | Partial update of `status` only (`active` / `inactive`). Optional `expected_updated_at` → `409`. Email, credentials, human id, and permissions are not writable. Disabling the last active Administrator → `409`. |
+| PUT | `/administration/users/{user_id}/roles` | `administration.manage` **and** `user.role.manage` + CSRF | Replace role set with seven-role catalog names only. Duplicates normalized. Unknown role → `422`. Returns resulting roles + effective permissions. Removing Administrator from the last active Administrator → `409`. |
 
 ## Domain read endpoints
 
@@ -60,10 +63,10 @@ All domain rows require a valid session (`401` otherwise) and the permission lis
 | GET | `/threat-intelligence/sources` | Feed catalog and connection status |
 | GET | `/administration/summary` | Integration, user, audit, and access-review counts |
 | GET | `/administration/integrations` | Catalog rows without credentials |
-| GET | `/administration/users` | Users, roles, and derived privileged flag |
+| GET | `/administration/users` | Users, roles, derived privileged flag, and `updated_at` |
 | GET | `/administration/roles` | Stored role catalog and derived permission labels |
 | GET | `/administration/audit-events` | Append-only audit rows |
-| GET | `/administration/access-reviews` | Review status and finding counts |
+| GET | `/administration/access-reviews` | Review status, finding counts, and `updated_at` |
 | GET | `/reports/summary` | Report definition, dataset, and experiment counts |
 | GET | `/reports/definitions` | Filters: `search`, `status`, `report_type` |
 | GET | `/reports/definitions/{report_id}` | Definition detail with empty `generated_files` |

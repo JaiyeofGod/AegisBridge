@@ -126,9 +126,9 @@ The web app reads development API data through the Vite `/api` proxy (`VITE_API_
 
 Domain read routes, including threat intelligence, administration, reports, datasets, dataset experiments, and cyber-range, are documented in `docs/api/API_CONTRACTS.md`. Auth and Account APIs are documented there and in `docs/security/AUTHENTICATION_AND_RBAC.md`.
 
-**Auth status:** Argon2id passwords + HttpOnly sessions + synchronizer CSRF; domain GET RBAC enforced; preferences, risk treatment, incident, and vulnerability remediation writes on the API. Frontend wires preferences + risk treatment today; incident/vuln write UI is next. SPA route guards remain UX only. Backend remains the authorization boundary.
+**Auth status:** Argon2id passwords + HttpOnly sessions + synchronizer CSRF; domain GET RBAC enforced; preferences, risk treatment, incident, vulnerability remediation, and administration (access review / user status / role assignment) writes on the API. SPA wires prefs/risk/incident/vuln; administration writes not yet in the SPA. Backend remains the authorization boundary.
 
-**Not yet created:** Admin/integration/report/cyber-range writes, SSO/MFA, password reset, rate limiting, external integrations, background jobs, Celery worker, CI workflows.
+**Not yet created:** Integration/report/cyber-range writes, SSO/MFA, password reset, rate limiting, external integrations, background jobs, Celery worker, CI workflows.
 
 Local login seed: set `AEGIS_DEV_ADMIN_PASSWORD` in `.env`, run migrations + `python -m app.db.seed`, then use `amara.okonkwo@aegisbridge.example` (`USR-0001`).
 

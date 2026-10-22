@@ -389,6 +389,9 @@ def test_openapi_documents_write_and_csrf_routes(client: TestClient) -> None:
     assert {"SessionCookie": []} in rem_patch.get("security", [])
     assert "IncidentUpdate" in spec["components"]["schemas"]
     assert "VulnerabilityRemediationUpdate" in spec["components"]["schemas"]
+    assert "AccessReviewUpdate" in spec["components"]["schemas"]
+    assert "UserStatusUpdate" in spec["components"]["schemas"]
+    assert "UserRolesUpdate" in spec["components"]["schemas"]
 
 
 def test_incident_update_requires_manage_and_csrf(client: TestClient) -> None:

@@ -1,8 +1,9 @@
-import { apiGet } from "@/services/api-client";
+import { apiGet, apiPatch } from "@/services/api-client";
 import type {
   IncidentDetailResponse,
   IncidentListItem,
   IncidentQuery,
+  IncidentUpdate,
   PageResponse,
 } from "@/services/api-types";
 
@@ -20,4 +21,11 @@ export function fetchIncidents(query: IncidentQuery = {}) {
 
 export function fetchIncident(incidentId: string) {
   return apiGet<IncidentDetailResponse>(`/api/v1/incidents/${encodeURIComponent(incidentId)}`);
+}
+
+export function updateIncident(incidentId: string, patch: IncidentUpdate) {
+  return apiPatch<IncidentDetailResponse>(
+    `/api/v1/incidents/${encodeURIComponent(incidentId)}`,
+    patch,
+  );
 }

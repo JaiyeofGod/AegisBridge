@@ -1,10 +1,14 @@
 """Administration contracts. Credential material is not part of this response."""
 
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.common import PersonRef
+
+AccessReviewStatus = Literal["in_progress", "closed", "completed", "cancelled"]
+UserAccountStatus = Literal["active", "inactive"]
 
 
 class AdministrationSummary(BaseModel):
@@ -39,6 +43,13 @@ class UserListItem(BaseModel):
     department: str | None
     roles: list[str]
     privileged: bool
+    updated_at: datetime | None = None
+
+
+class UserAdminDetail(UserListItem):
+    """User row after administrative mutation, including effective permissions."""
+
+    permissions: list[str]
 
 
 class RoleListItem(BaseModel):
@@ -70,3 +81,32 @@ class AccessReviewItem(BaseModel):
     open_finding_count: int
     total_finding_count: int
     due_at: datetime | None
+    updated_at: datetime | None = None
+
+
+class AccessReviewUpdate(BaseModel):
+    """Partial access-review patch. Only columns that exist today are writable."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    status: AccessReviewStatus | None = None
+    expected_updated_at: datetime | None = None
+
+
+class UserStatusUpdate(BaseModel):
+    """Administrative account status only. Credentials and permissions are not writable."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: UserAccountStatus | None = None
+    expected_updated_at: datetime | None = None
+
+
+class UserRolesUpdate(BaseModel):
+    """Replace the user's role set with names from the seven-role catalog."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    roles: list[str] = Field(min_length=1, max_length=7)
+    expected_updated_at: datetime | None = None

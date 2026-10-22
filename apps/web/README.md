@@ -34,12 +34,14 @@ Requires Node.js 24 LTS. Dev server: `http://127.0.0.1:5173` (proxies `/api` to 
 
 ### First write APIs
 
-| Action                | Endpoint                             | Notes                                                                              |
-| --------------------- | ------------------------------------ | ---------------------------------------------------------------------------------- |
-| Save preferences      | `PATCH /api/v1/account/preferences`  | Fields: theme, density, landing_page, reduced_motion. UI shows Default vs Stored.  |
-| Update risk treatment | `PATCH /api/v1/risks/{id}/treatment` | Requires server permission `risk.manage`. Uses `expected_updated_at` when present. |
+| Action                | Endpoint                                         | Notes                                                                                                    |
+| --------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| Save preferences      | `PATCH /api/v1/account/preferences`              | Fields: theme, density, landing_page, reduced_motion. UI shows Default vs Stored.                        |
+| Update risk treatment | `PATCH /api/v1/risks/{id}/treatment`             | Requires server permission `risk.manage`. Uses `expected_updated_at` when present.                       |
+| Update incident       | `PATCH /api/v1/incidents/{id}`                   | Requires `incident.manage` (+ `incident.close` to resolve/close). Owner read-only in UI.                 |
+| Update remediation    | `PATCH /api/v1/vulnerabilities/{id}/remediation` | Requires `vulnerability.manage`. CVSS/EPSS/KEV/action_decision immutable. `asset_id` is a selector only. |
 
-Backend remains the authorization boundary. Other writes (incidents, remediation, administration, Cyber Range) stay disabled in the UI.
+Backend remains the authorization boundary. Incident task writes, administration, integrations, reports, and Cyber Range control stay disabled in the UI.
 
 ### Route guards (UX only)
 
