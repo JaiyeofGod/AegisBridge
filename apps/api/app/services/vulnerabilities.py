@@ -1,14 +1,19 @@
-"""Vulnerability queries. CVSS, EPSS, KEV, exposure, and SSVC stay separate."""
+"""Vulnerability queries and remediation updates. Enrichment factors stay separate."""
 
+from __future__ import annotations
+
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.errors import not_found
+from app.api.errors import ApiError, not_found
+from app.core.config import get_settings
 from app.models.assets import Asset
 from app.models.evidence import EvidenceControlLink, EvidenceRiskLink
 from app.models.grc import Control
+from app.models.identity import User
 from app.models.risk import Risk
 from app.models.vulnerability import (
     AssetVulnerability,
@@ -24,7 +29,10 @@ from app.schemas.vulnerabilities import (
     VulnerabilityAssetContext,
     VulnerabilityDetail,
     VulnerabilityListItem,
+    VulnerabilityRemediationUpdate,
 )
+from app.security.rbac import AuthenticatedPrincipal
+from app.services.audit_write import record_audit_event
 from app.services.support import (
     CVSS_SEVERITIES,
     SSVC_DECISIONS,
@@ -127,6 +135,100 @@ def get_vulnerability(session: Session, vulnerability_id: str) -> VulnerabilityD
     )
 
 
+def update_vulnerability_remediation(
+    session: Session,
+    principal: AuthenticatedPrincipal,
+    vulnerability_id: str,
+    patch: VulnerabilityRemediationUpdate,
+) -> VulnerabilityDetail:
+    payload = patch.model_dump(exclude_unset=True)
+    expected = payload.pop("expected_updated_at", None)
+    # asset_id is a selector only — never a mutable remediation field.
+    asset_human_id = payload.pop("asset_id", None)
+    if not payload:
+        raise ApiError(422, "validation_error", "At least one remediation field is required.")
+
+    finding = session.scalar(
+        select(Vulnerability).where(Vulnerability.human_id == vulnerability_id).with_for_update()
+    )
+    if finding is None:
+        raise not_found("Vulnerability", vulnerability_id)
+
+    links = session.scalars(
+        select(AssetVulnerability)
+        .where(AssetVulnerability.vulnerability_id == finding.id)
+        .options(
+            selectinload(AssetVulnerability.asset),
+            selectinload(AssetVulnerability.remediation_tasks),
+        )
+        .with_for_update()
+    ).all()
+    link = _select_asset_finding(list(links), asset_human_id)
+    task = _latest_remediation(link.remediation_tasks)
+    created = task is None
+    if task is None:
+        if "status" not in payload or "title" not in payload:
+            raise ApiError(
+                422,
+                "validation_error",
+                "Creating a remediation task requires status and title.",
+            )
+        task = RemediationTask(
+            asset_vulnerability_id=link.id,
+            title=payload["title"],
+            status=payload["status"],
+            due_on=payload.get("due_on"),
+            owner_user_id=_resolve_owner_id(session, payload["owner"])
+            if "owner" in payload
+            else None,
+        )
+        session.add(task)
+        changed = sorted(k for k in payload if k in {"status", "title", "due_on", "owner"})
+    else:
+        if expected is not None:
+            _assert_fresh(
+                task.updated_at,
+                expected,
+                "The remediation task was modified by another request.",
+            )
+        # Never reassign asset_vulnerability_id; asset_id only selected the row above.
+        changed = []
+        if "status" in payload and task.status != payload["status"]:
+            task.status = payload["status"]
+            changed.append("status")
+        if "title" in payload and task.title != payload["title"]:
+            task.title = payload["title"]
+            changed.append("title")
+        if "due_on" in payload and task.due_on != payload["due_on"]:
+            task.due_on = payload["due_on"]
+            changed.append("due_on")
+        if "owner" in payload:
+            new_owner_id = _resolve_owner_id(session, payload["owner"])
+            if task.owner_user_id != new_owner_id:
+                task.owner_user_id = new_owner_id
+                changed.append("owner")
+        task.updated_at = datetime.now(UTC)
+
+    settings = get_settings()
+    record_audit_event(
+        session,
+        organization_id=finding.organization_id,
+        action="VULNERABILITY_REMEDIATION_UPDATE",
+        object_type="vulnerability",
+        object_id=finding.human_id,
+        result="success",
+        actor_user_id=principal.user_id,
+        actor_label=principal.human_id,
+        environment_name=settings.app_env,
+        detail=(
+            f"{'Created' if created else 'Updated'} remediation fields: "
+            f"{', '.join(changed) if changed else 'none'}."
+        ),
+    )
+    session.commit()
+    return get_vulnerability(session, vulnerability_id)
+
+
 def _item(session: Session, finding: Vulnerability) -> VulnerabilityListItem:
     cve = finding.cve_record if finding.cve_record_id is not None else None
     if cve is None and finding.cve_record_id is not None:
@@ -198,7 +300,60 @@ def _asset_context(session: Session, link: AssetVulnerability) -> VulnerabilityA
         due_on=None if task is None else task.due_on,
         owner=None if task is None else person(task.owner),
         mitigating_controls=_mitigating_controls(session, link.asset_id),
+        remediation_updated_at=None if task is None else task.updated_at,
     )
+
+
+def _select_asset_finding(
+    findings: list[AssetVulnerability],
+    asset_human_id: str | None,
+) -> AssetVulnerability:
+    if not findings:
+        raise ApiError(
+            422,
+            "validation_error",
+            "This vulnerability has no asset findings to remediate.",
+        )
+    if asset_human_id:
+        target = asset_human_id.strip()
+        for link in findings:
+            asset = link.asset
+            if asset is not None and asset.human_id == target:
+                return link
+        raise ApiError(
+            422,
+            "validation_error",
+            "Asset finding was not found for this vulnerability.",
+        )
+    if len(findings) > 1:
+        raise ApiError(
+            422,
+            "validation_error",
+            "asset_id is required when the vulnerability has multiple asset findings.",
+        )
+    return findings[0]
+
+
+def _latest_remediation(tasks: list[RemediationTask]) -> RemediationTask | None:
+    if not tasks:
+        return None
+    return max(tasks, key=lambda item: item.created_at)
+
+
+def _resolve_owner_id(session: Session, owner_human_id: str | None):
+    if owner_human_id is None:
+        return None
+    user = session.scalar(select(User).where(User.human_id == owner_human_id.strip()))
+    if user is None:
+        raise ApiError(422, "validation_error", "Owner user was not found.")
+    return user.id
+
+
+def _assert_fresh(current: datetime, expected: datetime, message: str) -> None:
+    left = current if current.tzinfo is not None else current.replace(tzinfo=UTC)
+    right = expected if expected.tzinfo is not None else expected.replace(tzinfo=UTC)
+    if left != right:
+        raise ApiError(409, "conflict", message)
 
 
 def _mitigating_controls(session: Session, asset_id: UUID) -> list[RelatedRecord]:

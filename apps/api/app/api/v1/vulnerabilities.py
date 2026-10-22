@@ -1,11 +1,19 @@
-"""Read-only vulnerabilities."""
+"""Vulnerabilities: reads and authenticated remediation updates."""
 
 from fastapi import APIRouter, Depends
 
-from app.api.deps import DbSession, PageQuery, require_permissions
+from app.api.deps import DbSession, PageQuery, RequireCsrf, require_permissions
 from app.schemas.common import ErrorBody, Page
-from app.schemas.vulnerabilities import VulnerabilityDetail, VulnerabilityListItem
-from app.services.vulnerabilities import get_vulnerability, list_vulnerabilities
+from app.schemas.vulnerabilities import (
+    VulnerabilityDetail,
+    VulnerabilityListItem,
+    VulnerabilityRemediationUpdate,
+)
+from app.services.vulnerabilities import (
+    get_vulnerability,
+    list_vulnerabilities,
+    update_vulnerability_remediation,
+)
 
 router = APIRouter(
     prefix="/vulnerabilities",
@@ -48,3 +56,23 @@ def read_vulnerabilities(
 )
 def read_vulnerability(vulnerability_id: str, session: DbSession) -> VulnerabilityDetail:
     return get_vulnerability(session, vulnerability_id)
+
+
+@router.patch(
+    "/{vulnerability_id}/remediation",
+    response_model=VulnerabilityDetail,
+    responses={
+        404: {"model": ErrorBody},
+        409: {"model": ErrorBody},
+        422: {"model": ErrorBody},
+    },
+    dependencies=[Depends(require_permissions("vulnerability.manage"))],
+)
+def patch_vulnerability_remediation(
+    vulnerability_id: str,
+    body: VulnerabilityRemediationUpdate,
+    session: DbSession,
+    principal: RequireCsrf,
+) -> VulnerabilityDetail:
+    """Update remediation task fields only. CVSS/EPSS/KEV/SSVC stay immutable. CSRF required."""
+    return update_vulnerability_remediation(session, principal, vulnerability_id, body)

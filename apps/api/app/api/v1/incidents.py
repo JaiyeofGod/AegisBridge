@@ -1,11 +1,11 @@
-"""Read-only incidents."""
+"""Incidents: reads and authenticated management updates."""
 
 from fastapi import APIRouter, Depends
 
-from app.api.deps import DbSession, PageQuery, require_permissions
+from app.api.deps import DbSession, PageQuery, RequireCsrf, require_permissions
 from app.schemas.common import ErrorBody, Page
-from app.schemas.incidents import IncidentDetail, IncidentListItem
-from app.services.incidents import get_incident, list_incidents
+from app.schemas.incidents import IncidentDetail, IncidentListItem, IncidentUpdate
+from app.services.incidents import get_incident, list_incidents, update_incident
 
 router = APIRouter(
     prefix="/incidents",
@@ -42,3 +42,23 @@ def read_incidents(
 )
 def read_incident(incident_id: str, session: DbSession) -> IncidentDetail:
     return get_incident(session, incident_id)
+
+
+@router.patch(
+    "/{incident_id}",
+    response_model=IncidentDetail,
+    responses={
+        404: {"model": ErrorBody},
+        409: {"model": ErrorBody},
+        422: {"model": ErrorBody},
+    },
+    dependencies=[Depends(require_permissions("incident.manage"))],
+)
+def patch_incident(
+    incident_id: str,
+    body: IncidentUpdate,
+    session: DbSession,
+    principal: RequireCsrf,
+) -> IncidentDetail:
+    """Update supported incident fields. Closing requires incident.close. CSRF required."""
+    return update_incident(session, principal, incident_id, body)

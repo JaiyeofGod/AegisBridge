@@ -1,6 +1,6 @@
 # AegisBridge API (`apps/api`)
 
-FastAPI service with Phase 2 domain models, session authentication, enforced RBAC on domain reads, synchronizer CSRF, and the first authenticated write slice (account preferences + risk treatment). Frontend guards are UX only. Broader writes, SSO/MFA, and rate limiting remain deferred.
+FastAPI service with Phase 2 domain models, session authentication, enforced RBAC on domain reads, synchronizer CSRF, and authenticated writes for account preferences, risk treatment, incidents, and vulnerability remediation. Frontend guards are UX only. Remaining writes, SSO/MFA, and rate limiting remain deferred.
 
 ## Commands
 
@@ -37,7 +37,7 @@ The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. T
 2. `alembic upgrade head` and `python -m app.db.seed`.
 3. `POST /api/v1/auth/login` with email `amara.okonkwo@aegisbridge.example` and that password.
 4. Cookie `aegis_session` is HttpOnly. Use it for `/api/v1/auth/me`, `/api/v1/account/*`, and all domain GET routes.
-5. Login returns `csrf_token` (or call `GET /api/v1/auth/csrf`). Send `X-CSRF-Token` on logout, preference PATCH, and risk treatment PATCH.
+5. Login returns `csrf_token` (or call `GET /api/v1/auth/csrf`). Send `X-CSRF-Token` on logout and all authenticated PATCH/POST mutations.
 
 See `docs/security/AUTHENTICATION_AND_RBAC.md`. Never commit a real password. Production must not bootstrap a default password from this variable.
 
@@ -60,6 +60,8 @@ See `docs/security/AUTHENTICATION_AND_RBAC.md`. Never commit a real password. Pr
 - `GET` / `PATCH /api/v1/account/preferences`
 - `GET /api/v1/account/workspace`
 - `PATCH /api/v1/risks/{risk_id}/treatment` (`risk.manage` + CSRF)
+- `PATCH /api/v1/incidents/{incident_id}` (`incident.manage` + CSRF; `incident.close` to resolve/close)
+- `PATCH /api/v1/vulnerabilities/{vulnerability_id}/remediation` (`vulnerability.manage` + CSRF)
 
 ## Domain read API
 

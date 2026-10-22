@@ -1,10 +1,20 @@
 """Vulnerability contract. Factors stay independent. There is no combined score."""
 
 from datetime import date, datetime
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.common import PersonRef, RelatedRecord
+
+RemediationStatus = Literal[
+    "open",
+    "in_progress",
+    "complete",
+    "deferred",
+    "cancelled",
+    "accepted",
+]
 
 
 class VulnerabilityAssetContext(BaseModel):
@@ -21,6 +31,7 @@ class VulnerabilityAssetContext(BaseModel):
     due_on: date | None
     owner: PersonRef | None = None
     mitigating_controls: list[RelatedRecord]
+    remediation_updated_at: datetime | None = None
 
 
 class VulnerabilityListItem(BaseModel):
@@ -42,3 +53,27 @@ class VulnerabilityListItem(BaseModel):
 
 class VulnerabilityDetail(VulnerabilityListItem):
     cve_summary: str | None
+
+
+class VulnerabilityRemediationUpdate(BaseModel):
+    """Partial remediation patch. Enrichment factors (CVSS/EPSS/KEV/SSVC) are immutable here."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: RemediationStatus | None = None
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    due_on: date | None = None
+    owner: str | None = Field(
+        default=None,
+        description="Remediation owner user human id. Null clears the owner.",
+    )
+    asset_id: str | None = Field(
+        default=None,
+        description=(
+            "Selector only: asset human id used to disambiguate which existing "
+            "asset finding's remediation task to update when the vulnerability "
+            "has multiple findings. Must already be associated with the "
+            "vulnerability. Does not reassign or move the remediation task."
+        ),
+    )
+    expected_updated_at: datetime | None = None

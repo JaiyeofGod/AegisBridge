@@ -1,6 +1,6 @@
 # API contracts
 
-Base path: `/api/v1`. Domain GET routes require an authenticated session cookie and capability-based permissions. Authenticated writes use synchronizer CSRF (`X-CSRF-Token`; see `docs/security/AUTHENTICATION_AND_RBAC.md`). Health and `POST /auth/login` / `GET /auth/session` remain public. No SSO, MFA, email delivery, broader domain writes, or remote lab control.
+Base path: `/api/v1`. Domain GET routes require an authenticated session cookie and capability-based permissions. Authenticated writes use synchronizer CSRF (`X-CSRF-Token`; see `docs/security/AUTHENTICATION_AND_RBAC.md`). Health and `POST /auth/login` / `GET /auth/session` remain public. No SSO, MFA, email delivery, administration/integration/report/cyber-range writes, or remote lab control.
 
 Human-readable IDs are the public identifiers (`AST-0007`, `RISK-0021`, `VULN-0041`, `AL-0107`, `INC-0001`, `USR-0001`). Internal UUIDs are not returned. Timestamps are ISO 8601. Absent values are JSON `null`. Details: `docs/security/AUTHENTICATION_AND_RBAC.md`.
 
@@ -27,11 +27,13 @@ Login body: `{ "email", "password" }`. Responses never include password hashes, 
 | PATCH | `/account/preferences` | CSRF. Partial update of `theme`, `density`, `landing_page`, `reduced_motion`. Current user only. |
 | GET | `/account/workspace` | Organization, roles, permissions, privileged flag |
 
-## Domain write endpoints (first slice)
+## Domain write endpoints
 
 | Method | Path | Permission | Notes |
 |---|---|---|---|
 | PATCH | `/risks/{risk_id}/treatment` | `risk.manage` + CSRF | Partial update of `strategy`, `status`, `notes`. Optional `expected_updated_at` → `409` on stale. |
+| PATCH | `/incidents/{incident_id}` | `incident.manage` + CSRF | Partial update of `title`, `severity`, `status`, `summary`, `owner` (user human id). Setting `status` to `resolved`/`closed` also requires `incident.close`. Optional `expected_updated_at` → `409`. `containment_state` is not stored and cannot be written. Incident task PATCH is deferred (tasks lack public ids). |
+| PATCH | `/vulnerabilities/{vulnerability_id}/remediation` | `vulnerability.manage` + CSRF | Partial update of remediation `status`, `title`, `due_on`, `owner`. Optional `asset_id` (required when multiple asset findings). Optional `expected_updated_at` → `409`. CVSS, EPSS, KEV, SSVC/`action_decision`, and source enrichment are immutable. |
 
 ## Domain read endpoints
 
@@ -45,11 +47,11 @@ All domain rows require a valid session (`401` otherwise) and the permission lis
 | GET | `/risks` | Filters: `search`, `risk_level`, `treatment_status`, `owner` |
 | GET | `/risks/{risk_id}` | Likelihood, impact, and score stay separate |
 | GET | `/vulnerabilities` | Filters: `search`, `severity`, `kev`, `action_decision`, `remediation_status`, `asset_criticality` |
-| GET | `/vulnerabilities/{vulnerability_id}` | CVSS, EPSS, KEV, exposure, criticality, and SSVC stay separate |
+| GET | `/vulnerabilities/{vulnerability_id}` | CVSS, EPSS, KEV, exposure, criticality, and SSVC stay separate; asset contexts may include `remediation_updated_at` |
 | GET | `/alerts` | Filters: `search`, `severity`, `status`, `asset`, `attack_technique` |
 | GET | `/alerts/{alert_id}` | Selected Wazuh reference metadata |
 | GET | `/incidents` | Filters: `search`, `severity`, `status`, `owner`, `containment_state` |
-| GET | `/incidents/{incident_id}` | Timeline, tasks, indicators, evidence, related alerts, affected assets |
+| GET | `/incidents/{incident_id}` | Timeline, tasks, indicators, evidence, related alerts, affected assets; includes `updated_at` for concurrency |
 | GET | `/governance/summary` | Framework identifiers, counts, evidence freshness, policies, access reviews |
 | GET | `/threat-intelligence/summary` | Stored indicator, match, advisory, and source-status counts |
 | GET | `/threat-intelligence/indicators` | Filters: `search`, `indicator_type`, `source`, `status`, `internal_match` |
@@ -100,7 +102,7 @@ Validation uses the same shape with `code` `validation_error` and `details` entr
 
 ## Security semantics
 
-- Auth uses Argon2id password hashes and opaque session cookies. Domain GET routes are not yet permission-gated.
+- Auth uses Argon2id password hashes and opaque session cookies. Domain GET and the documented write routes enforce capability permissions plus CSRF on mutations.
 - Role permissions are resolved from the deterministic catalog in `app/security/permissions.py`. Administration role list responses include that catalog (union stored `role_catalog` entitlements).
 - A user is privileged when a role is Administrator or Security Engineer.
 - Risk `score` is likelihood × impact. `methodology` is `aegisbridge_likelihood_x_impact`. Bands are low 1–4, medium 5–9, high 10–15, and critical 16–25.

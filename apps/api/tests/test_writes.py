@@ -376,6 +376,363 @@ def test_openapi_documents_write_and_csrf_routes(client: TestClient) -> None:
     assert "patch" in spec["paths"]["/api/v1/account/preferences"]
     assert "/api/v1/risks/{risk_id}/treatment" in spec["paths"]
     assert "patch" in spec["paths"]["/api/v1/risks/{risk_id}/treatment"]
+    assert "/api/v1/incidents/{incident_id}" in spec["paths"]
+    assert "patch" in spec["paths"]["/api/v1/incidents/{incident_id}"]
+    assert "/api/v1/vulnerabilities/{vulnerability_id}/remediation" in spec["paths"]
+    assert "patch" in spec["paths"]["/api/v1/vulnerabilities/{vulnerability_id}/remediation"]
     assert "SessionCookie" in spec["components"]["securitySchemes"]
     prefs_patch = spec["paths"]["/api/v1/account/preferences"]["patch"]
     assert {"SessionCookie": []} in prefs_patch.get("security", [])
+    incident_patch = spec["paths"]["/api/v1/incidents/{incident_id}"]["patch"]
+    assert {"SessionCookie": []} in incident_patch.get("security", [])
+    rem_patch = spec["paths"]["/api/v1/vulnerabilities/{vulnerability_id}/remediation"]["patch"]
+    assert {"SessionCookie": []} in rem_patch.get("security", [])
+    assert "IncidentUpdate" in spec["components"]["schemas"]
+    assert "VulnerabilityRemediationUpdate" in spec["components"]["schemas"]
+
+
+def test_incident_update_requires_manage_and_csrf(client: TestClient) -> None:
+    login_as_role(client, "Read Only")
+    denied = client.patch(
+        "/api/v1/incidents/INC-0001",
+        json={"status": "contained"},
+        headers=csrf_headers(client),
+    )
+    assert denied.status_code == 403
+    assert denied.json()["code"] == "forbidden"
+
+    client.cookies.clear()
+    assert (
+        client.patch(
+            "/api/v1/incidents/INC-0001",
+            json={"status": "contained"},
+        ).status_code
+        == 401
+    )
+
+    login_as_role(client, "SOC Analyst")
+    missing_csrf = client.patch(
+        "/api/v1/incidents/INC-0001",
+        json={"status": "contained"},
+    )
+    assert missing_csrf.status_code == 403
+    assert missing_csrf.json()["code"] == "csrf_failed"
+
+
+def test_incident_update_persists_and_audits(client: TestClient) -> None:
+    login_as_role(client, "SOC Analyst")
+    reset = client.patch(
+        "/api/v1/incidents/INC-0001",
+        json={
+            "title": "Repeated authentication failures",
+            "severity": "medium",
+            "status": "investigating",
+            "summary": (
+                "Simulated incident. Severity and status are separate. No confirmed compromise."
+            ),
+            "owner": "USR-0004",
+        },
+        headers=csrf_headers(client),
+    )
+    assert reset.status_code == 200
+    before = client.get("/api/v1/incidents/INC-0001").json()
+    expected = before.get("updated_at")
+
+    updated = client.patch(
+        "/api/v1/incidents/INC-0001",
+        json={
+            "status": "contained",
+            "severity": "high",
+            "summary": "Containment steps recorded in the lab seed environment.",
+            "expected_updated_at": expected,
+        },
+        headers=csrf_headers(client),
+    )
+    assert updated.status_code == 200
+    body = updated.json()
+    assert body["status"] == "contained"
+    assert body["severity"] == "high"
+    assert body["summary"] == "Containment steps recorded in the lab seed environment."
+    assert body["title"] == before["title"]
+    assert body["containment_state"] is None
+
+    stale = client.patch(
+        "/api/v1/incidents/INC-0001",
+        json={"status": "resolved", "expected_updated_at": expected},
+        headers=csrf_headers(client),
+    )
+    assert stale.status_code == 409
+
+    assert client.get("/api/v1/incidents/INC-0001").json()["status"] == "contained"
+
+    with SessionLocal() as session:
+        events = session.scalars(
+            select(AuditEvent).where(AuditEvent.action == "INCIDENT_UPDATE")
+        ).all()
+        assert events
+        for event in events:
+            assert event.object_id == "INC-0001"
+            blob = f"{event.detail or ''}{event.actor_label}"
+            assert CSRF_HEADER_NAME.lower() not in blob.lower()
+            assert "token_digest" not in blob
+            assert "aegis_session" not in blob.lower()
+
+
+def test_incident_update_rejects_unexpected_fields(client: TestClient) -> None:
+    login_as_role(client, "SOC Analyst")
+    before = client.get("/api/v1/incidents/INC-0001").json()
+    rejected = client.patch(
+        "/api/v1/incidents/INC-0001",
+        json={
+            "status": "contained",
+            "containment_state": "should-fail",
+            "cvss_base_score": 9.8,
+            "created_at": "2020-01-01T00:00:00Z",
+            "permissions": ["incident.manage"],
+            "id": "INC-HACK",
+        },
+        headers=csrf_headers(client),
+    )
+    assert rejected.status_code == 422
+    assert rejected.json()["code"] == "validation_error"
+    after = client.get("/api/v1/incidents/INC-0001").json()
+    assert after["status"] == before["status"]
+    assert after["updated_at"] == before["updated_at"]
+
+
+def test_incident_update_validation_and_not_found(client: TestClient) -> None:
+    login_as_role(client, "Administrator")
+    invalid = client.patch(
+        "/api/v1/incidents/INC-0001",
+        json={"severity": "apocalyptic"},
+        headers=csrf_headers(client),
+    )
+    assert invalid.status_code == 422
+
+    missing = client.patch(
+        "/api/v1/incidents/INC-9999",
+        json={"status": "investigating"},
+        headers=csrf_headers(client),
+    )
+    assert missing.status_code == 404
+
+
+def test_incident_close_requires_close_permission(client: TestClient) -> None:
+    """Strip incident.close from SOC Analyst for this check, then restore."""
+    from app.security.permissions import ROLE_PERMISSIONS
+
+    original = ROLE_PERMISSIONS["SOC Analyst"]
+    narrowed = frozenset(p for p in original if p != "incident.close")
+    ROLE_PERMISSIONS["SOC Analyst"] = narrowed
+    try:
+        client.cookies.clear()
+        login_as_role(client, "SOC Analyst")
+        denied = client.patch(
+            "/api/v1/incidents/INC-0001",
+            json={"status": "closed"},
+            headers=csrf_headers(client),
+        )
+        assert denied.status_code == 403
+        assert denied.json()["code"] == "forbidden"
+    finally:
+        ROLE_PERMISSIONS["SOC Analyst"] = original
+
+
+def test_vulnerability_remediation_requires_manage_and_csrf(client: TestClient) -> None:
+    login_as_role(client, "Read Only")
+    denied = client.patch(
+        "/api/v1/vulnerabilities/VULN-0041/remediation",
+        json={"status": "in_progress"},
+        headers=csrf_headers(client),
+    )
+    assert denied.status_code == 403
+    assert denied.json()["code"] == "forbidden"
+
+    client.cookies.clear()
+    assert (
+        client.patch(
+            "/api/v1/vulnerabilities/VULN-0041/remediation",
+            json={"status": "in_progress"},
+        ).status_code
+        == 401
+    )
+
+    login_as_role(client, "Security Engineer")
+    missing_csrf = client.patch(
+        "/api/v1/vulnerabilities/VULN-0041/remediation",
+        json={"status": "in_progress"},
+    )
+    assert missing_csrf.status_code == 403
+    assert missing_csrf.json()["code"] == "csrf_failed"
+
+
+def test_vulnerability_remediation_persists_and_audits(client: TestClient) -> None:
+    login_as_role(client, "Security Engineer")
+    reset = client.patch(
+        "/api/v1/vulnerabilities/VULN-0041/remediation",
+        json={
+            "status": "open",
+            "title": "Patch FIN-APP-01",
+            "due_on": "2026-10-20",
+            "owner": "USR-0001",
+            "asset_id": "AST-0007",
+        },
+        headers=csrf_headers(client),
+    )
+    assert reset.status_code == 200
+    before = client.get("/api/v1/vulnerabilities/VULN-0041").json()
+    asset = before["assets"][0]
+    assert asset["remediation_status"] == "open"
+    expected = asset.get("remediation_updated_at")
+    cvss_before = before["cvss_base_score"]
+    epss_before = before["epss"]
+    kev_before = before["kev_listed"]
+    action_before = asset["action_decision"]
+
+    updated = client.patch(
+        "/api/v1/vulnerabilities/VULN-0041/remediation",
+        json={
+            "status": "in_progress",
+            "title": "Patch FIN-APP-01 — lab window",
+            "due_on": "2026-10-27",
+            "expected_updated_at": expected,
+            "asset_id": "AST-0007",
+        },
+        headers=csrf_headers(client),
+    )
+    assert updated.status_code == 200
+    body = updated.json()
+    asset_after = body["assets"][0]
+    assert asset_after["asset_id"] == "AST-0007"
+    assert asset_after["remediation_status"] == "in_progress"
+    assert asset_after["remediation_title"] == "Patch FIN-APP-01 — lab window"
+    assert asset_after["due_on"] == "2026-10-27"
+    assert body["cvss_base_score"] == cvss_before
+    assert body["epss"] == epss_before
+    assert body["kev_listed"] == kev_before
+    assert asset_after["action_decision"] == action_before
+
+    stale = client.patch(
+        "/api/v1/vulnerabilities/VULN-0041/remediation",
+        json={
+            "status": "complete",
+            "expected_updated_at": expected,
+            "asset_id": "AST-0007",
+        },
+        headers=csrf_headers(client),
+    )
+    assert stale.status_code == 409
+
+    refreshed = client.get("/api/v1/vulnerabilities/VULN-0041").json()
+    assert refreshed["assets"][0]["remediation_status"] == "in_progress"
+    assert refreshed["assets"][0]["asset_id"] == "AST-0007"
+
+    with SessionLocal() as session:
+        events = session.scalars(
+            select(AuditEvent).where(AuditEvent.action == "VULNERABILITY_REMEDIATION_UPDATE")
+        ).all()
+        assert events
+        for event in events:
+            assert event.object_id == "VULN-0041"
+            blob = f"{event.detail or ''}{event.actor_label}"
+            assert CSRF_HEADER_NAME.lower() not in blob.lower()
+            assert "token_digest" not in blob
+
+
+def test_vulnerability_remediation_rejects_unexpected_fields(client: TestClient) -> None:
+    login_as_role(client, "Security Engineer")
+    before = client.get("/api/v1/vulnerabilities/VULN-0041").json()
+    rejected = client.patch(
+        "/api/v1/vulnerabilities/VULN-0041/remediation",
+        json={
+            "status": "complete",
+            "cvss_base_score": 1.0,
+            "epss": 0.01,
+            "kev_listed": False,
+            "action_decision": "track",
+            "created_at": "2020-01-01T00:00:00Z",
+            "permissions": ["vulnerability.manage"],
+            "id": "VULN-HACK",
+        },
+        headers=csrf_headers(client),
+    )
+    assert rejected.status_code == 422
+    assert rejected.json()["code"] == "validation_error"
+    after = client.get("/api/v1/vulnerabilities/VULN-0041").json()
+    assert after["assets"][0]["remediation_status"] == before["assets"][0]["remediation_status"]
+    assert after["cvss_base_score"] == before["cvss_base_score"]
+    assert after["epss"] == before["epss"]
+    assert after["kev_listed"] == before["kev_listed"]
+    assert after["assets"][0]["action_decision"] == before["assets"][0]["action_decision"]
+
+
+def test_vulnerability_remediation_cannot_reassign_asset(client: TestClient) -> None:
+    """asset_id selects an existing finding; it cannot move remediation to another asset."""
+    from app.models.vulnerability import AssetVulnerability, RemediationTask, Vulnerability
+
+    login_as_role(client, "Security Engineer")
+    before = client.get("/api/v1/vulnerabilities/VULN-0041").json()
+    assert before["assets"][0]["asset_id"] == "AST-0007"
+    status_before = before["assets"][0]["remediation_status"]
+
+    with SessionLocal() as session:
+        finding = session.scalar(select(Vulnerability).where(Vulnerability.human_id == "VULN-0041"))
+        assert finding is not None
+        task = session.scalar(
+            select(RemediationTask)
+            .join(
+                AssetVulnerability,
+                AssetVulnerability.id == RemediationTask.asset_vulnerability_id,
+            )
+            .where(AssetVulnerability.vulnerability_id == finding.id)
+            .order_by(RemediationTask.created_at.desc())
+        )
+        assert task is not None
+        original_link_id = task.asset_vulnerability_id
+
+    # AST-0018 exists in seed but is not linked to VULN-0041.
+    rejected = client.patch(
+        "/api/v1/vulnerabilities/VULN-0041/remediation",
+        json={"status": "complete", "asset_id": "AST-0018"},
+        headers=csrf_headers(client),
+    )
+    assert rejected.status_code == 422
+    assert rejected.json()["code"] == "validation_error"
+
+    after = client.get("/api/v1/vulnerabilities/VULN-0041").json()
+    assert after["assets"][0]["asset_id"] == "AST-0007"
+    assert after["assets"][0]["remediation_status"] == status_before
+    assert len(after["assets"]) == 1
+
+    with SessionLocal() as session:
+        finding = session.scalar(select(Vulnerability).where(Vulnerability.human_id == "VULN-0041"))
+        assert finding is not None
+        task = session.scalar(
+            select(RemediationTask)
+            .join(
+                AssetVulnerability,
+                AssetVulnerability.id == RemediationTask.asset_vulnerability_id,
+            )
+            .where(AssetVulnerability.vulnerability_id == finding.id)
+            .order_by(RemediationTask.created_at.desc())
+        )
+        assert task is not None
+        assert task.asset_vulnerability_id == original_link_id
+        assert task.status == status_before
+
+
+def test_vulnerability_remediation_validation_and_not_found(client: TestClient) -> None:
+    login_as_role(client, "Administrator")
+    invalid = client.patch(
+        "/api/v1/vulnerabilities/VULN-0041/remediation",
+        json={"status": "ignore-me"},
+        headers=csrf_headers(client),
+    )
+    assert invalid.status_code == 422
+
+    missing = client.patch(
+        "/api/v1/vulnerabilities/VULN-9999/remediation",
+        json={"status": "open"},
+        headers=csrf_headers(client),
+    )
+    assert missing.status_code == 404

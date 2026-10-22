@@ -1,6 +1,6 @@
 # Authentication and RBAC
 
-**Status:** Backend authentication, domain read authorization, **CSRF-protected authenticated writes** (preferences + risk treatment), and session CSRF foundation are in place. Frontend route guards remain UX only. SSO/OIDC, MFA, email reset, rate limiting, and broader domain writes remain deferred.
+**Status:** Backend authentication, domain read authorization, **CSRF-protected authenticated writes** (preferences, risk treatment, incident update, vulnerability remediation), and session CSRF foundation are in place. Frontend route guards remain UX only. SSO/OIDC, MFA, email reset, rate limiting, and remaining domain writes (admin, integrations, reports, cyber-range control, incident tasks) remain deferred.
 
 ## Authentication model
 
@@ -64,6 +64,8 @@ Session cookies remain HttpOnly. CSRF uses a **synchronizer token** bound to the
 | POST | `/auth/logout-all` | Authenticated + CSRF |
 | PATCH | `/account/preferences` | Authenticated + CSRF |
 | PATCH | `/risks/{risk_id}/treatment` | Authenticated + `risk.manage` + CSRF |
+| PATCH | `/incidents/{incident_id}` | Authenticated + `incident.manage` + CSRF (`incident.close` when closing) |
+| PATCH | `/vulnerabilities/{vulnerability_id}/remediation` | Authenticated + `vulnerability.manage` + CSRF |
 
 ### CSRF exemptions
 
@@ -176,10 +178,10 @@ Authenticated session required (401 without a valid cookie):
 | Risks | `risk.read`; treatment PATCH requires `risk.manage` + CSRF | Yes (read + treatment write) |
 | Controls / governance | `control.read` (+ manage/update for writes later) | Yes (read) |
 | Evidence | `evidence.read` (+ manage/download for writes later) | No dedicated list route yet |
-| Vulnerabilities | `vulnerability.read` (+ manage for writes later) | Yes (read) |
+| Vulnerabilities | `vulnerability.read`; remediation PATCH requires `vulnerability.manage` + CSRF | Yes (read + remediation write) |
 | Alerts | `alert.read` | Yes |
 | Detections | `detection.read` (+ manage for writes later) | No dedicated list route yet |
-| Incidents | `incident.read` (+ manage/close for writes later) | Yes (read) |
+| Incidents | `incident.read`; PATCH requires `incident.manage` + CSRF; close statuses also need `incident.close` | Yes (read + incident write) |
 | Threat intelligence | `threat_intel.read` | Yes |
 | Reports | `report.read` (+ manage for writes later) | Yes (read) |
 | Datasets / experiments | `dataset.read` (+ manage for writes later) | Yes (read) |
@@ -191,11 +193,25 @@ Authenticated session required (401 without a valid cookie):
 | Auth session/me | authenticated (`/me`); `/session` public | Yes |
 | Account | authenticated; preferences PATCH + CSRF | Yes |
 | Risk treatment PATCH | `risk.manage` + CSRF | Yes |
+| Incident PATCH | `incident.manage` + CSRF (+ `incident.close` to resolve/close) | Yes |
+| Vulnerability remediation PATCH | `vulnerability.manage` + CSRF | Yes |
 
 **401** = no valid session (missing, revoked, expired, or inactive user).  
-**403** = missing permission (`forbidden`) or CSRF failure (`csrf_failed`). Error bodies do not list capability codes or tokens.
+**403** = missing permission (`forbidden`) or CSRF failure (`csrf_failed`). Error bodies do not list capability codes or tokens.  
+**409** = stale `expected_updated_at` concurrency conflict.
 
-**Broader authenticated domain writes** (incidents, vulns, admin, integrations, reports, cyber-range control) remain deferred. No Cyber Range remote control.
+**Remaining authenticated domain writes** (incident tasks, admin, integrations, reports, cyber-range control, exception workflows beyond remediation) remain deferred. No Cyber Range remote control.
+
+### Incident mutation scope (`incident.manage`)
+
+Writable: `title`, `severity`, `status`, `summary`, `owner` (user human id).  
+Not writable: `containment_state` (no column), related alerts/assets, tasks (no public task ids yet).  
+Closing (`resolved` / `closed`) additionally requires `incident.close`.
+
+### Vulnerability remediation scope (`vulnerability.manage`)
+
+Writable on the latest `RemediationTask` for a selected asset finding: `status`, `title`, `due_on`, `owner`.  
+Immutable: CVSS, EPSS, KEV, CVE metadata, asset criticality/exposure, SSVC `action_decision` / rationale.
 
 ## Audit behavior
 
@@ -207,6 +223,8 @@ Security-relevant actions write `audit_events` rows:
 - `LOGOUT_ALL`
 - `PREFERENCES_UPDATE`
 - `RISK_TREATMENT_UPDATE`
+- `INCIDENT_UPDATE`
+- `VULNERABILITY_REMEDIATION_UPDATE`
 
 Metadata may include actor human id, action, object human id, and changed field names. Metadata must not include passwords, hashes, session/CSRF tokens, or digests.
 
@@ -222,7 +240,7 @@ Never commit the real password. Production must not rely on this variable.
 ## Production hardening still required
 
 - Login rate limiting / lockout (structure is ready; not implemented)
-- Broader CSRF-protected domain writes beyond preferences + risk treatment
+- Remaining CSRF-protected domain writes (admin, integrations, reports, cyber-range, incident tasks)
 - MFA/TOTP
 - Password reset email flows
 - SSO/OIDC
