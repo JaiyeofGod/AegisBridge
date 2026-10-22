@@ -50,7 +50,7 @@ describe("Governance & Compliance page", () => {
       if (url.includes("/api/v1/governance/summary")) {
         return fail ? jsonResponse({ message: "down" }, 500) : jsonResponse(governanceSummary);
       }
-      return jsonResponse({ status: "ok", service: "aegisbridge" });
+      return undefined;
     });
     const user = userEvent.setup();
     await renderWithProviders(<AppRouter />, { initialEntries: ["/governance"] });
@@ -61,7 +61,7 @@ describe("Governance & Compliance page", () => {
     await user.click(screen.getByRole("button", { name: "Retry" }));
     expect(await screen.findByText(/partial/i)).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Policies" }));
-    expect(await screen.findByText(/POL-0001/)).toBeInTheDocument();
+    expect(await screen.findByTestId("policies-list")).toHaveTextContent("POL-0001");
     expect(screen.queryByText("72 / 96")).not.toBeInTheDocument();
   });
 
@@ -106,9 +106,9 @@ describe("Governance & Compliance page", () => {
     expect(within(evidence).queryByText("Stale")).not.toBeInTheDocument();
 
     await user.click(within(page).getByRole("tab", { name: "Policies" }));
-    expect(within(page).getByTestId("policies-list")).toHaveTextContent("POL-0001");
+    expect(await within(page).findByTestId("policies-list")).toHaveTextContent("POL-0001");
     expect(within(page).getByTestId("policies-list")).toHaveTextContent("Access control policy");
-    expect(within(page).getByTestId("policies-list")).toHaveTextContent("Draft");
+    expect(within(page).getByTestId("policies-list")).toHaveTextContent("Published");
 
     await user.click(within(page).getByRole("tab", { name: "Access reviews" }));
     expect(within(page).getByTestId("access-reviews-list")).toHaveTextContent("ARV-0001");
@@ -123,6 +123,9 @@ describe("Governance & Compliance page", () => {
   it("shows honest empty states when policies, reviews, tests, and evidence are absent", async () => {
     installApiFetch((url) => {
       if (url.includes("/api/v1/governance/summary")) return jsonResponse(emptyGovernanceSummary);
+      if (url.includes("/api/v1/policies")) {
+        return jsonResponse({ page: 1, page_size: 50, total: 0, items: [] });
+      }
       return jsonResponse({ status: "ok", service: "aegisbridge" });
     });
     const user = userEvent.setup();
@@ -139,7 +142,7 @@ describe("Governance & Compliance page", () => {
     );
 
     await user.click(within(page).getByRole("tab", { name: "Policies" }));
-    expect(within(page).getByTestId("policies-list")).toHaveTextContent(
+    expect(await within(page).findByTestId("policies-list")).toHaveTextContent(
       "No policy records are stored.",
     );
 

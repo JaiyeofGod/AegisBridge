@@ -50,8 +50,12 @@ Requires Node.js 24 LTS. Dev server: `http://127.0.0.1:5173` (proxies `/api` to 
 | Download evidence object      | `GET /api/v1/evidence/{id}/object`                       | Requires `evidence.read`. Authenticated Blob download; no public/S3 URLs.                                  |
 | Delete evidence object        | `DELETE /api/v1/evidence/{id}/object`                    | Requires `evidence.manage` + CSRF. Deletes stored bytes only; metadata + control links remain.             |
 | Link/unlink evidence          | `POST`/`DELETE .../controls/{id}/evidence/{evidence_id}` | Requires `control.manage` + `evidence.manage`. Unlink removes association only.                            |
+| Create policy                 | `POST /api/v1/policies`                                  | Requires `policy.manage` + CSRF. Server assigns `POL-NNNN` + initial draft. No client-generated ids.       |
+| Create/edit draft version     | `POST`/`PATCH .../policies/{id}/versions`                | Requires `policy.manage` + CSRF. Published/superseded versions are immutable in the UI.                    |
+| Policy lifecycle              | `POST .../policies/{id}/transition`                      | Manage vs approve from permission codes (not role names). Publish/retire confirmations required.           |
+| Acknowledge policy            | `POST .../policies/{id}/acknowledge`                     | Current authenticated user + current published version only. Idempotent; count only (no fake %).           |
 
-Backend remains the authorization boundary. Evidence files are stored outside PostgreSQL (local SeaweedFS / future R2) via the API only. SHA-256 is calculated server-side at ingestion; `integrity_verified` remains false; malware scanning is not implemented. Integration credential writes, reports, Cyber Range control, and incident tasks stay disabled in the UI.
+Backend remains the authorization boundary. Evidence files are stored outside PostgreSQL (local SeaweedFS / future R2) via the API only. SHA-256 is calculated server-side at ingestion; `integrity_verified` remains false; malware scanning is not implemented. Policy UI preserves version history; e-sign, email, rich docs, and policy↔control linking are not supported. Integration credential writes, reports, Cyber Range control, and incident tasks stay disabled in the UI.
 
 ### Route guards (UX only)
 

@@ -19,6 +19,7 @@ import { ControlImplementationEditor } from "@/features/governance/ControlImplem
 import { ControlTestPanel } from "@/features/governance/ControlTestPanel";
 import { GovernanceSectionNav } from "@/features/governance/GovernanceSectionNav";
 import { mapGovernanceSummary, type GovernanceView } from "@/features/governance/mapGovernance";
+import { PolicyManagementPanel } from "@/features/governance/PolicyManagementPanel";
 import {
   useGovernanceControl,
   useGovernanceControls,
@@ -35,6 +36,9 @@ export function GovernancePage() {
   const canReadEvidence = permissions.includes("evidence.read");
   const canManageEvidence = permissions.includes("evidence.manage");
   const canLinkEvidence = canManageControls && canManageEvidence;
+  const canReadPolicies = permissions.includes("policy.read");
+  const canManagePolicies = permissions.includes("policy.manage");
+  const canApprovePolicies = permissions.includes("policy.approve");
   const governance = useGovernanceSummary();
   const [section, setSection] = useState<GovernanceSectionId>("summary");
   const generatedAt = governance.dataUpdatedAt
@@ -111,7 +115,13 @@ export function GovernancePage() {
               />
             ) : null}
             {section === "evidence" ? <EvidenceSection data={view} /> : null}
-            {section === "policies" ? <PoliciesSection data={view} /> : null}
+            {section === "policies" ? (
+              <PolicyManagementPanel
+                canRead={canReadPolicies}
+                canManage={canManagePolicies}
+                canApprove={canApprovePolicies}
+              />
+            ) : null}
             {section === "access-reviews" ? <AccessReviewsSection data={view} /> : null}
           </div>
         ) : null}
@@ -449,41 +459,6 @@ function EvidenceSection({ data }: { data: GovernanceView }) {
             <li className="text-sm text-[var(--muted)]">{freshness.semantics}</li>
             <li className="text-sm text-[var(--muted)]">No evidence due dates are stored.</li>
           </>
-        )}
-      </ul>
-    </Panel>
-  );
-}
-
-function PoliciesSection({ data }: { data: GovernanceView }) {
-  return (
-    <Panel
-      title="Policy status"
-      description="Policy records returned by the governance summary. Review dates are not stored."
-      action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
-    >
-      <ul className="space-y-3" data-testid="policies-list">
-        {data.policies.length === 0 ? (
-          <li className="text-sm text-[var(--muted)]">No policy records are stored.</li>
-        ) : (
-          data.policies.map((policy) => (
-            <li
-              key={policy.id}
-              className="flex flex-wrap items-start justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
-            >
-              <div className="min-w-0 space-y-1">
-                <p className="font-medium text-[var(--text)]">
-                  {policy.id} · {policy.title}{" "}
-                  <span className="text-[var(--muted)]">({policy.version})</span>
-                </p>
-                <p className="text-xs text-[var(--muted)]">
-                  Owner {policy.owner} · Acknowledgements {policy.acknowledgementCount} · Next
-                  review Not stored
-                </p>
-              </div>
-              <StatusBadge label={policy.statusLabel} tone={policy.statusTone} />
-            </li>
-          ))
         )}
       </ul>
     </Panel>

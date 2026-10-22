@@ -31,6 +31,10 @@ import type {
   LabTelemetryItem,
   LabZoneItem,
   OverviewResponse,
+  PolicyAcknowledgeResult,
+  PolicyDetail,
+  PolicyListItem,
+  PolicyVersionDetail,
   ReportDefinitionDetail,
   ReportDefinitionListItem,
   ReportsSummary,
@@ -104,6 +108,9 @@ export const currentUserFixture = {
     "control.manage",
     "evidence.read",
     "evidence.manage",
+    "policy.read",
+    "policy.manage",
+    "policy.approve",
     "incident.read",
     "incident.manage",
     "incident.close",
@@ -570,8 +577,8 @@ export const governanceSummary: GovernanceSummary = {
     {
       id: "POL-0001",
       title: "Access control policy",
-      status: "draft",
-      current_version: "0.1",
+      status: "published",
+      current_version: "1.0",
       acknowledgement_count: 1,
       owner: { id: "USR-0003", display_name: "Priya Shah" },
     },
@@ -1987,10 +1994,94 @@ export function installApiFetch(
   };
   let evidenceCounter = 42;
   let controlTestCounter = 1;
+  let policyCounter = 2;
   const evidenceStore = new Map<string, EvidenceDetail>([
     ["EVID-0041", { ...evidenceDetailSeed, control_ids: [...evidenceDetailSeed.control_ids] }],
   ]);
   const evidenceObjectBytes = new Map<string, Uint8Array>();
+  const policySeed: PolicyDetail = {
+    id: "POL-0001",
+    title: "Access control policy",
+    status: "published",
+    owner: { id: "USR-0003", display_name: "Priya Shah" },
+    current_version: "1.0",
+    versions: [
+      {
+        version_label: "1.0",
+        status: "published",
+        is_current: true,
+        change_summary: "Initial published seed version.",
+        acknowledgement_count: 1,
+        updated_at: "2026-10-19T21:00:00+00:00",
+      },
+    ],
+    acknowledgements: {
+      current_version_label: "1.0",
+      acknowledgement_count: 1,
+      current_user_acknowledged: true,
+      current_user_acknowledged_at: "2026-10-19T21:05:00+00:00",
+      semantics:
+        "Acknowledgement count is for the current published version only. Organization-wide completion rate is not defined.",
+    },
+    created_at: "2026-10-19T20:00:00+00:00",
+    updated_at: "2026-10-19T21:00:00+00:00",
+    control_mappings: [],
+    semantics:
+      "Policy metadata and versioned plain-text summaries. Published versions are immutable historical records.",
+  };
+  const policyStore = new Map<string, PolicyDetail>([
+    [
+      "POL-0001",
+      {
+        ...policySeed,
+        versions: policySeed.versions.map((item) => ({ ...item })),
+        acknowledgements: { ...policySeed.acknowledgements },
+        control_mappings: [],
+      },
+    ],
+  ]);
+  const policyVersionBodies = new Map<string, PolicyVersionDetail>([
+    [
+      "POL-0001:1.0",
+      {
+        policy_id: "POL-0001",
+        version_label: "1.0",
+        status: "published",
+        is_current: true,
+        content: "Simulated access control policy summary. Development seeded text only.",
+        change_summary: "Initial published seed version.",
+        acknowledgement_count: 1,
+        created_at: "2026-10-19T20:00:00+00:00",
+        updated_at: "2026-10-19T21:00:00+00:00",
+      },
+    ],
+  ]);
+
+  function syncPolicySummary() {
+    governanceSummaryState = {
+      ...governanceSummaryState,
+      policies: [...policyStore.values()].map((policy) => ({
+        id: policy.id,
+        title: policy.title,
+        status: policy.status,
+        current_version: policy.current_version,
+        acknowledgement_count: policy.acknowledgements.acknowledgement_count,
+        owner: policy.owner,
+      })),
+    };
+  }
+
+  function policyListItem(policy: PolicyDetail): PolicyListItem {
+    return {
+      id: policy.id,
+      title: policy.title,
+      status: policy.status,
+      owner: policy.owner,
+      current_version: policy.current_version,
+      acknowledgement_count: policy.acknowledgements.acknowledgement_count,
+      updated_at: policy.updated_at,
+    };
+  }
 
   function syncGovernanceWriteCounts() {
     controlListState = {
@@ -2649,6 +2740,358 @@ export function installApiFetch(
     if (url.includes("/api/v1/governance/controls")) {
       return jsonResponse(assetPage([controlListState]));
     }
+    if (/\/api\/v1\/policies\/[^/?]+\/versions\/[^/?]+/.test(url)) {
+      const path = url.split("/policies/")[1] ?? "";
+      const policyId = decodeURIComponent(path.split("/versions/")[0] ?? "");
+      const versionLabel = decodeURIComponent(path.split("/versions/")[1]?.split("?")[0] ?? "");
+      const policy = policyStore.get(policyId);
+      if (!policy) {
+        return jsonResponse({ code: "not_found", message: "Policy was not found." }, 404);
+      }
+      const key = `${policyId}:${versionLabel}`;
+      if (init?.method === "PATCH") {
+        const provided = headerValue(init, "X-CSRF-Token");
+        if (!provided) {
+          return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+        }
+        const version = policyVersionBodies.get(key);
+        if (!version) {
+          return jsonResponse({ code: "not_found", message: "Policy version was not found." }, 404);
+        }
+        if (version.status !== "draft") {
+          return jsonResponse(
+            { code: "conflict", message: "Only draft versions can be edited." },
+            409,
+          );
+        }
+        const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+        if (
+          typeof body.expected_updated_at === "string" &&
+          version.updated_at &&
+          body.expected_updated_at !== version.updated_at
+        ) {
+          return jsonResponse(
+            { code: "conflict", message: "The policy version was modified by another request." },
+            409,
+          );
+        }
+        const updated: PolicyVersionDetail = {
+          ...version,
+          content: typeof body.content === "string" ? body.content : version.content,
+          change_summary:
+            "change_summary" in body
+              ? typeof body.change_summary === "string"
+                ? body.change_summary
+                : null
+              : version.change_summary,
+          updated_at: "2026-10-22T12:00:00+00:00",
+        };
+        policyVersionBodies.set(key, updated);
+        policy.versions = policy.versions.map((item) =>
+          item.version_label === versionLabel
+            ? {
+                ...item,
+                change_summary: updated.change_summary,
+                updated_at: updated.updated_at,
+              }
+            : item,
+        );
+        policy.updated_at = updated.updated_at;
+        policyStore.set(policyId, policy);
+        syncPolicySummary();
+        return jsonResponse(updated);
+      }
+      const version = policyVersionBodies.get(key);
+      if (!version) {
+        return jsonResponse({ code: "not_found", message: "Policy version was not found." }, 404);
+      }
+      return jsonResponse(version);
+    }
+
+    if (/\/api\/v1\/policies\/[^/?]+\/versions/.test(url)) {
+      const policyId = decodeURIComponent(
+        url.split("/policies/")[1]?.split("/versions")[0]?.split("?")[0] ?? "",
+      );
+      const policy = policyStore.get(policyId);
+      if (!policy) {
+        return jsonResponse({ code: "not_found", message: "Policy was not found." }, 404);
+      }
+      if (init?.method === "POST") {
+        const provided = headerValue(init, "X-CSRF-Token");
+        if (!provided) {
+          return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+        }
+        const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+        const label = typeof body.version_label === "string" ? body.version_label.trim() : "";
+        if (!label || typeof body.content !== "string") {
+          return jsonResponse({ code: "validation_error", message: "Invalid version." }, 422);
+        }
+        if (policy.versions.some((item) => item.version_label === label)) {
+          return jsonResponse({ code: "conflict", message: "Version already exists." }, 409);
+        }
+        const created: PolicyVersionDetail = {
+          policy_id: policyId,
+          version_label: label,
+          status: "draft",
+          is_current: false,
+          content: body.content,
+          change_summary: typeof body.change_summary === "string" ? body.change_summary : null,
+          acknowledgement_count: 0,
+          created_at: "2026-10-22T12:10:00+00:00",
+          updated_at: "2026-10-22T12:10:00+00:00",
+        };
+        policyVersionBodies.set(`${policyId}:${label}`, created);
+        policy.versions = [
+          ...policy.versions,
+          {
+            version_label: label,
+            status: "draft",
+            is_current: false,
+            change_summary: created.change_summary,
+            acknowledgement_count: 0,
+            updated_at: created.updated_at,
+          },
+        ];
+        policy.updated_at = created.updated_at;
+        policyStore.set(policyId, policy);
+        syncPolicySummary();
+        return jsonResponse(created);
+      }
+      return jsonResponse(policy.versions);
+    }
+
+    if (/\/api\/v1\/policies\/[^/?]+\/transition/.test(url) && init?.method === "POST") {
+      const provided = headerValue(init, "X-CSRF-Token");
+      if (!provided) {
+        return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+      }
+      const policyId = decodeURIComponent(
+        url.split("/policies/")[1]?.split("/transition")[0] ?? "",
+      );
+      const policy = policyStore.get(policyId);
+      if (!policy) {
+        return jsonResponse({ code: "not_found", message: "Policy was not found." }, 404);
+      }
+      const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+      if (
+        typeof body.expected_updated_at === "string" &&
+        policy.updated_at &&
+        body.expected_updated_at !== policy.updated_at
+      ) {
+        return jsonResponse(
+          { code: "conflict", message: "The policy was modified by another request." },
+          409,
+        );
+      }
+      const toStatus = typeof body.to_status === "string" ? body.to_status : "";
+      if (toStatus === "published") {
+        const label = typeof body.version_label === "string" ? body.version_label.trim() : "";
+        const version = policyVersionBodies.get(`${policyId}:${label}`);
+        if (!version || version.status !== "draft") {
+          return jsonResponse(
+            { code: "conflict", message: "Only a draft version can be published." },
+            409,
+          );
+        }
+        for (const item of policy.versions) {
+          if (item.version_label === label) continue;
+          if (item.is_current || item.status === "published") {
+            item.is_current = false;
+            item.status = "superseded";
+            const prior = policyVersionBodies.get(`${policyId}:${item.version_label}`);
+            if (prior) {
+              policyVersionBodies.set(`${policyId}:${item.version_label}`, {
+                ...prior,
+                is_current: false,
+                status: "superseded",
+              });
+            }
+          }
+        }
+        version.status = "published";
+        version.is_current = true;
+        version.updated_at = "2026-10-22T12:20:00+00:00";
+        policyVersionBodies.set(`${policyId}:${label}`, version);
+        policy.versions = policy.versions.map((item) =>
+          item.version_label === label
+            ? { ...item, status: "published", is_current: true, updated_at: version.updated_at }
+            : item.is_current || item.status === "published"
+              ? { ...item, status: "superseded", is_current: false }
+              : item,
+        );
+        policy.status = "published";
+        policy.current_version = label;
+        policy.acknowledgements = {
+          ...policy.acknowledgements,
+          current_version_label: label,
+          acknowledgement_count: 0,
+          current_user_acknowledged: false,
+          current_user_acknowledged_at: null,
+        };
+      } else if (
+        ["draft", "in_review", "approved", "retired"].includes(toStatus) &&
+        typeof toStatus === "string"
+      ) {
+        policy.status = toStatus as PolicyDetail["status"];
+      } else {
+        return jsonResponse(
+          { code: "validation_error", message: "Transition is not allowed." },
+          422,
+        );
+      }
+      policy.updated_at = "2026-10-22T12:20:00+00:00";
+      policyStore.set(policyId, policy);
+      syncPolicySummary();
+      return jsonResponse(policy);
+    }
+
+    if (/\/api\/v1\/policies\/[^/?]+\/acknowledge/.test(url) && init?.method === "POST") {
+      const provided = headerValue(init, "X-CSRF-Token");
+      if (!provided) {
+        return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+      }
+      const policyId = decodeURIComponent(
+        url.split("/policies/")[1]?.split("/acknowledge")[0] ?? "",
+      );
+      const policy = policyStore.get(policyId);
+      if (!policy) {
+        return jsonResponse({ code: "not_found", message: "Policy was not found." }, 404);
+      }
+      if (policy.status !== "published" || !policy.current_version) {
+        return jsonResponse(
+          { code: "conflict", message: "Only the currently published policy can be acknowledged." },
+          409,
+        );
+      }
+      const already = policy.acknowledgements.current_user_acknowledged;
+      if (!already) {
+        policy.acknowledgements = {
+          ...policy.acknowledgements,
+          acknowledgement_count: policy.acknowledgements.acknowledgement_count + 1,
+          current_user_acknowledged: true,
+          current_user_acknowledged_at: "2026-10-22T12:30:00+00:00",
+        };
+        const current = policy.versions.find((item) => item.is_current);
+        if (current) {
+          current.acknowledgement_count += 1;
+        }
+        const body = policyVersionBodies.get(`${policyId}:${policy.current_version}`);
+        if (body) {
+          body.acknowledgement_count += 1;
+          policyVersionBodies.set(`${policyId}:${policy.current_version}`, body);
+        }
+        policyStore.set(policyId, policy);
+        syncPolicySummary();
+      }
+      const result: PolicyAcknowledgeResult = {
+        policy_id: policyId,
+        version_label: policy.current_version,
+        acknowledged: true,
+        acknowledged_at:
+          policy.acknowledgements.current_user_acknowledged_at ?? "2026-10-22T12:30:00+00:00",
+        already_acknowledged: already,
+      };
+      return jsonResponse(result);
+    }
+
+    if (/\/api\/v1\/policies\/[^/?]+/.test(url) && !url.includes("/versions")) {
+      const policyId = decodeURIComponent(url.split("/policies/")[1]?.split("?")[0] ?? "");
+      const policy = policyStore.get(policyId);
+      if (!policy) {
+        return jsonResponse({ code: "not_found", message: "Policy was not found." }, 404);
+      }
+      if (init?.method === "PATCH") {
+        const provided = headerValue(init, "X-CSRF-Token");
+        if (!provided) {
+          return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+        }
+        const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+        if (
+          typeof body.expected_updated_at === "string" &&
+          policy.updated_at &&
+          body.expected_updated_at !== policy.updated_at
+        ) {
+          return jsonResponse(
+            { code: "conflict", message: "The policy was modified by another request." },
+            409,
+          );
+        }
+        if (typeof body.title === "string") {
+          policy.title = body.title;
+        }
+        policy.updated_at = "2026-10-22T12:05:00+00:00";
+        policyStore.set(policyId, policy);
+        syncPolicySummary();
+        return jsonResponse(policy);
+      }
+      return jsonResponse(policy);
+    }
+
+    if (url.includes("/api/v1/policies") && init?.method === "POST") {
+      const provided = headerValue(init, "X-CSRF-Token");
+      if (!provided) {
+        return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+      }
+      const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+      if ("human_id" in body || "id" in body || "permissions" in body || "roles" in body) {
+        return jsonResponse({ code: "validation_error", message: "Unexpected fields." }, 422);
+      }
+      const id = `POL-${String(policyCounter).padStart(4, "0")}`;
+      policyCounter += 1;
+      const label =
+        typeof body.initial_version_label === "string" ? body.initial_version_label : "0.1";
+      const content =
+        typeof body.initial_content === "string" ? body.initial_content : "Draft policy content.";
+      const created: PolicyDetail = {
+        id,
+        title: typeof body.title === "string" ? body.title : "Untitled",
+        status: "draft",
+        owner: { id: "USR-0001", display_name: "Amara Okonkwo" },
+        current_version: null,
+        versions: [
+          {
+            version_label: label,
+            status: "draft",
+            is_current: false,
+            change_summary: typeof body.change_summary === "string" ? body.change_summary : null,
+            acknowledgement_count: 0,
+            updated_at: "2026-10-22T12:00:00+00:00",
+          },
+        ],
+        acknowledgements: {
+          current_version_label: null,
+          acknowledgement_count: 0,
+          current_user_acknowledged: false,
+          current_user_acknowledged_at: null,
+          semantics: policySeed.acknowledgements.semantics,
+        },
+        created_at: "2026-10-22T12:00:00+00:00",
+        updated_at: "2026-10-22T12:00:00+00:00",
+        control_mappings: [],
+        semantics: policySeed.semantics,
+      };
+      policyStore.set(id, created);
+      policyVersionBodies.set(`${id}:${label}`, {
+        policy_id: id,
+        version_label: label,
+        status: "draft",
+        is_current: false,
+        content,
+        change_summary: created.versions[0]?.change_summary ?? null,
+        acknowledgement_count: 0,
+        created_at: created.created_at,
+        updated_at: created.updated_at,
+      });
+      syncPolicySummary();
+      return jsonResponse(created);
+    }
+
+    if (url.includes("/api/v1/policies")) {
+      return jsonResponse(
+        assetPage([...policyStore.values()].map((policy) => policyListItem(policy))),
+      );
+    }
+
     if (url.includes("/api/v1/governance/summary")) return jsonResponse(governanceSummaryState);
     if (/\/api\/v1\/threat-intelligence\/indicators\/[^/?]+/.test(url)) {
       const id = url.split("/indicators/")[1]?.split("?")[0] ?? "";

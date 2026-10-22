@@ -348,6 +348,103 @@ export type PolicyStatusItem = {
   owner: PersonRef | null;
 };
 
+export type PolicyLifecycleStatus = "draft" | "in_review" | "approved" | "published" | "retired";
+
+export type PolicyVersionStatus = "draft" | "published" | "superseded";
+
+export type PolicyVersionSummary = {
+  version_label: string;
+  status: PolicyVersionStatus;
+  is_current: boolean;
+  change_summary: string | null;
+  acknowledgement_count: number;
+  updated_at: string | null;
+};
+
+export type PolicyVersionDetail = {
+  policy_id: string;
+  version_label: string;
+  status: PolicyVersionStatus;
+  is_current: boolean;
+  content: string;
+  change_summary: string | null;
+  acknowledgement_count: number;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type PolicyAcknowledgementSummary = {
+  current_version_label: string | null;
+  acknowledgement_count: number;
+  current_user_acknowledged: boolean;
+  current_user_acknowledged_at: string | null;
+  semantics: string;
+};
+
+export type PolicyListItem = {
+  id: string;
+  title: string;
+  status: PolicyLifecycleStatus;
+  owner: PersonRef | null;
+  current_version: string | null;
+  acknowledgement_count: number;
+  updated_at: string | null;
+};
+
+export type PolicyDetail = {
+  id: string;
+  title: string;
+  status: PolicyLifecycleStatus;
+  owner: PersonRef | null;
+  current_version: string | null;
+  versions: PolicyVersionSummary[];
+  acknowledgements: PolicyAcknowledgementSummary;
+  created_at: string | null;
+  updated_at: string | null;
+  control_mappings: string[];
+  semantics: string;
+};
+
+export type PolicyCreate = {
+  title: string;
+  owner?: string | null;
+  initial_version_label?: string;
+  initial_content?: string;
+  change_summary?: string | null;
+};
+
+export type PolicyUpdate = {
+  title?: string;
+  owner?: string | null;
+  expected_updated_at?: string | null;
+};
+
+export type PolicyVersionCreate = {
+  version_label: string;
+  content: string;
+  change_summary?: string | null;
+};
+
+export type PolicyVersionUpdate = {
+  content?: string;
+  change_summary?: string | null;
+  expected_updated_at?: string | null;
+};
+
+export type PolicyTransition = {
+  to_status: PolicyLifecycleStatus;
+  version_label?: string | null;
+  expected_updated_at?: string | null;
+};
+
+export type PolicyAcknowledgeResult = {
+  policy_id: string;
+  version_label: string;
+  acknowledged: boolean;
+  acknowledged_at: string;
+  already_acknowledged: boolean;
+};
+
 export type AccessReviewStatusItem = {
   id: string;
   name: string;

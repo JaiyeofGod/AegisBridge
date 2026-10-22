@@ -3,7 +3,7 @@ import type { QueryClient } from "@tanstack/react-query";
 /** Refresh governance summary, control lists, and a selected control after writes. */
 export async function invalidateGovernanceWrites(
   queryClient: QueryClient,
-  options?: { controlId?: string; evidenceId?: string },
+  options?: { controlId?: string; evidenceId?: string; policyId?: string },
 ) {
   await queryClient.invalidateQueries({ queryKey: ["governance", "summary"] });
   await queryClient.invalidateQueries({ queryKey: ["governance", "controls"] });
@@ -17,6 +17,15 @@ export async function invalidateGovernanceWrites(
   if (options?.evidenceId) {
     await queryClient.invalidateQueries({
       queryKey: ["evidence", "detail", options.evidenceId],
+    });
+  }
+  await queryClient.invalidateQueries({ queryKey: ["policies"] });
+  if (options?.policyId) {
+    await queryClient.invalidateQueries({
+      queryKey: ["policies", "detail", options.policyId],
+    });
+    await queryClient.invalidateQueries({
+      queryKey: ["policies", "versions", options.policyId],
     });
   }
 }
