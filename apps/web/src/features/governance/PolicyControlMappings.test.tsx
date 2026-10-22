@@ -52,7 +52,7 @@ describe("Policy ↔ control mapping UI", () => {
     expect(screen.getByTestId("policy-mapping-add")).toBeInTheDocument();
     await user.click(screen.getByTestId("policy-mapping-add"));
     expect(await screen.findByTestId("policy-mapping-control-select")).toBeInTheDocument();
-    await user.selectOptions(screen.getByTestId("policy-mapping-control-select"), "CTRL-0002");
+    await user.click(await screen.findByTestId("policy-mapping-control-option-CTRL-0002"));
     await user.click(screen.getByTestId("policy-mapping-link-submit"));
 
     expect(await screen.findByTestId("policy-mapping-success")).toHaveTextContent(/CTRL-0002/);
@@ -77,11 +77,7 @@ describe("Policy ↔ control mapping UI", () => {
 
     // Idempotent second link does not duplicate rows
     await user.click(screen.getByTestId("policy-mapping-add"));
-    await user.selectOptions(screen.getByTestId("policy-mapping-control-select"), "CTRL-0002");
-    // Already mapped should be disabled — select may not change; force submit only if enabled
-    const option = within(screen.getByTestId("policy-mapping-control-select")).getByRole("option", {
-      name: /CTRL-0002/,
-    });
+    const option = await screen.findByTestId("policy-mapping-control-option-CTRL-0002");
     expect(option).toBeDisabled();
 
     await user.click(screen.getByTestId("policy-mapping-unlink-CTRL-0002"));
@@ -111,10 +107,7 @@ describe("Policy ↔ control mapping UI", () => {
     const page = await openPolicies(user);
 
     await user.click(screen.getByTestId("policy-mapping-add"));
-    await user.selectOptions(
-      await screen.findByTestId("policy-mapping-control-select"),
-      "CTRL-0002",
-    );
+    await user.click(await screen.findByTestId("policy-mapping-control-option-CTRL-0002"));
     await user.click(screen.getByTestId("policy-mapping-link-submit"));
     expect(await screen.findByTestId("policy-mapping-CTRL-0002")).toBeInTheDocument();
 
@@ -196,10 +189,7 @@ describe("Policy ↔ control mapping UI", () => {
     const user = userEvent.setup();
     await openPolicies(user);
     await user.click(screen.getByTestId("policy-mapping-add"));
-    await user.selectOptions(
-      await screen.findByTestId("policy-mapping-control-select"),
-      "CTRL-0002",
-    );
+    await user.click(await screen.findByTestId("policy-mapping-control-option-CTRL-0002"));
     await user.click(screen.getByTestId("policy-mapping-link-submit"));
     expect(await screen.findByTestId("policy-mapping-CTRL-0002")).toBeInTheDocument();
 

@@ -58,6 +58,13 @@ Requires Node.js 24 LTS. Dev server: `http://127.0.0.1:5173` (proxies `/api` to 
 
 Backend remains the authorization boundary. Evidence files are stored outside PostgreSQL (local SeaweedFS / future R2) via the API only. SHA-256 is calculated server-side at ingestion; `integrity_verified` remains false; malware scanning is not implemented. Policy UI preserves version history and Policy → Control → Test → Evidence traceability; licensed CIS safeguard prose is never surfaced. E-sign, email, and rich docs remain unsupported. Integration credential writes, reports, Cyber Range control, and incident tasks stay disabled in the UI.
 
+### Catalog discovery (controls & policies)
+
+- `GET /api/v1/governance/controls` and `GET /api/v1/policies` are queried with bounded `page` / `page_size` (default 25; selector uses 20), optional metadata `q`, closed filters, and allowlisted `sort`/`direction`.
+- The UI does **not** preload the entire catalog or assume `page_size=50` is complete.
+- Policy → Add Control uses the same control list API with server-side search/pagination; already-mapped controls are disabled.
+- Query keys include full query state; write invalidation uses query-key families (`["governance","controls"]`, `["policies"]`), not hard-coded page=1 keys.
+
 ### Route guards (UX only)
 
 `RequireAuth` / `GuestOnly` protect product and account routes in the SPA. They are **not** the security boundary; FastAPI enforces session + RBAC + CSRF on mutating routes.

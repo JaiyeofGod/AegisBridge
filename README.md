@@ -126,7 +126,7 @@ The web app reads development API data through the Vite `/api` proxy (`VITE_API_
 
 Domain read routes, including threat intelligence, administration, reports, datasets, dataset experiments, and cyber-range, are documented in `docs/api/API_CONTRACTS.md`. Auth and Account APIs are documented there and in `docs/security/AUTHENTICATION_AND_RBAC.md`.
 
-**Auth status:** Argon2id passwords + HttpOnly sessions + synchronizer CSRF; domain GET RBAC enforced; preferences, risk, incident, vulnerability, administration, governance, evidence objects, policy lifecycle/versioning/acknowledgement, and policy↔control mapping wired on API and Governance UI. Control and policy list endpoints support bounded pagination plus metadata search/filters (no licensed CIS prose; no policy body in list). Evidence bytes stay outside PostgreSQL (SeaweedFS locally; R2 later). SPA route guards remain UX only. Backend remains the authorization boundary.
+**Auth status:** Argon2id passwords + HttpOnly sessions + synchronizer CSRF; domain GET RBAC enforced; preferences, risk, incident, vulnerability, administration, governance, evidence objects, policy lifecycle/versioning/acknowledgement, and policy↔control mapping wired on API and Governance UI. Control and policy catalogs (and the policy→control selector) use server-side pagination/search/filters with bounded page sizes—no full-catalog preload. Evidence bytes stay outside PostgreSQL (SeaweedFS locally; R2 later). SPA route guards remain UX only. Backend remains the authorization boundary.
 
 **Not yet created:** Policy rich-text/PDF/e-sign/email, integration/report/cyber-range writes, SSO/MFA, password reset, rate limiting, external integrations, malware scanning for evidence, background jobs, Celery worker, CI workflows.
 

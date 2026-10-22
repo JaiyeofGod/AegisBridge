@@ -307,8 +307,175 @@ export const finAppDetail: AssetDetailResponse = {
   evidence: [{ id: "EVID-0041", title: "Finding evidence", status: "collected", summary: null }],
 };
 
-export function assetPage<T>(items: T[]) {
-  return { page: 1, page_size: 100, total: items.length, items };
+export function assetPage<T>(items: T[], page = 1, pageSize = 100) {
+  const total = items.length;
+  const start = Math.max(0, (page - 1) * pageSize);
+  return {
+    page,
+    page_size: pageSize,
+    total,
+    items: items.slice(start, start + pageSize),
+  };
+}
+
+/** Extra controls for multi-page catalog tests. Seeded with CTRL-0002. */
+export const controlCatalogExtras: ControlListItem[] = [
+  {
+    id: "CTRL-0010",
+    control_code: "AC-3",
+    title: "Access enforcement",
+    family: "AC",
+    framework_code: "NIST-800-53",
+    framework_version: "Rev. 5",
+    implementation_status: "implemented",
+    test_count: 0,
+    evidence_count: 0,
+  },
+  {
+    id: "CTRL-0011",
+    control_code: "AC-6",
+    title: "Least privilege",
+    family: "AC",
+    framework_code: "NIST-800-53",
+    framework_version: "Rev. 5",
+    implementation_status: "planned",
+    test_count: 0,
+    evidence_count: 0,
+  },
+  {
+    id: "CTRL-0012",
+    control_code: "AU-2",
+    title: "Audit events",
+    family: "AU",
+    framework_code: "NIST-800-53",
+    framework_version: "Rev. 5",
+    implementation_status: "partial",
+    test_count: 0,
+    evidence_count: 0,
+  },
+  {
+    id: "CTRL-0013",
+    control_code: "CM-2",
+    title: "Baseline configuration",
+    family: "CM",
+    framework_code: "NIST-800-53",
+    framework_version: "Rev. 5",
+    implementation_status: "implemented",
+    test_count: 0,
+    evidence_count: 0,
+  },
+  {
+    id: "CTRL-0014",
+    control_code: "SC-7",
+    title: "Boundary protection",
+    family: "SC",
+    framework_code: "NIST-800-53",
+    framework_version: "Rev. 5",
+    implementation_status: "not_implemented",
+    test_count: 0,
+    evidence_count: 0,
+  },
+  // Additional rows so page_size=25 can exercise Next/Previous in UI tests.
+  ...Array.from({ length: 24 }, (_, index) => {
+    const n = index + 20;
+    return {
+      id: `CTRL-${String(n).padStart(4, "0")}`,
+      control_code: `ZZ-${n}`,
+      title: `Catalog filler control ${n}`,
+      family: "ZZ",
+      framework_code: "NIST-800-53",
+      framework_version: "Rev. 5",
+      implementation_status: "planned" as const,
+      test_count: 0,
+      evidence_count: 0,
+    };
+  }),
+];
+
+export function filteredControlsPage(url: string, catalog: ControlListItem[]) {
+  const params = new URL(url, "http://localhost").searchParams;
+  const page = Number(params.get("page") ?? "1") || 1;
+  const pageSize = Number(params.get("page_size") ?? "25") || 25;
+  const q = params.get("q")?.trim().toLowerCase();
+  const framework = params.get("framework")?.trim().toLowerCase();
+  const status = params.get("implementation_status")?.trim().toLowerCase();
+  const sort = params.get("sort")?.trim().toLowerCase() || "id";
+  const direction = params.get("direction")?.trim().toLowerCase() === "desc" ? "desc" : "asc";
+
+  let items = [...catalog];
+  if (q) {
+    items = items.filter((item) => {
+      const haystack = [
+        item.id,
+        item.control_code,
+        item.title,
+        item.framework_code ?? "",
+        item.framework_version ?? "",
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }
+  if (framework) {
+    items = items.filter((item) => (item.framework_code ?? "").toLowerCase() === framework);
+  }
+  if (status) {
+    items = items.filter((item) => (item.implementation_status ?? "").toLowerCase() === status);
+  }
+
+  const factor = direction === "desc" ? -1 : 1;
+  items.sort((left, right) => {
+    const key =
+      sort === "control_code"
+        ? "control_code"
+        : sort === "title"
+          ? "title"
+          : sort === "updated_at" || sort === "created_at"
+            ? "id"
+            : "id";
+    return left[key].localeCompare(right[key]) * factor || left.id.localeCompare(right.id);
+  });
+
+  return assetPage(items, page, pageSize);
+}
+
+export function filteredPoliciesPage(url: string, policies: PolicyListItem[]) {
+  const params = new URL(url, "http://localhost").searchParams;
+  const page = Number(params.get("page") ?? "1") || 1;
+  const pageSize = Number(params.get("page_size") ?? "25") || 25;
+  const q = params.get("q")?.trim().toLowerCase();
+  const status = params.get("status")?.trim().toLowerCase();
+  const sort = params.get("sort")?.trim().toLowerCase() || "id";
+  const direction = params.get("direction")?.trim().toLowerCase() === "desc" ? "desc" : "asc";
+
+  let items = [...policies];
+  if (q) {
+    items = items.filter((item) => {
+      const haystack = [item.id, item.title, item.owner?.id ?? "", item.owner?.display_name ?? ""]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }
+  if (status) {
+    items = items.filter((item) => item.status === status);
+  }
+
+  const factor = direction === "desc" ? -1 : 1;
+  items.sort((left, right) => {
+    if (sort === "title") {
+      return left.title.localeCompare(right.title) * factor || left.id.localeCompare(right.id);
+    }
+    if (sort === "updated_at" || sort === "created_at") {
+      const leftTs = left.updated_at ?? "";
+      const rightTs = right.updated_at ?? "";
+      return leftTs.localeCompare(rightTs) * factor || left.id.localeCompare(right.id);
+    }
+    return left.id.localeCompare(right.id) * factor;
+  });
+
+  return assetPage(items, page, pageSize);
 }
 
 const priya = { id: "USR-0003", display_name: "Priya Shah" };
@@ -1984,6 +2151,10 @@ export function installApiFetch(
   /** policy human id → linked control human ids */
   const policyControlLinks = new Map<string, Set<string>>();
   let controlListState: ControlListItem = { ...controlListItem };
+  const controlCatalogState: ControlListItem[] = [
+    { ...controlListItem },
+    ...controlCatalogExtras.map((item) => ({ ...item })),
+  ];
   let governanceSummaryState: GovernanceSummary = {
     ...governanceSummary,
     frameworks: [...governanceSummary.frameworks],
@@ -2075,25 +2246,44 @@ export function installApiFetch(
     };
   }
 
-  function mappedControlPayload() {
+  function mappedControlPayload(controlId: string) {
+    const fromCatalog =
+      controlCatalogState.find((item) => item.id === controlId) ??
+      (controlId === controlListState.id ? controlListState : null);
+    if (!fromCatalog) {
+      return {
+        id: controlId,
+        control_code: controlId,
+        title: controlId,
+        framework_code: null,
+        framework_version: null,
+        implementation_status: null,
+        licensed_text_included: false as const,
+      };
+    }
     return {
-      id: controlListState.id,
-      control_code: controlListState.control_code,
-      title: controlListState.title,
-      framework_code: controlListState.framework_code,
-      framework_version: controlListState.framework_version,
-      implementation_status: controlListState.implementation_status,
+      id: fromCatalog.id,
+      control_code: fromCatalog.control_code,
+      title: fromCatalog.title,
+      framework_code: fromCatalog.framework_code,
+      framework_version: fromCatalog.framework_version,
+      implementation_status: fromCatalog.implementation_status,
       licensed_text_included: false as const,
     };
+  }
+
+  function syncControlCatalogFromListState() {
+    const index = controlCatalogState.findIndex((item) => item.id === controlListState.id);
+    if (index >= 0) {
+      controlCatalogState[index] = { ...controlListState };
+    }
   }
 
   function syncPolicyControlMappings() {
     for (const [policyId, controlIds] of policyControlLinks.entries()) {
       const policy = policyStore.get(policyId);
       if (!policy) continue;
-      policy.control_mappings = [...controlIds]
-        .filter((id) => id === controlListState.id)
-        .map(() => mappedControlPayload());
+      policy.control_mappings = [...controlIds].map((id) => mappedControlPayload(id));
       policyStore.set(policyId, policy);
     }
     for (const policy of policyStore.values()) {
@@ -2104,7 +2294,7 @@ export function installApiFetch(
     controlDetailState = {
       ...controlDetailState,
       policies: [...policyControlLinks.entries()]
-        .filter(([, controls]) => controls.has(controlListState.id))
+        .filter(([, controls]) => controls.has(controlDetailState.id))
         .map(([policyId]) => {
           const policy = policyStore.get(policyId);
           return {
@@ -2136,6 +2326,7 @@ export function installApiFetch(
       test_count: controlDetailState.tests.length,
       evidence_count: controlDetailState.evidence.length,
     };
+    syncControlCatalogFromListState();
     governanceSummaryState = {
       ...governanceSummaryState,
       control_implementations: {
@@ -2777,15 +2968,37 @@ export function installApiFetch(
     }
 
     if (/\/api\/v1\/governance\/controls\/[^/?]+/.test(url)) {
-      const id = decodeURIComponent(url.split("/controls/")[1]?.split("?")[0] ?? "");
+      const path = url.split("/controls/")[1] ?? "";
+      const id = decodeURIComponent(path.split("/")[0]?.split("?")[0] ?? "");
+      if (id.includes("/")) {
+        // handled by more specific routes above
+      }
       if (id !== controlDetailState.id) {
-        return jsonResponse({ code: "not_found", message: "Control was not found." }, 404);
+        const catalogHit = controlCatalogState.find((item) => item.id === id);
+        if (!catalogHit) {
+          return jsonResponse({ code: "not_found", message: "Control was not found." }, 404);
+        }
+        return jsonResponse({
+          ...catalogHit,
+          implementation: {
+            status: catalogHit.implementation_status ?? "planned",
+            notes: null,
+            owner: null,
+            updated_at: null,
+          },
+          tests: [],
+          evidence: [],
+          policies: [],
+          licensed_text_included: false,
+          updated_at: null,
+        } satisfies ControlDetail);
       }
       syncPolicyControlMappings();
       return jsonResponse(controlDetailState);
     }
     if (url.includes("/api/v1/governance/controls")) {
-      return jsonResponse(assetPage([controlListState]));
+      syncControlCatalogFromListState();
+      return jsonResponse(filteredControlsPage(url, controlCatalogState));
     }
     if (/\/api\/v1\/policies\/[^/?]+\/versions\/[^/?]+/.test(url)) {
       const path = url.split("/policies/")[1] ?? "";
@@ -3000,7 +3213,7 @@ export function installApiFetch(
       if (!policy) {
         return jsonResponse({ code: "not_found", message: "Policy was not found." }, 404);
       }
-      if (controlId !== controlListState.id) {
+      if (!controlCatalogState.some((item) => item.id === controlId)) {
         return jsonResponse({ code: "not_found", message: "Control was not found." }, 404);
       }
       const method = init?.method ?? "GET";
@@ -3180,7 +3393,10 @@ export function installApiFetch(
 
     if (url.includes("/api/v1/policies")) {
       return jsonResponse(
-        assetPage([...policyStore.values()].map((policy) => policyListItem(policy))),
+        filteredPoliciesPage(
+          url,
+          [...policyStore.values()].map((policy) => policyListItem(policy)),
+        ),
       );
     }
 

@@ -1,11 +1,15 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/buttons/Button";
+import { CatalogPager } from "@/components/navigation/CatalogPager";
 import { useAuthActions } from "@/features/auth/useAuthSession";
+import { CONTROL_SELECTOR_PAGE_SIZE, totalPages } from "@/features/governance/catalogConstants";
 import { invalidateGovernanceWrites } from "@/features/governance/governance-mutations";
+import { cn } from "@/lib/cn";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { ApiError } from "@/services/api-client";
-import type { ControlListItem, PolicyMappedControl } from "@/services/api-types";
+import type { ControlListItem, ControlListQuery, PolicyMappedControl } from "@/services/api-types";
 import { fetchGovernanceControls } from "@/services/governance";
 import { linkPolicyControl, unlinkPolicyControl } from "@/services/policies";
 
@@ -38,39 +42,48 @@ export function PolicyControlMappingsPanel({
   const queryClient = useQueryClient();
   const { handleAccountUnauthorized } = useAuthActions();
   const [showLinker, setShowLinker] = useState(false);
-  const [filter, setFilter] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const debouncedSearch = useDebouncedValue(searchInput, 300);
+  const [page, setPage] = useState(1);
   const [selectedControlId, setSelectedControlId] = useState("");
   const [pendingUnlinkId, setPendingUnlinkId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const selectorQuery = useMemo<ControlListQuery>(
+    () => ({
+      page,
+      pageSize: CONTROL_SELECTOR_PAGE_SIZE,
+      q: debouncedSearch.trim() || undefined,
+      sort: "id",
+      direction: "asc",
+    }),
+    [page, debouncedSearch],
+  );
+
   const catalogQuery = useQuery({
-    queryKey: ["governance", "controls"],
-    queryFn: () => fetchGovernanceControls(1, 50),
+    queryKey: ["governance", "controls", "selector", policyId, selectorQuery],
+    queryFn: () => fetchGovernanceControls(selectorQuery),
     enabled: canManage && showLinker,
     retry: false,
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
 
-  const mappedIds = useMemo(() => new Set(mappings.map((item) => item.id)), [mappings]);
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
 
-  const filteredControls = useMemo(() => {
-    const items = catalogQuery.data?.items ?? [];
-    const needle = filter.trim().toLowerCase();
-    return items.filter((item) => {
-      if (!needle) return true;
-      const haystack = [
-        item.id,
-        item.control_code,
-        item.title,
-        item.framework_code ?? "",
-        item.framework_version ?? "",
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(needle);
-    });
-  }, [catalogQuery.data?.items, filter]);
+  useEffect(() => {
+    if (!catalogQuery.data) return;
+    const pages = totalPages(catalogQuery.data.total, CONTROL_SELECTOR_PAGE_SIZE);
+    if (page > pages) setPage(pages);
+  }, [catalogQuery.data, page]);
+
+  const mappedIds = useMemo(() => new Set(mappings.map((item) => item.id)), [mappings]);
+  const catalogItems = catalogQuery.data?.items ?? [];
+  const catalogTotal = catalogQuery.data?.total ?? 0;
+  const hasSearch = Boolean(debouncedSearch.trim());
 
   async function onMutationError(error: unknown) {
     setSuccessMessage(null);
@@ -113,8 +126,9 @@ export function PolicyControlMappingsPanel({
       setSuccessMessage(`Linked ${result.control_id} to ${result.policy_id}.`);
       setErrorMessage(null);
       setShowLinker(false);
-      setFilter("");
+      setSearchInput("");
       setSelectedControlId("");
+      setPage(1);
       await invalidateGovernanceWrites(queryClient, {
         policyId: result.policy_id,
         controlId: result.control_id,
@@ -244,43 +258,108 @@ export function PolicyControlMappingsPanel({
             data-testid="policy-mapping-link-form"
           >
             <label className="block text-xs text-[var(--muted)]">
-              Filter controls
-              <input
-                className="mt-1 block w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--canvas)] px-3 py-2 text-sm text-[var(--text)]"
-                value={filter}
-                onChange={(event) => setFilter(event.target.value)}
-                data-testid="policy-mapping-control-filter"
-                placeholder="Search by id, code, title, framework…"
-              />
+              Search controls
+              <div className="mt-1 flex gap-2">
+                <input
+                  className="block w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--canvas)] px-3 py-2 text-sm text-[var(--text)]"
+                  value={searchInput}
+                  onChange={(event) => {
+                    setSearchInput(event.target.value);
+                    setSelectedControlId("");
+                  }}
+                  data-testid="policy-mapping-control-filter"
+                  placeholder="Search by id, code, title, framework…"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  aria-label="Clear control search"
+                  data-testid="policy-mapping-control-filter-clear"
+                  disabled={searchInput.length === 0}
+                  onClick={() => {
+                    setSearchInput("");
+                    setSelectedControlId("");
+                  }}
+                >
+                  Clear
+                </Button>
+              </div>
             </label>
-            {catalogQuery.isPending ? (
+            {catalogQuery.isPending && !catalogQuery.data ? (
               <p className="text-sm text-[var(--muted)]">Loading control catalog…</p>
+            ) : null}
+            {catalogQuery.isFetching && catalogQuery.data ? (
+              <p
+                className="text-xs text-[var(--muted)]"
+                data-testid="policy-mapping-catalog-updating"
+              >
+                Updating results…
+              </p>
             ) : null}
             {catalogQuery.isError ? (
               <p className="text-sm text-[var(--danger)]">Control catalog could not be loaded.</p>
             ) : null}
-            {catalogQuery.isSuccess ? (
-              <label className="block text-xs text-[var(--muted)]">
-                Existing control
-                <select
-                  className="mt-1 block w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--canvas)] px-3 py-2 text-sm text-[var(--text)]"
-                  value={selectedControlId}
-                  onChange={(event) => setSelectedControlId(event.target.value)}
-                  data-testid="policy-mapping-control-select"
-                >
-                  <option value="">Select control…</option>
-                  {filteredControls.map((item) => {
-                    const alreadyMapped = mappedIds.has(item.id);
-                    return (
-                      <option key={item.id} value={item.id} disabled={alreadyMapped}>
-                        {controlOptionLabel(item)}
-                        {alreadyMapped ? " (already mapped)" : ""}
-                        {` — ${item.title}`}
-                      </option>
-                    );
-                  })}
-                </select>
-              </label>
+            {catalogQuery.isSuccess || catalogQuery.data ? (
+              <>
+                <fieldset data-testid="policy-mapping-control-select">
+                  <legend className="text-xs text-[var(--muted)]">Existing control</legend>
+                  {catalogItems.length === 0 ? (
+                    <p
+                      className="mt-2 text-sm text-[var(--muted)]"
+                      data-testid="policy-mapping-catalog-empty"
+                    >
+                      {hasSearch
+                        ? "No controls match the current search."
+                        : "No controls are available."}
+                    </p>
+                  ) : (
+                    <ul className="mt-2 max-h-56 space-y-1 overflow-y-auto">
+                      {catalogItems.map((item) => {
+                        const alreadyMapped = mappedIds.has(item.id);
+                        const selected = selectedControlId === item.id;
+                        return (
+                          <li key={item.id}>
+                            <button
+                              type="button"
+                              disabled={alreadyMapped}
+                              aria-pressed={selected}
+                              data-testid={`policy-mapping-control-option-${item.id}`}
+                              className={cn(
+                                "w-full rounded-[var(--radius-control)] border px-3 py-2 text-left text-sm transition",
+                                alreadyMapped
+                                  ? "cursor-not-allowed border-[var(--border)] bg-[var(--canvas)] text-[var(--muted)] opacity-70"
+                                  : selected
+                                    ? "border-[var(--accent)] bg-[var(--canvas)] text-[var(--text)]"
+                                    : "border-[var(--border)] bg-[var(--canvas)] text-[var(--text)] hover:border-[var(--accent)]",
+                              )}
+                              onClick={() => {
+                                if (!alreadyMapped) setSelectedControlId(item.id);
+                              }}
+                            >
+                              <span className="font-medium">{controlOptionLabel(item)}</span>
+                              <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                                {item.title}
+                                {alreadyMapped ? " (already mapped)" : ""}
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </fieldset>
+                <CatalogPager
+                  page={page}
+                  pageSize={CONTROL_SELECTOR_PAGE_SIZE}
+                  total={catalogTotal}
+                  onPageChange={(next) => {
+                    setPage(next);
+                    setSelectedControlId("");
+                  }}
+                  label="controls"
+                  testIdPrefix="policy-mapping-catalog-pager"
+                />
+              </>
             ) : null}
             <div className="flex flex-wrap gap-2">
               <Button
@@ -296,8 +375,9 @@ export function PolicyControlMappingsPanel({
                 variant="secondary"
                 onClick={() => {
                   setShowLinker(false);
-                  setFilter("");
+                  setSearchInput("");
                   setSelectedControlId("");
+                  setPage(1);
                 }}
               >
                 Cancel

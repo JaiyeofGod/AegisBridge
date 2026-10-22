@@ -142,8 +142,8 @@ describe("Governance & Compliance page", () => {
     );
 
     await user.click(within(page).getByRole("tab", { name: "Policies" }));
-    expect(await within(page).findByTestId("policies-list")).toHaveTextContent(
-      "No policy records are stored.",
+    expect(await within(page).findByTestId("policies-catalog-empty")).toHaveTextContent(
+      "No policies are available.",
     );
 
     await user.click(within(page).getByRole("tab", { name: "Access reviews" }));

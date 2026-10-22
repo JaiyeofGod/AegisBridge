@@ -488,6 +488,31 @@ export type GovernanceSummary = {
 export type ControlImplementationStatusValue =
   "planned" | "partial" | "implemented" | "not_implemented" | "not_applicable";
 
+export type SortDirection = "asc" | "desc";
+
+export type ControlSortKey = "id" | "control_code" | "title" | "created_at" | "updated_at";
+
+export type PolicySortKey = "id" | "title" | "created_at" | "updated_at";
+
+export type ControlListQuery = {
+  q?: string;
+  framework?: string;
+  implementationStatus?: ControlImplementationStatusValue;
+  sort?: ControlSortKey;
+  direction?: SortDirection;
+  page?: number;
+  pageSize?: number;
+};
+
+export type PolicyListQuery = {
+  q?: string;
+  status?: PolicyLifecycleStatus;
+  sort?: PolicySortKey;
+  direction?: SortDirection;
+  page?: number;
+  pageSize?: number;
+};
+
 export type ControlTestResultValue = "pass" | "fail" | "partial" | "inconclusive";
 
 export type EvidenceClassificationValue = "simulated" | "internal" | "confidential" | "restricted";

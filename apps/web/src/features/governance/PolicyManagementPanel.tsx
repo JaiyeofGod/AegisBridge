@@ -1,12 +1,20 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/buttons/Button";
 import { Panel } from "@/components/cards/Panel";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { LoadingState } from "@/components/feedback/LoadingState";
+import { CatalogPager } from "@/components/navigation/CatalogPager";
 import { StatusBadge } from "@/components/status/StatusBadge";
 import { useAuthActions } from "@/features/auth/useAuthSession";
+import {
+  POLICY_PAGE_SIZE,
+  POLICY_SORT_OPTIONS,
+  POLICY_STATUSES,
+  SORT_DIRECTIONS,
+  totalPages,
+} from "@/features/governance/catalogConstants";
 import { invalidateGovernanceWrites } from "@/features/governance/governance-mutations";
 import { PolicyControlMappingsPanel } from "@/features/governance/PolicyControlMappingsPanel";
 import {
@@ -15,13 +23,17 @@ import {
 } from "@/features/governance/policyTransitions";
 import { cn } from "@/lib/cn";
 import { formatTimestamp } from "@/lib/format";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { ApiError } from "@/services/api-client";
 import type {
   PolicyCreate,
   PolicyDetail,
   PolicyLifecycleStatus,
+  PolicyListQuery,
+  PolicySortKey,
   PolicyVersionCreate,
   PolicyVersionUpdate,
+  SortDirection,
 } from "@/services/api-types";
 import {
   acknowledgePolicy,
@@ -76,19 +88,49 @@ export function PolicyManagementPanel({ canRead, canManage, canApprove, onOpenCo
   const [pendingTransition, setPendingTransition] = useState<PolicyTransitionOption | null>(null);
   const [publishVersionLabel, setPublishVersionLabel] = useState("");
 
+  const [searchInput, setSearchInput] = useState("");
+  const debouncedSearch = useDebouncedValue(searchInput, 300);
+  const [statusFilter, setStatusFilter] = useState<PolicyLifecycleStatus | "">("");
+  const [sort, setSort] = useState<PolicySortKey>("id");
+  const [direction, setDirection] = useState<SortDirection>("asc");
+  const [page, setPage] = useState(1);
+
+  const policyListParams = useMemo<PolicyListQuery>(
+    () => ({
+      page,
+      pageSize: POLICY_PAGE_SIZE,
+      q: debouncedSearch.trim() || undefined,
+      status: statusFilter || undefined,
+      sort,
+      direction,
+    }),
+    [page, debouncedSearch, statusFilter, sort, direction],
+  );
+
+  const hasListFilters = Boolean(debouncedSearch.trim() || statusFilter);
+
   const listQuery = useQuery({
-    queryKey: ["policies", "list"],
-    queryFn: () => fetchPolicies(1, 50),
+    queryKey: ["policies", "list", policyListParams],
+    queryFn: () => fetchPolicies(policyListParams),
     enabled: canRead,
     retry: false,
     staleTime: 15_000,
+    placeholderData: keepPreviousData,
   });
 
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter, sort, direction]);
+
+  useEffect(() => {
+    if (!listQuery.data) return;
+    const pages = totalPages(listQuery.data.total, POLICY_PAGE_SIZE);
+    if (page > pages) setPage(pages);
+  }, [listQuery.data, page]);
+
   const items = listQuery.data?.items ?? [];
-  const activeId =
-    selectedId && items.some((item) => item.id === selectedId)
-      ? selectedId
-      : (items[0]?.id ?? null);
+  const total = listQuery.data?.total ?? 0;
+  const activeId = selectedId || items[0]?.id || null;
 
   const detailQuery = useQuery({
     queryKey: ["policies", "detail", activeId],
@@ -402,51 +444,161 @@ export function PolicyManagementPanel({ canRead, canManage, canApprove, onOpenCo
         </p>
       )}
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,17rem)_minmax(0,1fr)]">
-        <Panel title="Policies" description="Select a policy to manage versions and lifecycle.">
-          {listQuery.isPending ? <LoadingState label="Loading policies" rows={3} /> : null}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+        <Panel
+          title="Policies"
+          description="Server-side search and pagination. Version bodies are not listed here."
+        >
+          <div className="mb-3 space-y-2" data-testid="policies-catalog-filters">
+            <label className="block text-xs text-[var(--muted)]">
+              Search policies
+              <div className="mt-1 flex gap-2">
+                <input
+                  className="block w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--canvas)] px-3 py-2 text-sm text-[var(--text)]"
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
+                  placeholder="Id, title, owner…"
+                  data-testid="policies-catalog-search"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  data-testid="policies-catalog-search-clear"
+                  aria-label="Clear policy search"
+                  disabled={searchInput.length === 0}
+                  onClick={() => setSearchInput("")}
+                >
+                  Clear
+                </Button>
+              </div>
+            </label>
+            <label className="block text-xs text-[var(--muted)]">
+              Status
+              <select
+                className="mt-1 block w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--canvas)] px-3 py-2 text-sm text-[var(--text)]"
+                value={statusFilter}
+                onChange={(event) =>
+                  setStatusFilter(event.target.value as PolicyLifecycleStatus | "")
+                }
+                data-testid="policies-catalog-status"
+              >
+                <option value="">All statuses</option>
+                {POLICY_STATUSES.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block text-xs text-[var(--muted)]">
+                Sort
+                <select
+                  className="mt-1 block w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--canvas)] px-3 py-2 text-sm text-[var(--text)]"
+                  value={sort}
+                  onChange={(event) => setSort(event.target.value as PolicySortKey)}
+                  data-testid="policies-catalog-sort"
+                  aria-label="Sort policies"
+                >
+                  {POLICY_SORT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-xs text-[var(--muted)]">
+                Direction
+                <select
+                  className="mt-1 block w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--canvas)] px-3 py-2 text-sm text-[var(--text)]"
+                  value={direction}
+                  onChange={(event) => setDirection(event.target.value as SortDirection)}
+                  data-testid="policies-catalog-direction"
+                  aria-label="Sort direction"
+                >
+                  {SORT_DIRECTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
+
+          {listQuery.isPending && !listQuery.data ? (
+            <LoadingState label="Loading policies" rows={3} />
+          ) : null}
           {listQuery.isError ? (
             <ErrorState
               title="Policies unavailable"
-              description="The policy list could not be loaded."
+              description={
+                listQuery.error instanceof ApiError && listQuery.error.status === 422
+                  ? "Policy catalog query parameters were rejected."
+                  : listQuery.error instanceof ApiError && listQuery.error.status === 403
+                    ? "You do not have permission to read policies."
+                    : "The policy list could not be loaded."
+              }
               onRetry={() => void listQuery.refetch()}
             />
           ) : null}
-          {listQuery.isSuccess ? (
-            <ul className="space-y-2" data-testid="policies-list">
-              {items.length === 0 ? (
-                <li className="text-sm text-[var(--muted)]">No policy records are stored.</li>
-              ) : (
-                items.map((item) => (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      className={cn(
-                        "w-full rounded-[var(--radius-control)] border px-3 py-3 text-left transition",
-                        item.id === activeId
-                          ? "border-[var(--accent)] bg-[var(--raised)]"
-                          : "border-[var(--border)] bg-[var(--canvas)] hover:border-[var(--accent)]",
-                      )}
-                      data-testid={`policy-select-${item.id}`}
-                      onClick={() => {
-                        setSelectedId(item.id);
-                        setSelectedVersionLabel(null);
-                        setSuccessMessage(null);
-                        setErrorMessage(null);
-                      }}
-                    >
-                      <p className="text-sm font-medium text-[var(--text)]">
-                        {item.id} · {item.title}
-                      </p>
-                      <p className="mt-1 text-xs text-[var(--muted)]">
-                        {titleCaseStatus(item.status)}
-                        {item.current_version ? ` · current ${item.current_version}` : ""}
-                      </p>
-                    </button>
+          {listQuery.isSuccess || listQuery.data ? (
+            <>
+              {listQuery.isFetching ? (
+                <p
+                  className="mb-2 text-xs text-[var(--muted)]"
+                  data-testid="policies-catalog-updating"
+                >
+                  Updating results…
+                </p>
+              ) : null}
+              <ul className="space-y-2" data-testid="policies-list">
+                {items.length === 0 ? (
+                  <li className="text-sm text-[var(--muted)]" data-testid="policies-catalog-empty">
+                    {hasListFilters
+                      ? "No policies match the current search or filters."
+                      : "No policies are available."}
                   </li>
-                ))
-              )}
-            </ul>
+                ) : (
+                  items.map((item) => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        className={cn(
+                          "w-full rounded-[var(--radius-control)] border px-3 py-3 text-left transition",
+                          item.id === activeId
+                            ? "border-[var(--accent)] bg-[var(--raised)]"
+                            : "border-[var(--border)] bg-[var(--canvas)] hover:border-[var(--accent)]",
+                        )}
+                        data-testid={`policy-select-${item.id}`}
+                        onClick={() => {
+                          setSelectedId(item.id);
+                          setSelectedVersionLabel(null);
+                          setSuccessMessage(null);
+                          setErrorMessage(null);
+                        }}
+                      >
+                        <p className="text-sm font-medium text-[var(--text)]">
+                          {item.id} · {item.title}
+                        </p>
+                        <p className="mt-1 text-xs text-[var(--muted)]">
+                          {titleCaseStatus(item.status)}
+                          {item.current_version ? ` · current ${item.current_version}` : ""}
+                        </p>
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
+              <CatalogPager
+                page={page}
+                pageSize={POLICY_PAGE_SIZE}
+                total={total}
+                onPageChange={setPage}
+                label="policies"
+                testIdPrefix="policies-catalog-pager"
+              />
+            </>
           ) : null}
         </Panel>
 

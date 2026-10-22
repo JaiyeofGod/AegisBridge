@@ -1,6 +1,6 @@
 # Frontend audit
 
-Audit date: 22 Oct 2026 (updated after Policy ↔ Control mapping UI). Scope is the implemented web client.
+Audit date: 22 Oct 2026 (updated after Governance/Policy catalog server-side search & pagination). Scope is the implemented web client.
 
 ## Auth / session / CSRF (current)
 
@@ -51,7 +51,7 @@ Development sign-in hint shows seeded email `amara.okonkwo@aegisbridge.example` 
 |---|---|
 | `/signin` | Guest-only. Real password login. Authenticated users redirect to `/overview`. |
 | `/overview` | Protected (UX). Renders from development API. |
-| `/governance` | Protected (UX). Control implementation/tests + evidence metadata/objects + Policies tab (lifecycle, versions, acknowledgement, control mappings). |
+| `/governance` | Protected (UX). Control implementation/tests + evidence metadata/objects + Policies tab (lifecycle, versions, acknowledgement, control mappings). Controls and policies lists use server-side `page`/`page_size`/`q`/filters/sort (bounded; no full-catalog preload). Policy→control Add Control selector queries the control catalog with server-side search/pagination. |
 | `/risks` | Protected (UX). Treatment editable with `risk.manage`; read-only with `risk.read`. |
 | `/assets` | Protected (UX). |
 | `/assets/FIN-APP-01` | Protected (UX). |
@@ -72,7 +72,7 @@ Unknown paths redirect to `/signin`. Auth status unknown shows a session loading
 ## Issues intentionally deferred
 
 - Incident task writes, integration credential writes, Cyber Range control, reports.
-- Policy rich-text editors, PDF/document generation, e-signature, email notifications, AI generation, attachments, policy↔risk/evidence mappings, bulk/drag-drop mapping.
+- Policy rich-text editors, PDF/document generation, e-signature, email notifications, AI generation, attachments, policy↔risk/evidence mappings, bulk/drag-drop mapping, URL-persisted catalog query state, infinite scroll.
 - Evidence malware scanning, independent integrity re-verification, public evidence URLs, browser-to-S3 uploads, R2 production cutover UI.
 - MFA enrollment, SSO/OIDC, password reset.
 - Profile/security field writes beyond preferences.

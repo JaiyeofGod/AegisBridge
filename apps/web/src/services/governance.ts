@@ -11,6 +11,7 @@ import type {
   ControlEvidenceLinkResult,
   ControlImplementationUpdate,
   ControlListItem,
+  ControlListQuery,
   ControlTestCreate,
   ControlTestItem,
   ControlTestUpdate,
@@ -25,11 +26,17 @@ export function fetchGovernanceSummary() {
   return apiGet<GovernanceSummary>("/api/v1/governance/summary");
 }
 
-export function fetchGovernanceControls(page = 1, pageSize = 50) {
-  const params = new URLSearchParams({
-    page: String(page),
-    page_size: String(pageSize),
-  });
+export function fetchGovernanceControls(query: ControlListQuery = {}) {
+  const params = new URLSearchParams();
+  params.set("page", String(query.page ?? 1));
+  params.set("page_size", String(query.pageSize ?? 25));
+  if (query.q?.trim()) params.set("q", query.q.trim());
+  if (query.framework?.trim()) params.set("framework", query.framework.trim());
+  if (query.implementationStatus) {
+    params.set("implementation_status", query.implementationStatus);
+  }
+  if (query.sort) params.set("sort", query.sort);
+  if (query.direction) params.set("direction", query.direction);
   return apiGet<PageResponse<ControlListItem>>(`/api/v1/governance/controls?${params}`);
 }
 

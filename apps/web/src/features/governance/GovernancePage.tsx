@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/buttons/Button";
 import { Panel } from "@/components/cards/Panel";
@@ -7,6 +7,7 @@ import { ErrorState } from "@/components/feedback/ErrorState";
 import { LoadingState } from "@/components/feedback/LoadingState";
 import { SimulatedDataBanner } from "@/components/feedback/SimulatedDataBanner";
 import { AppShell } from "@/components/navigation/AppShell";
+import { CatalogPager } from "@/components/navigation/CatalogPager";
 import { PageContainer } from "@/components/navigation/PageContainer";
 import { PageHeader } from "@/components/navigation/PageHeader";
 import { StatusBadge } from "@/components/status/StatusBadge";
@@ -14,6 +15,13 @@ import { StaleDataIndicator } from "@/components/status/StaleDataIndicator";
 import { useAuthStatus } from "@/features/auth/useAuthSession";
 import { SEEDED_DATA_LABEL, SEEDED_DATA_NOTE } from "@/features/data-origin";
 import { AssessmentWorkTable } from "@/features/governance/AssessmentWorkTable";
+import {
+  CONTROL_IMPLEMENTATION_STATUSES,
+  CONTROL_PAGE_SIZE,
+  CONTROL_SORT_OPTIONS,
+  SORT_DIRECTIONS,
+  totalPages,
+} from "@/features/governance/catalogConstants";
 import { ControlEvidencePanel } from "@/features/governance/ControlEvidencePanel";
 import { ControlImplementationEditor } from "@/features/governance/ControlImplementationEditor";
 import { ControlTestPanel } from "@/features/governance/ControlTestPanel";
@@ -27,6 +35,14 @@ import {
 } from "@/features/governance/useGovernanceData";
 import { cn } from "@/lib/cn";
 import { formatTimestamp } from "@/lib/format";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
+import { ApiError } from "@/services/api-client";
+import type {
+  ControlImplementationStatusValue,
+  ControlListQuery,
+  ControlSortKey,
+  SortDirection,
+} from "@/services/api-types";
 import type { GovernanceSectionId } from "@/types/governance";
 
 export function GovernancePage() {
@@ -277,21 +293,62 @@ function ControlsSection({
   initialControlId?: string | null;
   onControlFocused?: () => void;
 }) {
-  const controls = useGovernanceControls();
+  const [searchInput, setSearchInput] = useState("");
+  const debouncedSearch = useDebouncedValue(searchInput, 300);
+  const [framework, setFramework] = useState("");
+  const [implementationStatus, setImplementationStatus] = useState<
+    ControlImplementationStatusValue | ""
+  >("");
+  const [sort, setSort] = useState<ControlSortKey>("id");
+  const [direction, setDirection] = useState<SortDirection>("asc");
+  const [page, setPage] = useState(1);
+  const [selectedId, setSelectedId] = useState("");
+
+  const listQuery = useMemo<ControlListQuery>(
+    () => ({
+      page,
+      pageSize: CONTROL_PAGE_SIZE,
+      q: debouncedSearch.trim() || undefined,
+      framework: framework || undefined,
+      implementationStatus: implementationStatus || undefined,
+      sort,
+      direction,
+    }),
+    [page, debouncedSearch, framework, implementationStatus, sort, direction],
+  );
+
+  const hasCatalogFilters = Boolean(debouncedSearch.trim() || framework || implementationStatus);
+
+  const controls = useGovernanceControls(listQuery);
   const items = controls.data?.items ?? [];
-  const [selectedId, setSelectedId] = useState(items[0]?.id ?? "");
-  const activeId = items.some((item) => item.id === selectedId) ? selectedId : (items[0]?.id ?? "");
+  const total = controls.data?.total ?? 0;
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, framework, implementationStatus, sort, direction]);
+
+  useEffect(() => {
+    if (!controls.data) return;
+    const pages = totalPages(controls.data.total, CONTROL_PAGE_SIZE);
+    if (page > pages) setPage(pages);
+  }, [controls.data, page]);
+
+  const activeId = selectedId || items[0]?.id || "";
   const detail = useGovernanceControl(activeId || null);
 
   useEffect(() => {
     if (!initialControlId) return;
-    const catalog = controls.data?.items ?? [];
-    if (!catalog.some((item) => item.id === initialControlId)) return;
     setSelectedId(initialControlId);
+    setSearchInput(initialControlId);
     onControlFocused?.();
     // Clear focus once applied; parent callback identity is intentionally ignored.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- focus once per initialControlId
-  }, [initialControlId, controls.data?.items]);
+  }, [initialControlId]);
+
+  const frameworkOptions = data.frameworks.map((item) => ({
+    value: item.code,
+    label: `${item.code}${item.version ? ` ${item.version}` : ""}`,
+  }));
 
   return (
     <div className="space-y-6">
@@ -328,50 +385,175 @@ function ControlsSection({
         </p>
       </Panel>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,17rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <Panel
           title="Controls"
-          description="Select a control to review implementation, tests, and evidence."
+          description="Server-side search and pagination. Licensed CIS text is not included."
         >
-          {controls.isPending ? <LoadingState label="Loading controls" rows={3} /> : null}
+          <div className="mb-3 space-y-2" data-testid="controls-catalog-filters">
+            <label className="block text-xs text-[var(--muted)]">
+              Search controls
+              <div className="mt-1 flex gap-2">
+                <input
+                  className="block w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--canvas)] px-3 py-2 text-sm text-[var(--text)]"
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
+                  placeholder="Id, code, title, framework…"
+                  data-testid="controls-catalog-search"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  data-testid="controls-catalog-search-clear"
+                  aria-label="Clear control search"
+                  disabled={searchInput.length === 0}
+                  onClick={() => setSearchInput("")}
+                >
+                  Clear
+                </Button>
+              </div>
+            </label>
+            <label className="block text-xs text-[var(--muted)]">
+              Framework
+              <select
+                className="mt-1 block w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--canvas)] px-3 py-2 text-sm text-[var(--text)]"
+                value={framework}
+                onChange={(event) => setFramework(event.target.value)}
+                data-testid="controls-catalog-framework"
+              >
+                <option value="">All frameworks</option>
+                {frameworkOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-xs text-[var(--muted)]">
+              Implementation status
+              <select
+                className="mt-1 block w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--canvas)] px-3 py-2 text-sm text-[var(--text)]"
+                value={implementationStatus}
+                onChange={(event) =>
+                  setImplementationStatus(
+                    event.target.value as ControlImplementationStatusValue | "",
+                  )
+                }
+                data-testid="controls-catalog-status"
+              >
+                <option value="">All statuses</option>
+                {CONTROL_IMPLEMENTATION_STATUSES.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block text-xs text-[var(--muted)]">
+                Sort
+                <select
+                  className="mt-1 block w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--canvas)] px-3 py-2 text-sm text-[var(--text)]"
+                  value={sort}
+                  onChange={(event) => setSort(event.target.value as ControlSortKey)}
+                  data-testid="controls-catalog-sort"
+                  aria-label="Sort controls"
+                >
+                  {CONTROL_SORT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-xs text-[var(--muted)]">
+                Direction
+                <select
+                  className="mt-1 block w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--canvas)] px-3 py-2 text-sm text-[var(--text)]"
+                  value={direction}
+                  onChange={(event) => setDirection(event.target.value as SortDirection)}
+                  data-testid="controls-catalog-direction"
+                  aria-label="Sort direction"
+                >
+                  {SORT_DIRECTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
+
+          {controls.isPending && !controls.data ? (
+            <LoadingState label="Loading controls" rows={3} />
+          ) : null}
           {controls.isError ? (
             <ErrorState
               title="Controls unavailable"
-              description="The control list could not be loaded."
+              description={
+                controls.error instanceof ApiError && controls.error.status === 422
+                  ? "Control catalog query parameters were rejected."
+                  : controls.error instanceof ApiError && controls.error.status === 403
+                    ? "You do not have permission to read the control catalog."
+                    : "The control list could not be loaded."
+              }
               onRetry={() => void controls.refetch()}
             />
           ) : null}
-          {controls.isSuccess ? (
-            <ul className="space-y-2" data-testid="governance-control-catalog">
-              {items.length === 0 ? (
-                <li className="text-sm text-[var(--muted)]">No controls are stored.</li>
-              ) : (
-                items.map((item) => (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      className={cn(
-                        "w-full rounded-[var(--radius-control)] border px-3 py-3 text-left transition",
-                        item.id === activeId
-                          ? "border-[var(--accent)] bg-[var(--raised)]"
-                          : "border-[var(--border)] bg-[var(--canvas)] hover:border-[var(--accent)]",
-                      )}
-                      data-testid={`governance-control-${item.id}`}
-                      onClick={() => setSelectedId(item.id)}
-                    >
-                      <p className="text-sm font-medium text-[var(--text)]">
-                        {item.id} · {item.control_code}
-                      </p>
-                      <p className="mt-1 text-xs text-[var(--muted)]">{item.title}</p>
-                      <p className="mt-1 text-xs text-[var(--muted)]">
-                        {(item.implementation_status ?? "not stored").replaceAll("_", " ")} ·{" "}
-                        {item.test_count} tests · {item.evidence_count} evidence
-                      </p>
-                    </button>
+          {controls.isSuccess || controls.data ? (
+            <>
+              {controls.isFetching ? (
+                <p
+                  className="mb-2 text-xs text-[var(--muted)]"
+                  data-testid="controls-catalog-updating"
+                >
+                  Updating results…
+                </p>
+              ) : null}
+              <ul className="space-y-2" data-testid="governance-control-catalog">
+                {items.length === 0 ? (
+                  <li className="text-sm text-[var(--muted)]" data-testid="controls-catalog-empty">
+                    {hasCatalogFilters
+                      ? "No controls match the current search or filters."
+                      : "No controls are available."}
                   </li>
-                ))
-              )}
-            </ul>
+                ) : (
+                  items.map((item) => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        className={cn(
+                          "w-full rounded-[var(--radius-control)] border px-3 py-3 text-left transition",
+                          item.id === activeId
+                            ? "border-[var(--accent)] bg-[var(--raised)]"
+                            : "border-[var(--border)] bg-[var(--canvas)] hover:border-[var(--accent)]",
+                        )}
+                        data-testid={`governance-control-${item.id}`}
+                        onClick={() => setSelectedId(item.id)}
+                      >
+                        <p className="text-sm font-medium text-[var(--text)]">
+                          {item.id} · {item.control_code}
+                        </p>
+                        <p className="mt-1 text-xs text-[var(--muted)]">{item.title}</p>
+                        <p className="mt-1 text-xs text-[var(--muted)]">
+                          {(item.implementation_status ?? "not stored").replaceAll("_", " ")} ·{" "}
+                          {item.test_count} tests · {item.evidence_count} evidence
+                        </p>
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
+              <CatalogPager
+                page={page}
+                pageSize={CONTROL_PAGE_SIZE}
+                total={total}
+                onPageChange={setPage}
+                label="controls"
+                testIdPrefix="controls-catalog-pager"
+              />
+            </>
           ) : null}
         </Panel>
 

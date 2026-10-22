@@ -1,10 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
+import type { ControlListQuery } from "@/services/api-types";
 import {
   fetchGovernanceControl,
   fetchGovernanceControls,
   fetchGovernanceSummary,
 } from "@/services/governance";
+
+export const GOVERNANCE_CONTROLS_QUERY_KEY = ["governance", "controls"] as const;
 
 export function useGovernanceSummary() {
   return useQuery({
@@ -15,12 +18,13 @@ export function useGovernanceSummary() {
   });
 }
 
-export function useGovernanceControls() {
+export function useGovernanceControls(query: ControlListQuery = {}) {
   return useQuery({
-    queryKey: ["governance", "controls"],
-    queryFn: () => fetchGovernanceControls(1, 50),
+    queryKey: [...GOVERNANCE_CONTROLS_QUERY_KEY, query],
+    queryFn: () => fetchGovernanceControls(query),
     retry: false,
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
 }
 

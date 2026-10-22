@@ -6,6 +6,7 @@ import type {
   PolicyCreate,
   PolicyDetail,
   PolicyListItem,
+  PolicyListQuery,
   PolicyTransition,
   PolicyUpdate,
   PolicyVersionCreate,
@@ -14,11 +15,14 @@ import type {
   PolicyVersionUpdate,
 } from "@/services/api-types";
 
-export function fetchPolicies(page = 1, pageSize = 50) {
-  const params = new URLSearchParams({
-    page: String(page),
-    page_size: String(pageSize),
-  });
+export function fetchPolicies(query: PolicyListQuery = {}) {
+  const params = new URLSearchParams();
+  params.set("page", String(query.page ?? 1));
+  params.set("page_size", String(query.pageSize ?? 25));
+  if (query.q?.trim()) params.set("q", query.q.trim());
+  if (query.status) params.set("status", query.status);
+  if (query.sort) params.set("sort", query.sort);
+  if (query.direction) params.set("direction", query.direction);
   return apiGet<PageResponse<PolicyListItem>>(`/api/v1/policies?${params}`);
 }
 
