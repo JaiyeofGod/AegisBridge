@@ -56,6 +56,15 @@ All domain rows require a valid session (`401` otherwise) and the permission lis
 | GET | `/incidents` | Filters: `search`, `severity`, `status`, `owner`, `containment_state` |
 | GET | `/incidents/{incident_id}` | Timeline, tasks, indicators, evidence, related alerts, affected assets; includes `updated_at` for concurrency |
 | GET | `/governance/summary` | Framework identifiers, counts, evidence freshness, policies, access reviews |
+| GET | `/governance/controls` | Paginated control list (codes/titles/status counts; no licensed CIS text) |
+| GET | `/governance/controls/{control_id}` | Control detail with implementation, manual tests, linked evidence metadata |
+| PATCH | `/governance/controls/{control_id}/implementation` | Update implementation status/notes/owner; `control.manage` + CSRF; `expected_updated_at` → 409 |
+| POST | `/governance/controls/{control_id}/tests` | Record a manual control test (`CTEST-NNNN`); `control.manage` + CSRF |
+| PATCH | `/governance/control-tests/{test_id}` | Update a manual control test; `control.manage` + CSRF |
+| POST | `/governance/controls/{control_id}/evidence/{evidence_id}` | Link evidence metadata to a control; `control.manage` + `evidence.manage` + CSRF |
+| DELETE | `/governance/controls/{control_id}/evidence/{evidence_id}` | Unlink evidence from a control; same permissions + CSRF |
+| GET | `/evidence/{evidence_id}` | Evidence metadata only (`evidence.read`); no object URI or file bytes |
+| POST | `/evidence` | Create evidence metadata only (`evidence.manage` + CSRF); no upload |
 | GET | `/threat-intelligence/summary` | Stored indicator, match, advisory, and source-status counts |
 | GET | `/threat-intelligence/indicators` | Filters: `search`, `indicator_type`, `source`, `status`, `internal_match` |
 | GET | `/threat-intelligence/indicators/{indicator_id}` | Simulated indicator, source, and stored ATT&CK link |
@@ -112,8 +121,11 @@ Validation uses the same shape with `code` `validation_error` and `details` entr
 - `cvss_severity` is a label for the CVSS base score only. There is no combined vulnerability score.
 - KEV exposure counts internet-exposed assets that have a KEV row. It does not add CVSS or EPSS.
 - Alert rows set `stored_scope` to `selected_metadata` and `source_of_record` to `wazuh`. Raw events are not stored or returned.
-- Evidence responses include SHA-256 metadata and omit object-storage URIs and file bytes.
+- Evidence responses include SHA-256 metadata and omit object-storage URIs and file bytes. `object_stored` and `integrity_verified` are always false in this slice; a caller-supplied SHA-256 is not verification.
+- Evidence create accepts optional SHA-256 (exactly 64 hex, stored lowercase). File upload, base64 bodies, and fabricated object URIs are rejected or never generated.
 - Governance sets `licensed_text_included` to false. Control codes and stored titles are returned. CIS licensed text is not.
+- Control tests are manually recorded development data (`recording_mode: manual`). Notes include `[manual development recording]`. They are not automated assessments.
+- Governance summary counts (implementation by status, `tests_recorded`, evidence freshness) are derived from stored rows after writes.
 - Telemetry `active` counts only `active` or `reporting`. Seed values `reference_only` and `not_connected` stay at zero because the feed is absent.
 - Incident `containment_state` is null. Filtering it returns an empty page because the column is not stored. Related alerts and affected assets are empty for the same reason.
 - An incident summary is not a confirmed-compromise verdict.

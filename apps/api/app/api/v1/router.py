@@ -10,6 +10,7 @@ from app.api.v1 import (
     auth,
     cyber_range,
     datasets,
+    evidence,
     experiments,
     governance,
     health,
@@ -32,6 +33,7 @@ api_router.include_router(vulnerabilities.router)
 api_router.include_router(alerts.router)
 api_router.include_router(incidents.router)
 api_router.include_router(governance.router)
+api_router.include_router(evidence.router)
 api_router.include_router(threat_intel.router)
 api_router.include_router(administration.router)
 api_router.include_router(reports.router)

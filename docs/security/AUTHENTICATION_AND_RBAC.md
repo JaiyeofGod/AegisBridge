@@ -1,6 +1,6 @@
 # Authentication and RBAC
 
-**Status:** Backend authentication, domain read authorization, **CSRF-protected authenticated writes** (preferences, risk treatment, incident update, vulnerability remediation), and session CSRF foundation are in place. Frontend route guards remain UX only. SSO/OIDC, MFA, email reset, rate limiting, and remaining domain writes (admin, integrations, reports, cyber-range control, incident tasks) remain deferred.
+**Status:** Backend authentication, domain read authorization, **CSRF-protected authenticated writes** (preferences, risk treatment, incident update, vulnerability remediation, administration access reviews/users/roles, governance control implementation/tests, evidence metadata + control linking), and session CSRF foundation are in place. Frontend route guards remain UX only. SSO/OIDC, MFA, email reset, rate limiting, and remaining domain writes (integrations, reports, cyber-range control, incident tasks, binary evidence upload) remain deferred.
 
 ## Authentication model
 
@@ -66,6 +66,12 @@ Session cookies remain HttpOnly. CSRF uses a **synchronizer token** bound to the
 | PATCH | `/risks/{risk_id}/treatment` | Authenticated + `risk.manage` + CSRF |
 | PATCH | `/incidents/{incident_id}` | Authenticated + `incident.manage` + CSRF (`incident.close` when closing) |
 | PATCH | `/vulnerabilities/{vulnerability_id}/remediation` | Authenticated + `vulnerability.manage` + CSRF |
+| PATCH | `/governance/controls/{control_id}/implementation` | Authenticated + `control.manage` + CSRF |
+| POST | `/governance/controls/{control_id}/tests` | Authenticated + `control.manage` + CSRF |
+| PATCH | `/governance/control-tests/{test_id}` | Authenticated + `control.manage` + CSRF |
+| POST | `/evidence` | Authenticated + `evidence.manage` + CSRF (metadata only; no file upload) |
+| POST | `/governance/controls/{control_id}/evidence/{evidence_id}` | Authenticated + `control.manage` + `evidence.manage` + CSRF |
+| DELETE | `/governance/controls/{control_id}/evidence/{evidence_id}` | Authenticated + `control.manage` + `evidence.manage` + CSRF |
 
 ### CSRF exemptions
 
@@ -176,8 +182,8 @@ Authenticated session required (401 without a valid cookie):
 | Overview | Authenticated session (any role). Sections omit data the caller lacks `*.read` for. | Yes |
 | Assets | `asset.read` | Yes |
 | Risks | `risk.read`; treatment PATCH requires `risk.manage` + CSRF | Yes (read + treatment write) |
-| Controls / governance | `control.read` (+ manage/update for writes later) | Yes (read) |
-| Evidence | `evidence.read` (+ manage/download for writes later) | No dedicated list route yet |
+| Controls / governance | `control.read`; implementation/tests require `control.manage` + CSRF; evidence link requires `control.manage` + `evidence.manage` + CSRF | Yes (read + control/evidence writes) |
+| Evidence | `evidence.read`; metadata POST requires `evidence.manage` + CSRF | Yes (GET by id + metadata create; no upload) |
 | Vulnerabilities | `vulnerability.read`; remediation PATCH requires `vulnerability.manage` + CSRF | Yes (read + remediation write) |
 | Alerts | `alert.read` | Yes |
 | Detections | `detection.read` (+ manage for writes later) | No dedicated list route yet |
@@ -197,12 +203,15 @@ Authenticated session required (401 without a valid cookie):
 | Risk treatment PATCH | `risk.manage` + CSRF | Yes |
 | Incident PATCH | `incident.manage` + CSRF (+ `incident.close` to resolve/close) | Yes |
 | Vulnerability remediation PATCH | `vulnerability.manage` + CSRF | Yes |
+| Control implementation / tests | `control.manage` + CSRF | Yes |
+| Evidence metadata create | `evidence.manage` + CSRF | Yes (no file upload) |
+| Control ↔ evidence link/unlink | `control.manage` + `evidence.manage` + CSRF | Yes |
 
 **401** = no valid session (missing, revoked, expired, or inactive user).  
 **403** = missing permission (`forbidden`) or CSRF failure (`csrf_failed`). Error bodies do not list capability codes or tokens.  
 **409** = stale `expected_updated_at` concurrency conflict.
 
-**Remaining authenticated domain writes** (incident tasks, integration credentials, reports, cyber-range control, exception workflows beyond remediation) remain deferred. No Cyber Range remote control.
+**Remaining authenticated domain writes** (incident tasks, integration credentials, reports, cyber-range control, binary evidence upload / object storage, policy writes, access-review findings) remain deferred. No Cyber Range remote control.
 
 ### Incident mutation scope (`incident.manage`)
 
@@ -227,6 +236,16 @@ Immutable: CVSS, EPSS, KEV, CVE metadata, asset criticality/exposure, SSVC `acti
 
 **Still disabled:** integration credential/connection writes, role definition create/delete, permission catalog mutation, audit-event mutation, user deletion, password reset/change, MFA/SSO.
 
+### Governance / evidence mutation scope
+
+**Control implementation** (`control.manage` + CSRF): writable `status` ∈ `{planned, partial, implemented, not_implemented, not_applicable}`, `notes`, `owner` (user human id). Optimistic concurrency via `expected_updated_at` → `409`. Licensed CIS safeguard text is never accepted or returned.
+
+**Control tests** (`control.manage` + CSRF): create/update manual records only (`result` ∈ `{pass, fail, partial, inconclusive}`, optional `tested_at`, `tester`, `notes`). Public ids are `CTEST-NNNN`. Notes are tagged `[manual development recording]`. Not automated assessment or continuous monitoring.
+
+**Evidence metadata** (`evidence.manage` + CSRF): create title/description/version/optional caller-supplied SHA-256 (exactly 64 hex, normalized lowercase)/size/mime/classification/collected_at/collected_by. `object_uri` is always null and never returned. SHA-256 presence does **not** mean integrity was verified. No raw file bytes, base64, or fake object URIs.
+
+**Control ↔ evidence linking** (`control.manage` + `evidence.manage` + CSRF): link or unlink existing records by human ids. Duplicate links are idempotent (`linked: true`).
+
 ## Audit behavior
 
 Security-relevant actions write `audit_events` rows:
@@ -242,6 +261,12 @@ Security-relevant actions write `audit_events` rows:
 - `ACCESS_REVIEW_UPDATE`
 - `USER_STATUS_UPDATE`
 - `USER_ROLE_UPDATE`
+- `CONTROL_IMPLEMENTATION_UPDATE`
+- `CONTROL_TEST_CREATE`
+- `CONTROL_TEST_UPDATE`
+- `EVIDENCE_CREATE`
+- `CONTROL_EVIDENCE_LINK`
+- `CONTROL_EVIDENCE_UNLINK`
 
 Metadata may include actor human id, target human id, action, object human id, changed field names, and safe old/new status or role names. Privileged role changes note whether Administrator remains assigned. Metadata must not include passwords, hashes, session/CSRF tokens, or digests.
 
@@ -257,7 +282,7 @@ Never commit the real password. Production must not rely on this variable.
 ## Production hardening still required
 
 - Login rate limiting / lockout (structure is ready; not implemented)
-- Remaining CSRF-protected domain writes (integrations, reports, cyber-range, incident tasks)
+- Remaining CSRF-protected domain writes (integrations, reports, cyber-range, incident tasks, binary evidence upload)
 - MFA/TOTP
 - Password reset email flows
 - SSO/OIDC

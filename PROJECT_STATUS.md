@@ -1,8 +1,8 @@
 # AegisBridge Project Status
 
 **Last updated:** October 21, 2026  
-**Current phase:** Phase 2 — auth + domain GET RBAC + CSRF-protected writes (preferences, risk, incidents, vulnerabilities, administration access reviews/users/roles)  
-**Next:** Remaining mutations (integrations, reports, incident tasks). MFA, SSO, password reset, rate limiting, and Cyber Range control remain out of scope.
+**Current phase:** Phase 2 — auth + domain GET RBAC + CSRF-protected writes (preferences, risk, incidents, vulnerabilities, administration, governance control implementation/tests, evidence metadata + control linking)  
+**Next:** Remaining mutations (integrations, reports, incident tasks, binary evidence upload). MFA, SSO, password reset, rate limiting, and Cyber Range control remain out of scope.
 
 ---
 
@@ -15,11 +15,11 @@
 | Phase 1 plan | Present (`PHASE_1_IMPLEMENTATION_PLAN.md` v1.1) — corrected routes/tooling |
 | Minimal Phase 0 docs | Complete |
 | Application code | API domain schema + web UI on local mocks |
-| Domain schema | Through `20261020_0005` including cyber-range catalog tables |
-| Read API | `/api/v1` through reports, datasets, experiments, and cyber-range |
+| Domain schema | Through `20261020_0008` (`control_tests.human_id`) |
+| Read API | `/api/v1` through reports, datasets, experiments, cyber-range, governance controls, evidence detail |
 | Authentication | Sessions + CSRF synchronizer tokens; domain GET RBAC enforced |
-| Write API | Preferences, risk treatment, incident, vulnerability remediation, access-review, user status, user role assignment; integration/report/cyber-range writes deferred |
-| Frontend API connection | Reads + CSRF client + preferences, risk, incident, vulnerability remediation, and administration (access review / user status / roles) writes; integration/report/cyber-range writes still disabled |
+| Write API | Preferences, risk treatment, incident, vulnerability remediation, administration, control implementation/tests, evidence metadata + control link/unlink; binary upload and integration/report/cyber-range writes deferred |
+| Frontend API connection | Reads + CSRF client + preferences, risk, incident, vulnerability remediation, and administration writes; governance/evidence FE writes and integration/report/cyber-range writes still disabled |
 | Package installs | API via uv; web via pnpm (`apps/web`) |
 | Cyber range | Not started |
 | Hosting | Not started |

@@ -95,6 +95,7 @@ class ControlTest(UUIDMixin, TimestampMixin, Base):
 
     control_id: Mapped[UUID] = mapped_column(ForeignKey("controls.id"), nullable=False, index=True)
     tester_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
+    human_id: Mapped[str] = human_id_column()
     result: Mapped[str] = mapped_column(String(32), nullable=False)
     tested_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

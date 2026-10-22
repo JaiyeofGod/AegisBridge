@@ -1,6 +1,7 @@
 """Small query helpers shared by domain read services."""
 
 from collections.abc import Sequence
+from re import fullmatch
 
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
@@ -104,3 +105,28 @@ def page[T](page_params: PageParams, total: int, items: list[T]) -> Page[T]:
         total=total,
         items=items,
     )
+
+
+def next_human_id(session: Session, column, prefix: str) -> str:
+    """Allocate the next ``PREFIX-NNNN`` public id for a human_id column."""
+    pattern = f"{prefix}-%"
+    existing = session.scalars(select(column).where(column.like(pattern))).all()
+    highest = 0
+    for value in existing:
+        suffix = value.rsplit("-", maxsplit=1)[-1]
+        if suffix.isdigit():
+            highest = max(highest, int(suffix))
+    return f"{prefix}-{highest + 1:04d}"
+
+
+def normalize_sha256(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    if not fullmatch(r"[0-9a-f]{64}", normalized):
+        raise ApiError(
+            422,
+            "validation_error",
+            "sha256 must be exactly 64 lowercase hexadecimal characters.",
+        )
+    return normalized

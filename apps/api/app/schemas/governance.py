@@ -1,8 +1,21 @@
-"""Governance summary. Control text from licensed catalogs is not returned."""
+"""Governance contracts. Licensed CIS safeguard text is never returned."""
 
-from pydantic import BaseModel
+from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.common import PersonRef
+
+ImplementationStatus = Literal[
+    "planned",
+    "partial",
+    "implemented",
+    "not_implemented",
+    "not_applicable",
+]
+
+ControlTestResult = Literal["pass", "fail", "partial", "inconclusive"]
 
 
 class FrameworkSummary(BaseModel):
@@ -56,3 +69,89 @@ class GovernanceSummary(BaseModel):
     assessment_work: AssessmentWork
     policies: list[PolicyStatusItem]
     access_reviews: list[AccessReviewStatusItem]
+
+
+class ControlListItem(BaseModel):
+    id: str
+    control_code: str
+    title: str
+    family: str | None
+    framework_code: str | None
+    framework_version: str | None
+    implementation_status: str | None
+    test_count: int
+    evidence_count: int
+
+
+class ControlImplementationDetail(BaseModel):
+    status: str
+    notes: str | None
+    owner: PersonRef | None
+    updated_at: datetime | None = None
+
+
+class ControlTestItem(BaseModel):
+    id: str
+    control_id: str
+    result: str
+    tested_at: datetime
+    tester: PersonRef | None
+    notes: str | None
+    updated_at: datetime | None = None
+    recording_mode: str = "manual"
+
+
+class ControlEvidenceItem(BaseModel):
+    id: str
+    title: str
+    sha256: str | None
+    collected_at: datetime | None
+
+
+class ControlDetail(ControlListItem):
+    implementation: ControlImplementationDetail | None = None
+    tests: list[ControlTestItem] = Field(default_factory=list)
+    evidence: list[ControlEvidenceItem] = Field(default_factory=list)
+    licensed_text_included: bool = False
+    updated_at: datetime | None = None
+
+
+class ControlImplementationUpdate(BaseModel):
+    """Partial update of the current control implementation row."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: ImplementationStatus | None = None
+    notes: str | None = Field(default=None, max_length=8000)
+    owner: str | None = Field(
+        default=None,
+        description="Owner user human id (e.g. USR-0003). Null clears the owner.",
+    )
+    expected_updated_at: datetime | None = None
+
+
+class ControlTestCreate(BaseModel):
+    """Manually recorded control test. Not an automated assessment."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    result: ControlTestResult
+    tested_at: datetime | None = None
+    tester: str | None = Field(
+        default=None,
+        description="Tester user human id. Defaults to the authenticated actor.",
+    )
+    notes: str | None = Field(default=None, max_length=8000)
+
+
+class ControlTestUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    result: ControlTestResult | None = None
+    tested_at: datetime | None = None
+    tester: str | None = Field(
+        default=None,
+        description="Tester user human id. Null clears the tester.",
+    )
+    notes: str | None = Field(default=None, max_length=8000)
+    expected_updated_at: datetime | None = None
