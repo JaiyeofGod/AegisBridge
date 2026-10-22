@@ -1,6 +1,6 @@
 # Authentication and RBAC
 
-**Status:** Backend authentication, domain read authorization, **CSRF-protected authenticated writes** (preferences, risk treatment, incident update, vulnerability remediation, administration access reviews/users/roles, governance control implementation/tests, evidence metadata + control linking), and session CSRF foundation are in place. Frontend route guards remain UX only. SSO/OIDC, MFA, email reset, rate limiting, and remaining domain writes (integrations, reports, cyber-range control, incident tasks, binary evidence upload) remain deferred.
+**Status:** Backend authentication, domain read authorization, **CSRF-protected authenticated writes** (preferences, risk treatment, incident update, vulnerability remediation, administration access reviews/users/roles, governance control implementation/tests, evidence metadata + control linking, policy lifecycle + policy↔control mapping), and session CSRF foundation are in place. Frontend route guards remain UX only. SSO/OIDC, MFA, email reset, rate limiting, and remaining domain writes (integrations, reports, cyber-range control, incident tasks) remain deferred.
 
 ## Authentication model
 
@@ -211,12 +211,13 @@ Authenticated session required (401 without a valid cookie):
 | Evidence object upload/delete | `evidence.manage` + CSRF | Yes (private S3-compatible storage) |
 | Evidence object download | `evidence.read` | Yes (backend stream; no public URL) |
 | Control ↔ evidence link/unlink | `control.manage` + `evidence.manage` + CSRF | Yes |
+| Policy ↔ control link/unlink | `policy.manage` + CSRF | Yes (relationship-only; no control text) |
 
 **401** = no valid session (missing, revoked, expired, or inactive user).  
 **403** = missing permission (`forbidden`) or CSRF failure (`csrf_failed`). Error bodies do not list capability codes or tokens.  
 **409** = stale `expected_updated_at` concurrency conflict.
 
-**Policy lifecycle** (`policy.read` / `policy.manage` / `policy.approve` + CSRF on mutations): create/edit drafts, transition/publish, self-acknowledge published versions. Published versions are immutable; replacements create new drafts. External e-signature, email notification, and policy↔control mapping writes are not implemented (no mapping table yet).
+**Policy lifecycle** (`policy.read` / `policy.manage` / `policy.approve` + CSRF on mutations): create/edit drafts, transition/publish, self-acknowledge published versions, link/unlink controls. Published versions are immutable; replacements create new drafts. External e-signature and email notification are not implemented.
 
 **Remaining authenticated domain writes** (incident tasks, integration credentials, reports, cyber-range control, access-review findings) remain deferred. No Cyber Range remote control.
 
@@ -259,6 +260,8 @@ Immutable: CVSS, EPSS, KEV, CVE metadata, asset criticality/exposure, SSVC `acti
 
 **Control ↔ evidence linking** (`control.manage` + `evidence.manage` + CSRF): link or unlink existing records by human ids. Duplicate links are idempotent (`linked: true`).
 
+**Policy ↔ control linking** (`policy.manage` + CSRF): `POST`/`DELETE /policies/{policy_id}/controls/{control_id}` by human ids. Stores relationship only in `policy_control_mappings` (no control title/text duplication, no licensed CIS prose). Duplicate links are idempotent (`linked: true`). Missing unlink → `404` (same convention as evidence unlink). Unlink does not delete policy, control, evidence, or tests.
+
 ## Audit behavior
 
 Security-relevant actions write `audit_events` rows:
@@ -283,6 +286,8 @@ Security-relevant actions write `audit_events` rows:
 - `EVIDENCE_OBJECT_DELETE`
 - `CONTROL_EVIDENCE_LINK`
 - `CONTROL_EVIDENCE_UNLINK`
+- `POLICY_CONTROL_LINK`
+- `POLICY_CONTROL_UNLINK`
 
 Metadata may include actor human id, target human id, action, object human id, changed field names, and safe old/new status or role names. Privileged role changes note whether Administrator remains assigned. Metadata must not include passwords, hashes, session/CSRF tokens, or digests.
 

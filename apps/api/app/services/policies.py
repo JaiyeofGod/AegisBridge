@@ -11,16 +11,19 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.errors import ApiError, not_found
 from app.core.config import get_settings
+from app.models.grc import Control, ControlImplementation, FrameworkVersion
 from app.models.identity import User
-from app.models.policy import Policy, PolicyAcknowledgement, PolicyVersion
+from app.models.policy import Policy, PolicyAcknowledgement, PolicyControlMapping, PolicyVersion
 from app.schemas.common import Page
 from app.schemas.policies import (
     POLICY_SEMANTICS,
     PolicyAcknowledgementSummary,
     PolicyAcknowledgeResult,
+    PolicyControlLinkResult,
     PolicyCreate,
     PolicyDetail,
     PolicyListItem,
+    PolicyMappedControl,
     PolicyTransition,
     PolicyUpdate,
     PolicyVersionCreate,
@@ -450,6 +453,104 @@ def _publish_version(policy: Policy, version: PolicyVersion) -> None:
     policy.status = "published"
 
 
+def link_policy_control(
+    session: Session,
+    principal: AuthenticatedPrincipal,
+    policy_id: str,
+    control_id: str,
+) -> PolicyControlLinkResult:
+    policy = _load_policy(session, policy_id, for_update=True)
+    control = session.scalar(select(Control).where(Control.human_id == control_id))
+    if control is None or control.organization_id != policy.organization_id:
+        raise not_found("Control", control_id)
+
+    existing = session.scalar(
+        select(PolicyControlMapping).where(
+            PolicyControlMapping.policy_id == policy.id,
+            PolicyControlMapping.control_id == control.id,
+        )
+    )
+    if existing is not None:
+        return PolicyControlLinkResult(
+            policy_id=policy.human_id,
+            control_id=control.human_id,
+            linked=True,
+        )
+
+    session.add(PolicyControlMapping(policy_id=policy.id, control_id=control.id))
+    try:
+        session.flush()
+    except IntegrityError as exc:
+        raise ApiError(409, "conflict", "Control is already linked to this policy.") from exc
+
+    settings = get_settings()
+    record_audit_event(
+        session,
+        organization_id=policy.organization_id,
+        action="POLICY_CONTROL_LINK",
+        object_type="policy_control_mapping",
+        object_id=f"{policy.human_id}:{control.human_id}",
+        result="success",
+        actor_user_id=principal.user_id,
+        actor_label=principal.human_id,
+        environment_name=settings.app_env,
+        detail=f"Linked policy {policy.human_id} to control {control.human_id}.",
+    )
+    session.commit()
+    return PolicyControlLinkResult(
+        policy_id=policy.human_id,
+        control_id=control.human_id,
+        linked=True,
+    )
+
+
+def unlink_policy_control(
+    session: Session,
+    principal: AuthenticatedPrincipal,
+    policy_id: str,
+    control_id: str,
+) -> PolicyControlLinkResult:
+    """Remove the policy↔control relationship only. Missing links return 404 (same as evidence)."""
+    policy = session.scalar(select(Policy).where(Policy.human_id == policy_id))
+    if policy is None:
+        raise not_found("Policy", policy_id)
+    control = session.scalar(select(Control).where(Control.human_id == control_id))
+    if control is None or control.organization_id != policy.organization_id:
+        raise not_found("Control", control_id)
+
+    link = session.scalar(
+        select(PolicyControlMapping)
+        .where(
+            PolicyControlMapping.policy_id == policy.id,
+            PolicyControlMapping.control_id == control.id,
+        )
+        .with_for_update()
+    )
+    if link is None:
+        raise ApiError(404, "not_found", "Control is not linked to this policy.")
+
+    session.delete(link)
+    settings = get_settings()
+    record_audit_event(
+        session,
+        organization_id=policy.organization_id,
+        action="POLICY_CONTROL_UNLINK",
+        object_type="policy_control_mapping",
+        object_id=f"{policy.human_id}:{control.human_id}",
+        result="success",
+        actor_user_id=principal.user_id,
+        actor_label=principal.human_id,
+        environment_name=settings.app_env,
+        detail=f"Unlinked policy {policy.human_id} from control {control.human_id}.",
+    )
+    session.commit()
+    return PolicyControlLinkResult(
+        policy_id=policy.human_id,
+        control_id=control.human_id,
+        linked=False,
+    )
+
+
 def _load_policy(session: Session, policy_id: str, *, for_update: bool) -> Policy:
     statement = (
         select(Policy)
@@ -457,6 +558,13 @@ def _load_policy(session: Session, policy_id: str, *, for_update: bool) -> Polic
         .options(
             selectinload(Policy.owner),
             selectinload(Policy.versions).selectinload(PolicyVersion.acknowledgements),
+            selectinload(Policy.control_links)
+            .selectinload(PolicyControlMapping.control)
+            .selectinload(Control.framework_version)
+            .selectinload(FrameworkVersion.framework),
+            selectinload(Policy.control_links)
+            .selectinload(PolicyControlMapping.control)
+            .selectinload(Control.implementations),
         )
     )
     if for_update:
@@ -529,9 +637,35 @@ def _detail(
         ),
         created_at=policy.created_at,
         updated_at=policy.updated_at,
-        control_mappings=[],
+        control_mappings=[
+            _mapped_control(link.control)
+            for link in policy.control_links
+            if link.control is not None
+        ],
         semantics=POLICY_SEMANTICS,
     )
+
+
+def _mapped_control(control: Control) -> PolicyMappedControl:
+    framework = control.framework_version
+    implementation = _latest_implementation(control.implementations)
+    return PolicyMappedControl(
+        id=control.human_id,
+        control_code=control.control_code,
+        title=control.title,
+        framework_code=None if framework is None else framework.framework.code,
+        framework_version=None if framework is None else framework.version_label,
+        implementation_status=None if implementation is None else implementation.status,
+        licensed_text_included=False,
+    )
+
+
+def _latest_implementation(
+    rows: list[ControlImplementation],
+) -> ControlImplementation | None:
+    if not rows:
+        return None
+    return sorted(rows, key=lambda row: (row.updated_at, row.created_at), reverse=True)[0]
 
 
 def _version_summary(version: PolicyVersion) -> PolicyVersionSummary:

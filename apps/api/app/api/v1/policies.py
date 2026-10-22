@@ -13,6 +13,7 @@ from app.api.deps import (
 from app.schemas.common import ErrorBody, Page
 from app.schemas.policies import (
     PolicyAcknowledgeResult,
+    PolicyControlLinkResult,
     PolicyCreate,
     PolicyDetail,
     PolicyListItem,
@@ -172,3 +173,35 @@ def post_acknowledge(
 ) -> PolicyAcknowledgeResult:
     """Self-acknowledge the current published version. CSRF required. policy.read sufficient."""
     return policy_service.acknowledge_policy(session, principal, policy_id)
+
+
+@router.post(
+    "/{policy_id}/controls/{control_id}",
+    response_model=PolicyControlLinkResult,
+    responses={404: {"model": ErrorBody}, 409: {"model": ErrorBody}},
+    dependencies=[Depends(require_permissions("policy.manage"))],
+)
+def post_policy_control_link(
+    policy_id: str,
+    control_id: str,
+    session: DbSession,
+    principal: RequireCsrf,
+) -> PolicyControlLinkResult:
+    """Link a control to a policy by human ids. CSRF required. Duplicate links are idempotent."""
+    return policy_service.link_policy_control(session, principal, policy_id, control_id)
+
+
+@router.delete(
+    "/{policy_id}/controls/{control_id}",
+    response_model=PolicyControlLinkResult,
+    responses={404: {"model": ErrorBody}},
+    dependencies=[Depends(require_permissions("policy.manage"))],
+)
+def delete_policy_control_link(
+    policy_id: str,
+    control_id: str,
+    session: DbSession,
+    principal: RequireCsrf,
+) -> PolicyControlLinkResult:
+    """Remove a policy↔control relationship only. CSRF required. Missing link → 404."""
+    return policy_service.unlink_policy_control(session, principal, policy_id, control_id)

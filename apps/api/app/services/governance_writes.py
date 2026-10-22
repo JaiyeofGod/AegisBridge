@@ -13,6 +13,7 @@ from app.core.config import get_settings
 from app.models.evidence import EvidenceControlLink
 from app.models.grc import Control, ControlImplementation, ControlTest, FrameworkVersion
 from app.models.identity import User
+from app.models.policy import Policy, PolicyControlMapping
 from app.schemas.common import Page
 from app.schemas.governance import (
     ControlDetail,
@@ -20,6 +21,7 @@ from app.schemas.governance import (
     ControlImplementationDetail,
     ControlImplementationUpdate,
     ControlListItem,
+    ControlMappedPolicy,
     ControlTestCreate,
     ControlTestItem,
     ControlTestUpdate,
@@ -309,6 +311,14 @@ def _detail(session: Session, control: Control) -> ControlDetail:
         .options(selectinload(EvidenceControlLink.evidence))
         .order_by(EvidenceControlLink.created_at)
     ).all()
+    policy_rows = session.scalars(
+        select(PolicyControlMapping)
+        .where(PolicyControlMapping.control_id == control.id)
+        .options(
+            selectinload(PolicyControlMapping.policy).selectinload(Policy.versions),
+        )
+        .order_by(PolicyControlMapping.created_at)
+    ).all()
     return ControlDetail(
         **base.model_dump(),
         implementation=(
@@ -332,8 +342,22 @@ def _detail(session: Session, control: Control) -> ControlDetail:
             for link in evidence_rows
             if link.evidence is not None
         ],
+        policies=[_mapped_policy(link.policy) for link in policy_rows if link.policy is not None],
         licensed_text_included=False,
         updated_at=control.updated_at,
+    )
+
+
+def _mapped_policy(policy: Policy) -> ControlMappedPolicy:
+    current = next(
+        (version for version in policy.versions if version.is_current),
+        None,
+    )
+    return ControlMappedPolicy(
+        id=policy.human_id,
+        title=policy.title,
+        status=policy.status,
+        current_version=None if current is None else current.version_label,
     )
 
 

@@ -93,6 +93,7 @@ REQUIRED_TABLES = {
     "policies",
     "policy_versions",
     "policy_acknowledgements",
+    "policy_control_mappings",
     "datasets",
     "dataset_versions",
     "dataset_files",
@@ -177,6 +178,8 @@ def test_human_ids_are_unique_and_foreign_keys_exist() -> None:
     assert "assets.id" in risk_asset
     evidence_links = Base.metadata.tables["evidence_control_links"].foreign_keys
     assert {fk.column.table.name for fk in evidence_links} == {"evidence", "controls"}
+    policy_control_links = Base.metadata.tables["policy_control_mappings"].foreign_keys
+    assert {fk.column.table.name for fk in policy_control_links} == {"policies", "controls"}
 
 
 def _alembic_config() -> Config:

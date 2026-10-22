@@ -391,7 +391,12 @@ def test_openapi_documents_policy_routes(client: TestClient) -> None:
     assert "/api/v1/policies/{policy_id}/versions/{version_label}" in paths
     assert "/api/v1/policies/{policy_id}/transition" in paths
     assert "/api/v1/policies/{policy_id}/acknowledge" in paths
+    assert "/api/v1/policies/{policy_id}/controls/{control_id}" in paths
     post = paths["/api/v1/policies"]["post"]
     assert {"SessionCookie": []} in post.get("security", [])
     ack = paths["/api/v1/policies/{policy_id}/acknowledge"]["post"]
     assert {"SessionCookie": []} in ack.get("security", [])
+    link = paths["/api/v1/policies/{policy_id}/controls/{control_id}"]["post"]
+    assert {"SessionCookie": []} in link.get("security", [])
+    unlink = paths["/api/v1/policies/{policy_id}/controls/{control_id}"]["delete"]
+    assert {"SessionCookie": []} in unlink.get("security", [])

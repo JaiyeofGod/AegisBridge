@@ -55,7 +55,7 @@ from app.models.incident import (
 )
 from app.models.integration import Integration, SyncJob, SyncState
 from app.models.organization import BusinessProcess, Department, Organization
-from app.models.policy import Policy, PolicyAcknowledgement, PolicyVersion
+from app.models.policy import Policy, PolicyAcknowledgement, PolicyControlMapping, PolicyVersion
 from app.models.preferences import UserPreferences
 from app.models.report import ReportDefinition
 from app.models.risk import Risk, RiskAssessment, RiskReview, RiskTreatment
@@ -128,6 +128,7 @@ __all__ = [
     "Permission",
     "Policy",
     "PolicyAcknowledgement",
+    "PolicyControlMapping",
     "PolicyVersion",
     "RemediationTask",
     "ReportDefinition",

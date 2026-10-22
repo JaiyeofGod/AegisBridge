@@ -12,6 +12,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, TimestampMixin, UUIDMixin, human_id_column
 
 if TYPE_CHECKING:
+    from app.models.grc import Control
     from app.models.identity import User
     from app.models.organization import Organization
 
@@ -32,6 +33,10 @@ class Policy(UUIDMixin, TimestampMixin, Base):
     versions: Mapped[list[PolicyVersion]] = relationship(
         back_populates="policy",
         order_by="PolicyVersion.created_at",
+    )
+    control_links: Mapped[list[PolicyControlMapping]] = relationship(
+        back_populates="policy",
+        order_by="PolicyControlMapping.created_at",
     )
 
 
@@ -68,3 +73,16 @@ class PolicyAcknowledgement(UUIDMixin, TimestampMixin, Base):
 
     policy_version: Mapped[PolicyVersion] = relationship(back_populates="acknowledgements")
     user: Mapped[User] = relationship()
+
+
+class PolicyControlMapping(UUIDMixin, TimestampMixin, Base):
+    """Relationship-only link between a policy and a control. No control text is stored."""
+
+    __tablename__ = "policy_control_mappings"
+    __table_args__ = (UniqueConstraint("policy_id", "control_id", name="policy_control"),)
+
+    policy_id: Mapped[UUID] = mapped_column(ForeignKey("policies.id"), nullable=False, index=True)
+    control_id: Mapped[UUID] = mapped_column(ForeignKey("controls.id"), nullable=False, index=True)
+
+    policy: Mapped[Policy] = relationship(back_populates="control_links")
+    control: Mapped[Control] = relationship()

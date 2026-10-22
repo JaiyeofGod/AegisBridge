@@ -108,10 +108,20 @@ class ControlEvidenceItem(BaseModel):
     collected_at: datetime | None
 
 
+class ControlMappedPolicy(BaseModel):
+    """Minimal policy reference from a control. No nested version bodies."""
+
+    id: str
+    title: str
+    status: str
+    current_version: str | None = None
+
+
 class ControlDetail(ControlListItem):
     implementation: ControlImplementationDetail | None = None
     tests: list[ControlTestItem] = Field(default_factory=list)
     evidence: list[ControlEvidenceItem] = Field(default_factory=list)
+    policies: list[ControlMappedPolicy] = Field(default_factory=list)
     licensed_text_included: bool = False
     updated_at: datetime | None = None
 

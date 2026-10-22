@@ -57,7 +57,7 @@ All domain rows require a valid session (`401` otherwise) and the permission lis
 | GET | `/incidents/{incident_id}` | Timeline, tasks, indicators, evidence, related alerts, affected assets; includes `updated_at` for concurrency |
 | GET | `/governance/summary` | Framework identifiers, counts, evidence freshness, policies, access reviews |
 | GET | `/governance/controls` | Paginated control list (codes/titles/status counts; no licensed CIS text) |
-| GET | `/governance/controls/{control_id}` | Control detail with implementation, manual tests, linked evidence metadata |
+| GET | `/governance/controls/{control_id}` | Control detail with implementation, manual tests, linked evidence metadata, mapped policy refs |
 | PATCH | `/governance/controls/{control_id}/implementation` | Update implementation status/notes/owner; `control.manage` + CSRF; `expected_updated_at` → 409 |
 | POST | `/governance/controls/{control_id}/tests` | Record a manual control test (`CTEST-NNNN`); `control.manage` + CSRF |
 | PATCH | `/governance/control-tests/{test_id}` | Update a manual control test; `control.manage` + CSRF |
@@ -69,7 +69,7 @@ All domain rows require a valid session (`401` otherwise) and the permission lis
 | GET | `/evidence/{evidence_id}/object` | Authenticated private download stream (`evidence.read`); no CSRF |
 | DELETE | `/evidence/{evidence_id}/object` | Delete stored object bytes; keep evidence metadata (`evidence.manage` + CSRF) |
 | GET | `/policies` | Paginated policy list (`policy.read`) |
-| GET | `/policies/{policy_id}` | Policy detail, versions, acknowledgement summary (`policy.read`) |
+| GET | `/policies/{policy_id}` | Policy detail, versions, acknowledgement summary, mapped controls (`policy.read`) |
 | GET | `/policies/{policy_id}/versions` | Version summaries for a policy |
 | GET | `/policies/{policy_id}/versions/{version_label}` | Version content detail (`version_label` is the public version id) |
 | POST | `/policies` | Create policy + initial draft version (`policy.manage` + CSRF); server `POL-NNNN` |
@@ -78,6 +78,8 @@ All domain rows require a valid session (`401` otherwise) and the permission lis
 | PATCH | `/policies/{policy_id}/versions/{version_label}` | Edit draft content only (`policy.manage` + CSRF); published/superseded → 409 |
 | POST | `/policies/{policy_id}/transition` | Lifecycle transition (`policy.manage` or `policy.approve` per transition + CSRF). Publish requires `version_label` of a draft. |
 | POST | `/policies/{policy_id}/acknowledge` | Self-acknowledge current published version (`policy.read` + CSRF); idempotent |
+| POST | `/policies/{policy_id}/controls/{control_id}` | Link control to policy (`policy.manage` + CSRF); human ids; idempotent duplicate |
+| DELETE | `/policies/{policy_id}/controls/{control_id}` | Unlink relationship only (`policy.manage` + CSRF); missing link → 404 |
 | GET | `/threat-intelligence/summary` | Stored indicator, match, advisory, and source-status counts |
 | GET | `/threat-intelligence/indicators` | Filters: `search`, `indicator_type`, `source`, `status`, `internal_match` |
 | GET | `/threat-intelligence/indicators/{indicator_id}` | Simulated indicator, source, and stored ATT&CK link |
@@ -139,8 +141,8 @@ Validation uses the same shape with `code` `validation_error` and `details` entr
 - Governance sets `licensed_text_included` to false. Control codes and stored titles are returned. CIS licensed text is not.
 - Control tests are manually recorded development data (`recording_mode: manual`). Notes include `[manual development recording]`. They are not automated assessments.
 - Governance summary counts (implementation by status, `tests_recorded`, evidence freshness) are derived from stored rows after writes.
-- Policies use closed lifecycle statuses `draft` → `in_review` → `approved` → `published` → `retired` (plus `published` → `published` to replace the current version). Version statuses are `draft`, `published`, and `superseded`. Published/superseded content is immutable. Acknowledgements bind to a specific published version and remain after supersession. Acknowledgement responses expose counts only (no invented completion percentage). Policy↔control mappings are not stored yet (`control_mappings` is always `[]`). External e-signature and email workflows are unsupported.
-- Policy permissions: `policy.read` (read + self-acknowledge), `policy.manage` (create/edit drafts and metadata; draft↔in_review), `policy.approve` (approve/publish/retire; sensitive).
+- Policies use closed lifecycle statuses `draft` → `in_review` → `approved` → `published` → `retired` (plus `published` → `published` to replace the current version). Version statuses are `draft`, `published`, and `superseded`. Published/superseded content is immutable. Acknowledgements bind to a specific published version and remain after supersession. Acknowledgement responses expose counts only (no invented completion percentage). Policy↔control mappings are relationship-only (`policy_control_mappings`); responses never duplicate licensed CIS text (`licensed_text_included=false`). Unlink removes the relationship only. External e-signature and email workflows are unsupported.
+- Policy permissions: `policy.read` (read + self-acknowledge + view mappings), `policy.manage` (create/edit drafts and metadata; draft↔in_review; link/unlink controls), `policy.approve` (approve/publish/retire; sensitive).
 - Telemetry `active` counts only `active` or `reporting`. Seed values `reference_only` and `not_connected` stay at zero because the feed is absent.
 - Incident `containment_state` is null. Filtering it returns an empty page because the column is not stored. Related alerts and affected assets are empty for the same reason.
 - An incident summary is not a confirmed-compromise verdict.

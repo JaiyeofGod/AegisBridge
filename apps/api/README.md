@@ -1,6 +1,6 @@
 # AegisBridge API (`apps/api`)
 
-FastAPI service with Phase 2 domain models, session authentication, enforced RBAC on domain reads, synchronizer CSRF, and authenticated writes for account preferences, risk treatment, incidents, vulnerability remediation, administration, governance, evidence (including private objects), and **policy lifecycle / versioning / acknowledgement**. Object storage uses an S3-compatible abstraction (SeaweedFS locally / Cloudflare R2 hosted). Frontend guards are UX only. Integration/report/cyber-range writes, SSO/MFA, and rate limiting remain deferred.
+FastAPI service with Phase 2 domain models, session authentication, enforced RBAC on domain reads, synchronizer CSRF, and authenticated writes for account preferences, risk treatment, incidents, vulnerability remediation, administration, governance, evidence (including private objects), **policy lifecycle / versioning / acknowledgement**, and **policy↔control mapping**. Object storage uses an S3-compatible abstraction (SeaweedFS locally / Cloudflare R2 hosted). Frontend guards are UX only. Integration/report/cyber-range writes, SSO/MFA, and rate limiting remain deferred.
 
 ## Commands
 
@@ -29,7 +29,15 @@ uv run --project apps/api python -m app.db.seed
 uv run --project apps/api python -m app.db.seed --reset
 ```
 
-The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. Threat-intelligence tables and `integrations.human_id` are `20261020_0003`. Report definitions and dataset registry metadata are `20261020_0004`. Cyber-range catalog tables and detection metadata columns are `20261020_0005`. Local credentials and sessions are `20261020_0006`. CSRF digests and `user_preferences` are `20261020_0007`. Control-test public ids (`control_tests.human_id`) are `20261020_0008`. Evidence object metadata (`evidence_objects`) is `20261020_0009`. Policy version lifecycle (`policy_versions.status`, `change_summary`, policy status check) is `20261020_0010`. Seed data is not in the migration. Re-running the seed ensures contract rows when the organization already exists.
+The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. Threat-intelligence tables and `integrations.human_id` are `20261020_0003`. Report definitions and dataset registry metadata are `20261020_0004`. Cyber-range catalog tables and detection metadata columns are `20261020_0005`. Local credentials and sessions are `20261020_0006`. CSRF digests and `user_preferences` are `20261020_0007`. Control-test public ids (`control_tests.human_id`) are `20261020_0008`. Evidence object metadata (`evidence_objects`) is `20261020_0009`. Policy version lifecycle (`policy_versions.status`, `change_summary`, policy status check) is `20261020_0010`. Policy↔control relationship table (`policy_control_mappings`) is `20261020_0011`. Seed data is not in the migration. Re-running the seed ensures contract rows when the organization already exists.
+
+### Policy ↔ control mappings
+
+- Relationship-only rows in `policy_control_mappings` (unique `(policy_id, control_id)`). No control title/text duplication and no licensed CIS safeguard prose.
+- `POST /api/v1/policies/{policy_id}/controls/{control_id}` (`policy.manage` + CSRF): link by human ids; duplicate links are idempotent (`linked: true`).
+- `DELETE` same path: removes the relationship only (policy, control, evidence, and tests remain). Missing link → `404` (same convention as evidence unlink).
+- `GET /policies/{id}` returns mapped controls with `licensed_text_included=false`. `GET /governance/controls/{id}` returns minimal mapped policy refs.
+- Frontend mapping UI is not wired yet.
 
 ### Evidence object storage
 
@@ -92,6 +100,7 @@ Requires the domain migration, development seed, and a valid session cookie. Con
 - `POST /api/v1/policies`, `PATCH /api/v1/policies/{id}`, version create/update — `policy.manage` + CSRF
 - `POST /api/v1/policies/{id}/transition` — `policy.manage` or `policy.approve` (transition-specific) + CSRF
 - `POST /api/v1/policies/{id}/acknowledge` — self-ack current published version (`policy.read` + CSRF)
+- `POST|DELETE /api/v1/policies/{id}/controls/{control_id}` — link/unlink control (`policy.manage` + CSRF); relationship only
 - `GET /api/v1/evidence/{id}` — `evidence.read`; `POST /api/v1/evidence` — `evidence.manage` + CSRF (metadata)
 - `POST|GET|DELETE /api/v1/evidence/{id}/object` — upload/download/delete private object (`evidence.manage` for mutations + CSRF; `evidence.read` for download)
 - `GET /api/v1/threat-intelligence/*` — `threat_intel.read`

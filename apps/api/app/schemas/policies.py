@@ -12,8 +12,9 @@ PolicyVersionStatus = Literal["draft", "published", "superseded"]
 
 POLICY_SEMANTICS = (
     "Policy metadata and versioned plain-text summaries. Published versions are immutable "
-    "historical records. External e-signature, email notification, and document generation "
-    "are not implemented. Policy↔control mappings are not stored in this schema revision."
+    "historical records. Policy↔control mappings are relationship-only (no duplicated control "
+    "or licensed framework text). External e-signature, email notification, and document "
+    "generation are not implemented."
 )
 
 
@@ -61,6 +62,18 @@ class PolicyListItem(BaseModel):
     updated_at: datetime | None = None
 
 
+class PolicyMappedControl(BaseModel):
+    """Mapped control reference. Relationship only — no licensed safeguard prose."""
+
+    id: str
+    control_code: str
+    title: str
+    framework_code: str | None = None
+    framework_version: str | None = None
+    implementation_status: str | None = None
+    licensed_text_included: bool = False
+
+
 class PolicyDetail(BaseModel):
     id: str
     title: str
@@ -71,11 +84,14 @@ class PolicyDetail(BaseModel):
     acknowledgements: PolicyAcknowledgementSummary
     created_at: datetime | None = None
     updated_at: datetime | None = None
-    control_mappings: list[str] = Field(
-        default_factory=list,
-        description="Empty until a policy↔control relationship table exists.",
-    )
+    control_mappings: list[PolicyMappedControl] = Field(default_factory=list)
     semantics: str = POLICY_SEMANTICS
+
+
+class PolicyControlLinkResult(BaseModel):
+    policy_id: str
+    control_id: str
+    linked: bool
 
 
 class PolicyCreate(BaseModel):
