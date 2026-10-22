@@ -1,7 +1,8 @@
-import { apiGet, apiPatch, apiPostCsrf } from "@/services/api-client";
+import { apiDelete, apiGet, apiPatch, apiPostCsrf } from "@/services/api-client";
 import type {
   PageResponse,
   PolicyAcknowledgeResult,
+  PolicyControlLinkResult,
   PolicyCreate,
   PolicyDetail,
   PolicyListItem,
@@ -73,5 +74,19 @@ export function transitionPolicy(policyId: string, body: PolicyTransition) {
 export function acknowledgePolicy(policyId: string) {
   return apiPostCsrf<PolicyAcknowledgeResult>(
     `/api/v1/policies/${encodeURIComponent(policyId)}/acknowledge`,
+  );
+}
+
+/** Link by human ids only. No request body. */
+export function linkPolicyControl(policyId: string, controlId: string) {
+  return apiPostCsrf<PolicyControlLinkResult>(
+    `/api/v1/policies/${encodeURIComponent(policyId)}/controls/${encodeURIComponent(controlId)}`,
+  );
+}
+
+/** Unlink relationship only. No request body. */
+export function unlinkPolicyControl(policyId: string, controlId: string) {
+  return apiDelete<PolicyControlLinkResult>(
+    `/api/v1/policies/${encodeURIComponent(policyId)}/controls/${encodeURIComponent(controlId)}`,
   );
 }

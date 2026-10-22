@@ -642,6 +642,7 @@ export const controlDetailSeed: ControlDetail = {
       collected_at: "2026-10-19T21:00:00+00:00",
     },
   ],
+  policies: [],
   licensed_text_included: false,
   updated_at: "2026-10-20T18:00:00+00:00",
 };
@@ -1978,7 +1979,10 @@ export function installApiFetch(
       : null,
     tests: [...controlDetailSeed.tests],
     evidence: controlDetailSeed.evidence.map((item) => ({ ...item })),
+    policies: [...(controlDetailSeed.policies ?? [])],
   };
+  /** policy human id → linked control human ids */
+  const policyControlLinks = new Map<string, Set<string>>();
   let controlListState: ControlListItem = { ...controlListItem };
   let governanceSummaryState: GovernanceSummary = {
     ...governanceSummary,
@@ -2068,6 +2072,48 @@ export function installApiFetch(
         acknowledgement_count: policy.acknowledgements.acknowledgement_count,
         owner: policy.owner,
       })),
+    };
+  }
+
+  function mappedControlPayload() {
+    return {
+      id: controlListState.id,
+      control_code: controlListState.control_code,
+      title: controlListState.title,
+      framework_code: controlListState.framework_code,
+      framework_version: controlListState.framework_version,
+      implementation_status: controlListState.implementation_status,
+      licensed_text_included: false as const,
+    };
+  }
+
+  function syncPolicyControlMappings() {
+    for (const [policyId, controlIds] of policyControlLinks.entries()) {
+      const policy = policyStore.get(policyId);
+      if (!policy) continue;
+      policy.control_mappings = [...controlIds]
+        .filter((id) => id === controlListState.id)
+        .map(() => mappedControlPayload());
+      policyStore.set(policyId, policy);
+    }
+    for (const policy of policyStore.values()) {
+      if (!policyControlLinks.has(policy.id)) {
+        policy.control_mappings = [];
+      }
+    }
+    controlDetailState = {
+      ...controlDetailState,
+      policies: [...policyControlLinks.entries()]
+        .filter(([, controls]) => controls.has(controlListState.id))
+        .map(([policyId]) => {
+          const policy = policyStore.get(policyId);
+          return {
+            id: policyId,
+            title: policy?.title ?? policyId,
+            status: policy?.status ?? "draft",
+            current_version: policy?.current_version ?? null,
+          };
+        }),
     };
   }
 
@@ -2735,6 +2781,7 @@ export function installApiFetch(
       if (id !== controlDetailState.id) {
         return jsonResponse({ code: "not_found", message: "Control was not found." }, 404);
       }
+      syncPolicyControlMappings();
       return jsonResponse(controlDetailState);
     }
     if (url.includes("/api/v1/governance/controls")) {
@@ -2943,6 +2990,51 @@ export function installApiFetch(
       policyStore.set(policyId, policy);
       syncPolicySummary();
       return jsonResponse(policy);
+    }
+
+    if (/\/api\/v1\/policies\/[^/?]+\/controls\/[^/?]+/.test(url)) {
+      const path = url.split("/policies/")[1] ?? "";
+      const policyId = decodeURIComponent(path.split("/controls/")[0] ?? "");
+      const controlId = decodeURIComponent(path.split("/controls/")[1]?.split("?")[0] ?? "");
+      const policy = policyStore.get(policyId);
+      if (!policy) {
+        return jsonResponse({ code: "not_found", message: "Policy was not found." }, 404);
+      }
+      if (controlId !== controlListState.id) {
+        return jsonResponse({ code: "not_found", message: "Control was not found." }, 404);
+      }
+      const method = init?.method ?? "GET";
+      if (method === "POST") {
+        const provided = headerValue(init, "X-CSRF-Token");
+        if (!provided) {
+          return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+        }
+        const linked = policyControlLinks.get(policyId) ?? new Set<string>();
+        linked.add(controlId);
+        policyControlLinks.set(policyId, linked);
+        syncPolicyControlMappings();
+        return jsonResponse({ policy_id: policyId, control_id: controlId, linked: true });
+      }
+      if (method === "DELETE") {
+        const provided = headerValue(init, "X-CSRF-Token");
+        if (!provided) {
+          return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+        }
+        const linked = policyControlLinks.get(policyId);
+        if (!linked?.has(controlId)) {
+          return jsonResponse(
+            { code: "not_found", message: "Control is not linked to this policy." },
+            404,
+          );
+        }
+        linked.delete(controlId);
+        if (linked.size === 0) {
+          policyControlLinks.delete(policyId);
+        }
+        syncPolicyControlMappings();
+        return jsonResponse({ policy_id: policyId, control_id: controlId, linked: false });
+      }
+      return jsonResponse({ code: "method_not_allowed", message: "Method not allowed." }, 405);
     }
 
     if (/\/api\/v1\/policies\/[^/?]+\/acknowledge/.test(url) && init?.method === "POST") {

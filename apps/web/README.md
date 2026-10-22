@@ -34,28 +34,29 @@ Requires Node.js 24 LTS. Dev server: `http://127.0.0.1:5173` (proxies `/api` to 
 
 ### First write APIs
 
-| Action                        | Endpoint                                                 | Notes                                                                                                      |
-| ----------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Save preferences              | `PATCH /api/v1/account/preferences`                      | Fields: theme, density, landing_page, reduced_motion. UI shows Default vs Stored.                          |
-| Update risk treatment         | `PATCH /api/v1/risks/{id}/treatment`                     | Requires server permission `risk.manage`. Uses `expected_updated_at` when present.                         |
-| Update incident               | `PATCH /api/v1/incidents/{id}`                           | Requires `incident.manage` (+ `incident.close` to resolve/close). Owner read-only in UI.                   |
-| Update remediation            | `PATCH /api/v1/vulnerabilities/{id}/remediation`         | Requires `vulnerability.manage`. CVSS/EPSS/KEV/action_decision immutable. `asset_id` is a selector only.   |
-| Update access review          | `PATCH /api/v1/administration/access-reviews/{id}`       | Requires `administration.manage`. Name/status only. Findings deferred.                                     |
-| Update user status            | `PATCH /api/v1/administration/users/{id}`                | Requires `administration.manage`. `active`/`inactive` only; inactive confirmation in UI. Last-admin → 409. |
-| Replace user roles            | `PUT /api/v1/administration/users/{id}/roles`            | Requires `user.role.manage`. Seven-role catalog only. Last-admin demotion → 409.                           |
-| Update control implementation | `PATCH /api/v1/governance/controls/{id}/implementation`  | Requires `control.manage`. Status/notes/owner; `expected_updated_at` when present.                         |
-| Record/update control test    | `POST .../tests`, `PATCH /control-tests/{id}`            | Requires `control.manage`. Manual development recordings only; not automated validation.                   |
-| Create evidence metadata      | `POST /api/v1/evidence`                                  | Requires `evidence.manage`. Metadata first; no object URI / credentials in the body.                       |
-| Upload evidence object        | `POST /api/v1/evidence/{id}/object` (multipart `file`)   | Requires `evidence.manage` + CSRF. `apiPostMultipart`; browser sets multipart boundary. One object/record. |
-| Download evidence object      | `GET /api/v1/evidence/{id}/object`                       | Requires `evidence.read`. Authenticated Blob download; no public/S3 URLs.                                  |
-| Delete evidence object        | `DELETE /api/v1/evidence/{id}/object`                    | Requires `evidence.manage` + CSRF. Deletes stored bytes only; metadata + control links remain.             |
-| Link/unlink evidence          | `POST`/`DELETE .../controls/{id}/evidence/{evidence_id}` | Requires `control.manage` + `evidence.manage`. Unlink removes association only.                            |
-| Create policy                 | `POST /api/v1/policies`                                  | Requires `policy.manage` + CSRF. Server assigns `POL-NNNN` + initial draft. No client-generated ids.       |
-| Create/edit draft version     | `POST`/`PATCH .../policies/{id}/versions`                | Requires `policy.manage` + CSRF. Published/superseded versions are immutable in the UI.                    |
-| Policy lifecycle              | `POST .../policies/{id}/transition`                      | Manage vs approve from permission codes (not role names). Publish/retire confirmations required.           |
-| Acknowledge policy            | `POST .../policies/{id}/acknowledge`                     | Current authenticated user + current published version only. Idempotent; count only (no fake %).           |
+| Action                        | Endpoint                                                 | Notes                                                                                                                      |
+| ----------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Save preferences              | `PATCH /api/v1/account/preferences`                      | Fields: theme, density, landing_page, reduced_motion. UI shows Default vs Stored.                                          |
+| Update risk treatment         | `PATCH /api/v1/risks/{id}/treatment`                     | Requires server permission `risk.manage`. Uses `expected_updated_at` when present.                                         |
+| Update incident               | `PATCH /api/v1/incidents/{id}`                           | Requires `incident.manage` (+ `incident.close` to resolve/close). Owner read-only in UI.                                   |
+| Update remediation            | `PATCH /api/v1/vulnerabilities/{id}/remediation`         | Requires `vulnerability.manage`. CVSS/EPSS/KEV/action_decision immutable. `asset_id` is a selector only.                   |
+| Update access review          | `PATCH /api/v1/administration/access-reviews/{id}`       | Requires `administration.manage`. Name/status only. Findings deferred.                                                     |
+| Update user status            | `PATCH /api/v1/administration/users/{id}`                | Requires `administration.manage`. `active`/`inactive` only; inactive confirmation in UI. Last-admin → 409.                 |
+| Replace user roles            | `PUT /api/v1/administration/users/{id}/roles`            | Requires `user.role.manage`. Seven-role catalog only. Last-admin demotion → 409.                                           |
+| Update control implementation | `PATCH /api/v1/governance/controls/{id}/implementation`  | Requires `control.manage`. Status/notes/owner; `expected_updated_at` when present.                                         |
+| Record/update control test    | `POST .../tests`, `PATCH /control-tests/{id}`            | Requires `control.manage`. Manual development recordings only; not automated validation.                                   |
+| Create evidence metadata      | `POST /api/v1/evidence`                                  | Requires `evidence.manage`. Metadata first; no object URI / credentials in the body.                                       |
+| Upload evidence object        | `POST /api/v1/evidence/{id}/object` (multipart `file`)   | Requires `evidence.manage` + CSRF. `apiPostMultipart`; browser sets multipart boundary. One object/record.                 |
+| Download evidence object      | `GET /api/v1/evidence/{id}/object`                       | Requires `evidence.read`. Authenticated Blob download; no public/S3 URLs.                                                  |
+| Delete evidence object        | `DELETE /api/v1/evidence/{id}/object`                    | Requires `evidence.manage` + CSRF. Deletes stored bytes only; metadata + control links remain.                             |
+| Link/unlink evidence          | `POST`/`DELETE .../controls/{id}/evidence/{evidence_id}` | Requires `control.manage` + `evidence.manage`. Unlink removes association only.                                            |
+| Create policy                 | `POST /api/v1/policies`                                  | Requires `policy.manage` + CSRF. Server assigns `POL-NNNN` + initial draft. No client-generated ids.                       |
+| Create/edit draft version     | `POST`/`PATCH .../policies/{id}/versions`                | Requires `policy.manage` + CSRF. Published/superseded versions are immutable in the UI.                                    |
+| Policy lifecycle              | `POST .../policies/{id}/transition`                      | Manage vs approve from permission codes (not role names). Publish/retire confirmations required.                           |
+| Acknowledge policy            | `POST .../policies/{id}/acknowledge`                     | Current authenticated user + current published version only. Idempotent; count only (no fake %).                           |
+| Link/unlink policy↔control    | `POST`/`DELETE .../policies/{id}/controls/{control_id}`  | Requires `policy.manage` + CSRF. Human ids; no body. Unlink removes relationship only (not policy/control/tests/evidence). |
 
-Backend remains the authorization boundary. Evidence files are stored outside PostgreSQL (local SeaweedFS / future R2) via the API only. SHA-256 is calculated server-side at ingestion; `integrity_verified` remains false; malware scanning is not implemented. Policy UI preserves version history; e-sign, email, rich docs, and policy↔control linking are not supported. Integration credential writes, reports, Cyber Range control, and incident tasks stay disabled in the UI.
+Backend remains the authorization boundary. Evidence files are stored outside PostgreSQL (local SeaweedFS / future R2) via the API only. SHA-256 is calculated server-side at ingestion; `integrity_verified` remains false; malware scanning is not implemented. Policy UI preserves version history and Policy → Control → Test → Evidence traceability; licensed CIS safeguard prose is never surfaced. E-sign, email, and rich docs remain unsupported. Integration credential writes, reports, Cyber Range control, and incident tasks stay disabled in the UI.
 
 ### Route guards (UX only)
 

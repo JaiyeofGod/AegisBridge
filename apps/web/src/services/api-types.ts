@@ -391,6 +391,16 @@ export type PolicyListItem = {
   updated_at: string | null;
 };
 
+export type PolicyMappedControl = {
+  id: string;
+  control_code: string;
+  title: string;
+  framework_code: string | null;
+  framework_version: string | null;
+  implementation_status: string | null;
+  licensed_text_included: boolean;
+};
+
 export type PolicyDetail = {
   id: string;
   title: string;
@@ -401,8 +411,21 @@ export type PolicyDetail = {
   acknowledgements: PolicyAcknowledgementSummary;
   created_at: string | null;
   updated_at: string | null;
-  control_mappings: string[];
+  control_mappings: PolicyMappedControl[];
   semantics: string;
+};
+
+export type PolicyControlLinkResult = {
+  policy_id: string;
+  control_id: string;
+  linked: boolean;
+};
+
+export type ControlMappedPolicy = {
+  id: string;
+  title: string;
+  status: string;
+  current_version: string | null;
 };
 
 export type PolicyCreate = {
@@ -510,6 +533,7 @@ export type ControlDetail = ControlListItem & {
   implementation: ControlImplementationDetail | null;
   tests: ControlTestItem[];
   evidence: ControlEvidenceItem[];
+  policies: ControlMappedPolicy[];
   licensed_text_included: boolean;
   updated_at: string | null;
 };

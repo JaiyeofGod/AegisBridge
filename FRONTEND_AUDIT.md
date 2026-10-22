@@ -1,6 +1,6 @@
 # Frontend audit
 
-Audit date: 22 Oct 2026 (updated after Policy Management UI). Scope is the implemented web client.
+Audit date: 22 Oct 2026 (updated after Policy ↔ Control mapping UI). Scope is the implemented web client.
 
 ## Auth / session / CSRF (current)
 
@@ -29,6 +29,7 @@ Audit date: 22 Oct 2026 (updated after Policy Management UI). Scope is the imple
 | Policy create / versions | `POST /api/v1/policies`, `POST`/`PATCH .../versions` when `policy.manage` (CSRF). Server assigns `POL-NNNN`; drafts editable; published/superseded read-only. |
 | Policy lifecycle | `POST .../transition` — `policy.manage` for draft/review moves; `policy.approve` for approve/publish/retire. Publish/retire require confirmation. No role-name inference. |
 | Policy acknowledgement | `POST .../acknowledge` for current user + current published version only (CSRF). Count shown; no fake completion %. |
+| Policy ↔ control mapping | `POST`/`DELETE .../policies/{id}/controls/{control_id}` when `policy.manage` (CSRF). Human ids; no body; unlink confirms relationship-only removal. |
 | Credentials | `credentials: "include"` on all API client fetches. CSRF token never in localStorage/sessionStorage. |
 | Route guards | `RequireAuth` / `GuestOnly` — **UX only**. Not the security boundary. |
 | Domain GET authz | Enforced on the backend. Frontend still uses server permission labels for UX. |
@@ -50,7 +51,7 @@ Development sign-in hint shows seeded email `amara.okonkwo@aegisbridge.example` 
 |---|---|
 | `/signin` | Guest-only. Real password login. Authenticated users redirect to `/overview`. |
 | `/overview` | Protected (UX). Renders from development API. |
-| `/governance` | Protected (UX). Control implementation/tests + evidence metadata/objects + Policies tab (lifecycle, versions, acknowledgement). |
+| `/governance` | Protected (UX). Control implementation/tests + evidence metadata/objects + Policies tab (lifecycle, versions, acknowledgement, control mappings). |
 | `/risks` | Protected (UX). Treatment editable with `risk.manage`; read-only with `risk.read`. |
 | `/assets` | Protected (UX). |
 | `/assets/FIN-APP-01` | Protected (UX). |
@@ -71,7 +72,7 @@ Unknown paths redirect to `/signin`. Auth status unknown shows a session loading
 ## Issues intentionally deferred
 
 - Incident task writes, integration credential writes, Cyber Range control, reports.
-- Policy rich-text editors, PDF/document generation, e-signature, email notifications, policy↔control linking, AI generation, attachments.
+- Policy rich-text editors, PDF/document generation, e-signature, email notifications, AI generation, attachments, policy↔risk/evidence mappings, bulk/drag-drop mapping.
 - Evidence malware scanning, independent integrity re-verification, public evidence URLs, browser-to-S3 uploads, R2 production cutover UI.
 - MFA enrollment, SSO/OIDC, password reset.
 - Profile/security field writes beyond preferences.

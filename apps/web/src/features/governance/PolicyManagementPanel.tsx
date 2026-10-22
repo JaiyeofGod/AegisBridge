@@ -8,6 +8,7 @@ import { LoadingState } from "@/components/feedback/LoadingState";
 import { StatusBadge } from "@/components/status/StatusBadge";
 import { useAuthActions } from "@/features/auth/useAuthSession";
 import { invalidateGovernanceWrites } from "@/features/governance/governance-mutations";
+import { PolicyControlMappingsPanel } from "@/features/governance/PolicyControlMappingsPanel";
 import {
   allowedPolicyTransitions,
   type PolicyTransitionOption,
@@ -37,6 +38,7 @@ type Props = {
   canRead: boolean;
   canManage: boolean;
   canApprove: boolean;
+  onOpenControl?: (controlId: string) => void;
 };
 
 function titleCaseStatus(status: string): string {
@@ -50,7 +52,7 @@ function statusTone(status: string): "neutral" | "warning" | "success" | "critic
   return "neutral";
 }
 
-export function PolicyManagementPanel({ canRead, canManage, canApprove }: Props) {
+export function PolicyManagementPanel({ canRead, canManage, canApprove, onOpenControl }: Props) {
   const queryClient = useQueryClient();
   const { handleAccountUnauthorized } = useAuthActions();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -541,6 +543,18 @@ export function PolicyManagementPanel({ canRead, canManage, canApprove }: Props)
                           : ""}
                       </p>
                     ) : null}
+                  </Panel>
+
+                  <Panel
+                    title="Mapped controls"
+                    description="Policy → Control → Test → Evidence. Relationship-only; no duplicated framework text."
+                  >
+                    <PolicyControlMappingsPanel
+                      policyId={detail.id}
+                      mappings={detail.control_mappings}
+                      canManage={canManage}
+                      onOpenControl={onOpenControl}
+                    />
                   </Panel>
 
                   <Panel

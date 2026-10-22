@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/buttons/Button";
 import { Panel } from "@/components/cards/Panel";
@@ -41,6 +41,7 @@ export function GovernancePage() {
   const canApprovePolicies = permissions.includes("policy.approve");
   const governance = useGovernanceSummary();
   const [section, setSection] = useState<GovernanceSectionId>("summary");
+  const [focusControlId, setFocusControlId] = useState<string | null>(null);
   const generatedAt = governance.dataUpdatedAt
     ? new Date(governance.dataUpdatedAt).toISOString()
     : new Date().toISOString();
@@ -112,6 +113,8 @@ export function GovernancePage() {
                 canReadEvidence={canReadEvidence}
                 canManageEvidence={canManageEvidence}
                 canLinkEvidence={canLinkEvidence}
+                initialControlId={focusControlId}
+                onControlFocused={() => setFocusControlId(null)}
               />
             ) : null}
             {section === "evidence" ? <EvidenceSection data={view} /> : null}
@@ -120,6 +123,10 @@ export function GovernancePage() {
                 canRead={canReadPolicies}
                 canManage={canManagePolicies}
                 canApprove={canApprovePolicies}
+                onOpenControl={(controlId) => {
+                  setFocusControlId(controlId);
+                  setSection("controls");
+                }}
               />
             ) : null}
             {section === "access-reviews" ? <AccessReviewsSection data={view} /> : null}
@@ -259,18 +266,32 @@ function ControlsSection({
   canReadEvidence,
   canManageEvidence,
   canLinkEvidence,
+  initialControlId,
+  onControlFocused,
 }: {
   data: GovernanceView;
   canManageControls: boolean;
   canReadEvidence: boolean;
   canManageEvidence: boolean;
   canLinkEvidence: boolean;
+  initialControlId?: string | null;
+  onControlFocused?: () => void;
 }) {
   const controls = useGovernanceControls();
   const items = controls.data?.items ?? [];
   const [selectedId, setSelectedId] = useState(items[0]?.id ?? "");
   const activeId = items.some((item) => item.id === selectedId) ? selectedId : (items[0]?.id ?? "");
   const detail = useGovernanceControl(activeId || null);
+
+  useEffect(() => {
+    if (!initialControlId) return;
+    const catalog = controls.data?.items ?? [];
+    if (!catalog.some((item) => item.id === initialControlId)) return;
+    setSelectedId(initialControlId);
+    onControlFocused?.();
+    // Clear focus once applied; parent callback identity is intentionally ignored.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- focus once per initialControlId
+  }, [initialControlId, controls.data?.items]);
 
   return (
     <div className="space-y-6">
@@ -395,6 +416,42 @@ function ControlsSection({
                         ? " (API unexpectedly marked licensed text present)."
                         : "."}
                     </p>
+                  </Panel>
+
+                  <Panel
+                    title="Mapped policies"
+                    description="Policies linked to this control. Relationship-only; no nested version bodies."
+                  >
+                    <div data-testid="control-mapped-policies">
+                      {(detail.data.policies ?? []).length === 0 ? (
+                        <p
+                          className="text-sm text-[var(--muted)]"
+                          data-testid="control-mapped-policies-empty"
+                        >
+                          No policies are mapped to this control.
+                        </p>
+                      ) : (
+                        <ul className="space-y-2" data-testid="control-mapped-policies-list">
+                          {detail.data.policies.map((policy) => (
+                            <li
+                              key={policy.id}
+                              className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--canvas)] px-3 py-2"
+                              data-testid={`control-mapped-policy-${policy.id}`}
+                            >
+                              <p className="text-sm font-medium text-[var(--text)]">
+                                {policy.id} · {policy.title}
+                              </p>
+                              <p className="mt-1 text-xs text-[var(--muted)]">
+                                {policy.status.replaceAll("_", " ")}
+                                {policy.current_version
+                                  ? ` · current ${policy.current_version}`
+                                  : ""}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </Panel>
 
                   <Panel
