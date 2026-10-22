@@ -454,8 +454,22 @@ export type EvidenceDetail = {
   updated_at: string | null;
   object_stored: boolean;
   integrity_verified: boolean;
+  original_filename: string | null;
+  stored_at: string | null;
+  storage_provider: string | null;
+  content_type: string | null;
+  hash_source: string | null;
   semantics: string;
 };
+
+export type EvidenceObjectDeleteResult = {
+  evidence_id: string;
+  object_stored: boolean;
+  deleted: boolean;
+};
+
+/** Development default matching API EVIDENCE_MAX_UPLOAD_BYTES (25 MiB). */
+export const EVIDENCE_MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 export type EvidenceCreate = {
   title: string;

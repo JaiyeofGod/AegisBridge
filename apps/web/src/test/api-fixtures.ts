@@ -49,7 +49,39 @@ export function jsonResponse(body: unknown, status = 200) {
     status,
     json: async () => (typeof body === "string" ? JSON.parse(body) : body),
     text: async () => payload,
-    headers: { get: () => "application/json" },
+    blob: async () => new Blob([payload], { type: "application/json" }),
+    headers: {
+      get: (name: string) => (name.toLowerCase() === "content-type" ? "application/json" : null),
+    },
+  };
+}
+
+export function blobResponse(
+  body: BlobPart,
+  options?: { status?: number; filename?: string; contentType?: string },
+) {
+  const status = options?.status ?? 200;
+  const contentType = options?.contentType ?? "application/octet-stream";
+  const blob = body instanceof Blob ? body : new Blob([body], { type: contentType });
+  const filename = options?.filename ?? "download.bin";
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => {
+      throw new Error("Not JSON");
+    },
+    text: async () => await blob.text(),
+    blob: async () => blob,
+    headers: {
+      get: (name: string) => {
+        const key = name.toLowerCase();
+        if (key === "content-type") return contentType;
+        if (key === "content-disposition") {
+          return `attachment; filename="${filename}"`;
+        }
+        return null;
+      },
+    },
   };
 }
 
@@ -622,8 +654,13 @@ const evidenceDetailSeed: EvidenceDetail = {
   updated_at: "2026-10-19T21:00:00+00:00",
   object_stored: false,
   integrity_verified: false,
+  original_filename: null,
+  stored_at: null,
+  storage_provider: null,
+  content_type: null,
+  hash_source: null,
   semantics:
-    "Metadata only. File bytes are not stored in the API. A SHA-256 value is caller-supplied metadata and is not verified against object storage.",
+    "Evidence metadata. File bytes are stored in private object storage when object_stored is true. A SHA-256 value calculated at ingestion is not an independent integrity re-verification. Malware scanning is not implemented in this phase.",
 };
 
 const internalSource = {
@@ -1953,6 +1990,7 @@ export function installApiFetch(
   const evidenceStore = new Map<string, EvidenceDetail>([
     ["EVID-0041", { ...evidenceDetailSeed, control_ids: [...evidenceDetailSeed.control_ids] }],
   ]);
+  const evidenceObjectBytes = new Map<string, Uint8Array>();
 
   function syncGovernanceWriteCounts() {
     controlListState = {
@@ -2394,6 +2432,156 @@ export function installApiFetch(
       return jsonResponse({ control_id: controlId, evidence_id: evidenceId, linked: false });
     }
 
+    if (/\/api\/v1\/evidence\/[^/?]+\/object/.test(url)) {
+      const id = decodeURIComponent(
+        url.split("/evidence/")[1]?.split("/object")[0]?.split("?")[0] ?? "",
+      );
+      const evidence = evidenceStore.get(id);
+      if (!evidence) {
+        return jsonResponse({ code: "not_found", message: "Evidence was not found." }, 404);
+      }
+
+      if (init?.method === "POST") {
+        const provided = headerValue(init, "X-CSRF-Token");
+        if (!provided) {
+          return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+        }
+        if (headerValue(init, "Content-Type")?.includes("multipart")) {
+          // Browser-set Content-Type is fine; fixtures only reject JSON uploads.
+        }
+        const form =
+          typeof FormData !== "undefined" && init.body instanceof FormData
+            ? init.body
+            : init.body &&
+                typeof init.body === "object" &&
+                "get" in init.body &&
+                typeof (init.body as FormData).get === "function"
+              ? (init.body as FormData)
+              : null;
+        if (!form) {
+          return jsonResponse(
+            { code: "validation_error", message: "Expected multipart form field file." },
+            422,
+          );
+        }
+        const entry = form.get("file");
+        if (typeof entry === "string" || entry == null) {
+          return jsonResponse(
+            { code: "validation_error", message: "Missing multipart file field." },
+            422,
+          );
+        }
+        if (evidence.object_stored) {
+          return jsonResponse(
+            {
+              code: "conflict",
+              message: "This evidence record already has a stored object.",
+            },
+            409,
+          );
+        }
+        const file = entry;
+        const size = file.size;
+        if (size > 25 * 1024 * 1024) {
+          return jsonResponse(
+            { code: "payload_too_large", message: "The file is too large for evidence storage." },
+            413,
+          );
+        }
+        const originalFilename = "name" in file && file.name ? file.name : "upload.bin";
+        // Avoid File.arrayBuffer()/text() under jsdom (can hang). Store a deterministic stand-in.
+        const bytes = new TextEncoder().encode(`fixture:${originalFilename}:${size}`);
+        evidenceObjectBytes.set(id, bytes);
+        const digestBuffer = await crypto.subtle.digest("SHA-256", bytes);
+        const sha256 = [...new Uint8Array(digestBuffer)]
+          .map((value) => value.toString(16).padStart(2, "0"))
+          .join("");
+        const updated: EvidenceDetail = {
+          ...evidence,
+          object_stored: true,
+          integrity_verified: false,
+          original_filename: originalFilename,
+          size_bytes: size,
+          mime_type: file.type || "application/octet-stream",
+          content_type: file.type || "application/octet-stream",
+          sha256,
+          stored_at: "2026-10-21T20:00:00+00:00",
+          storage_provider: "s3_compatible",
+          hash_source: "server_calculated_at_ingestion",
+          updated_at: "2026-10-21T20:00:00+00:00",
+          semantics: evidenceDetailSeed.semantics,
+        };
+        evidenceStore.set(id, updated);
+        if (controlDetailState.evidence.some((item) => item.id === id)) {
+          controlDetailState = {
+            ...controlDetailState,
+            evidence: controlDetailState.evidence.map((item) =>
+              item.id === id
+                ? {
+                    ...item,
+                    sha256: updated.sha256,
+                    title: updated.title,
+                  }
+                : item,
+            ),
+          };
+        }
+        syncGovernanceWriteCounts();
+        appendAdminAudit("evidence.object.upload", "evidence", id, "Private object stored.");
+        return jsonResponse(updated);
+      }
+
+      if (init?.method === "DELETE") {
+        const provided = headerValue(init, "X-CSRF-Token");
+        if (!provided) {
+          return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+        }
+        if (!evidence.object_stored) {
+          return jsonResponse(
+            { code: "not_found", message: "No stored object was found for this evidence." },
+            404,
+          );
+        }
+        evidenceObjectBytes.delete(id);
+        const updated: EvidenceDetail = {
+          ...evidence,
+          object_stored: false,
+          integrity_verified: false,
+          original_filename: null,
+          size_bytes: null,
+          mime_type: null,
+          content_type: null,
+          sha256:
+            evidence.sha256 && evidence.hash_source === "server_calculated_at_ingestion"
+              ? null
+              : evidence.sha256,
+          stored_at: null,
+          storage_provider: null,
+          hash_source: null,
+          updated_at: "2026-10-21T20:05:00+00:00",
+        };
+        evidenceStore.set(id, updated);
+        syncGovernanceWriteCounts();
+        appendAdminAudit("evidence.object.delete", "evidence", id, "Private object deleted.");
+        return jsonResponse({ evidence_id: id, object_stored: false, deleted: true });
+      }
+
+      // GET download
+      if (!evidence.object_stored || !evidenceObjectBytes.has(id)) {
+        return jsonResponse(
+          { code: "not_found", message: "No stored object was found for this evidence." },
+          404,
+        );
+      }
+      const bytes = evidenceObjectBytes.get(id)!;
+      const copy = new ArrayBuffer(bytes.byteLength);
+      new Uint8Array(copy).set(bytes);
+      return blobResponse(new Blob([copy]), {
+        filename: evidence.original_filename ?? `${id}.bin`,
+        contentType: evidence.content_type ?? "application/octet-stream",
+      });
+    }
+
     if (url.includes("/api/v1/evidence") && init?.method === "POST") {
       const provided = headerValue(init, "X-CSRF-Token");
       if (!provided) {
@@ -2430,6 +2618,11 @@ export function installApiFetch(
         updated_at: "2026-10-21T19:15:00+00:00",
         object_stored: false,
         integrity_verified: false,
+        original_filename: null,
+        stored_at: null,
+        storage_provider: null,
+        content_type: null,
+        hash_source: null,
         semantics: evidenceDetailSeed.semantics,
       };
       evidenceStore.set(id, created);

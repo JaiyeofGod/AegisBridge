@@ -146,17 +146,16 @@ describe("Governance write integration", () => {
     expect(page.textContent).not.toMatch(/automated validation succeeded/i);
   });
 
-  it("creates evidence metadata without file upload and links it", async () => {
+  it("creates evidence metadata then offers private file upload and links it", async () => {
     setCsrfToken("gov-csrf");
     const { calls, inits } = installApiFetch();
     const user = userEvent.setup();
     const page = await openControls(user);
 
-    expect(within(page).getByTestId("evidence-metadata-only-copy")).toHaveTextContent(
-      /No file has been uploaded or stored/i,
+    expect(within(page).getByTestId("evidence-workflow-copy")).toHaveTextContent(
+      /private file upload through AegisBridge/i,
     );
     expect(screen.queryByTestId("evidence-file-upload")).not.toBeInTheDocument();
-    expect(within(page).queryByLabelText(/file/i)).not.toBeInTheDocument();
 
     await user.type(screen.getByTestId("evidence-title"), "Manual export note");
     await user.type(screen.getByTestId("evidence-sha256"), "b".repeat(64));
@@ -167,6 +166,7 @@ describe("Governance write integration", () => {
     expect(screen.getByTestId("evidence-created-summary")).toHaveTextContent(
       "integrity_verified=false",
     );
+    expect(screen.getByTestId("evidence-file-upload")).toBeInTheDocument();
 
     const createIndex = calls.findIndex(
       (url, index) => url.endsWith("/api/v1/evidence") && inits[index]?.method === "POST",

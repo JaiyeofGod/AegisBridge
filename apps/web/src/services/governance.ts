@@ -1,4 +1,11 @@
-import { apiDelete, apiGet, apiPatch, apiPostCsrf } from "@/services/api-client";
+import {
+  apiDelete,
+  apiGet,
+  apiGetBlob,
+  apiPatch,
+  apiPostCsrf,
+  apiPostMultipart,
+} from "@/services/api-client";
 import type {
   ControlDetail,
   ControlEvidenceLinkResult,
@@ -9,6 +16,7 @@ import type {
   ControlTestUpdate,
   EvidenceCreate,
   EvidenceDetail,
+  EvidenceObjectDeleteResult,
   GovernanceSummary,
   PageResponse,
 } from "@/services/api-types";
@@ -68,4 +76,41 @@ export function unlinkControlEvidence(controlId: string, evidenceId: string) {
   return apiDelete<ControlEvidenceLinkResult>(
     `/api/v1/governance/controls/${encodeURIComponent(controlId)}/evidence/${encodeURIComponent(evidenceId)}`,
   );
+}
+
+export function uploadEvidenceObject(evidenceId: string, file: File) {
+  const formData = new FormData();
+  formData.append("file", file, file.name);
+  return apiPostMultipart<EvidenceDetail>(
+    `/api/v1/evidence/${encodeURIComponent(evidenceId)}/object`,
+    formData,
+  );
+}
+
+export function deleteEvidenceObject(evidenceId: string) {
+  return apiDelete<EvidenceObjectDeleteResult>(
+    `/api/v1/evidence/${encodeURIComponent(evidenceId)}/object`,
+  );
+}
+
+export async function downloadEvidenceObject(evidenceId: string): Promise<void> {
+  const { blob, filename } = await apiGetBlob(
+    `/api/v1/evidence/${encodeURIComponent(evidenceId)}/object`,
+  );
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filename || `${evidenceId}.bin`;
+    anchor.rel = "noopener";
+    // Prevent jsdom from attempting real navigation on click.
+    anchor.addEventListener("click", (event) => {
+      event.preventDefault();
+    });
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }

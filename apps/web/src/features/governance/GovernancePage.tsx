@@ -32,6 +32,7 @@ export function GovernancePage() {
   const auth = useAuthStatus();
   const permissions = auth.user?.permissions ?? [];
   const canManageControls = permissions.includes("control.manage");
+  const canReadEvidence = permissions.includes("evidence.read");
   const canManageEvidence = permissions.includes("evidence.manage");
   const canLinkEvidence = canManageControls && canManageEvidence;
   const governance = useGovernanceSummary();
@@ -104,6 +105,7 @@ export function GovernancePage() {
               <ControlsSection
                 data={view}
                 canManageControls={canManageControls}
+                canReadEvidence={canReadEvidence}
                 canManageEvidence={canManageEvidence}
                 canLinkEvidence={canLinkEvidence}
               />
@@ -244,11 +246,13 @@ function FrameworksSection({ data }: { data: GovernanceView }) {
 function ControlsSection({
   data,
   canManageControls,
+  canReadEvidence,
   canManageEvidence,
   canLinkEvidence,
 }: {
   data: GovernanceView;
   canManageControls: boolean;
+  canReadEvidence: boolean;
   canManageEvidence: boolean;
   canLinkEvidence: boolean;
 }) {
@@ -404,11 +408,12 @@ function ControlsSection({
 
                   <Panel
                     title="Evidence"
-                    description="Metadata records and control associations. Binary upload is not available."
+                    description="Metadata, private file upload through the API, and control associations."
                   >
                     <ControlEvidencePanel
                       controlId={detail.data.id}
                       evidence={detail.data.evidence}
+                      canReadEvidence={canReadEvidence}
                       canManageEvidence={canManageEvidence}
                       canLink={canLinkEvidence}
                     />

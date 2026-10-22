@@ -163,4 +163,65 @@ export async function apiDelete<T>(path: string, body?: unknown): Promise<T> {
   return apiMutate<T>("DELETE", path, body);
 }
 
+/**
+ * Authenticated multipart POST. Does not set Content-Type so the browser can
+ * supply the multipart boundary. CSRF refresh/retry matches apiMutate.
+ */
+export async function apiPostMultipart<T>(path: string, formData: FormData): Promise<T> {
+  async function send(retried: boolean): Promise<T> {
+    const token = await ensureCsrfToken();
+    const headers = new Headers({ Accept: "application/json" });
+    headers.set(getCsrfHeaderName(), token);
+    const response = await fetch(
+      `${API_BASE}${path}`,
+      requestInit({
+        method: "POST",
+        headers,
+        body: formData,
+      }),
+    );
+    if (response.ok) {
+      return parseSuccessBody<T>(response);
+    }
+    const error = await parseError(response, path);
+    if (!retried && error.status === 403 && error.code === "csrf_failed") {
+      clearCsrfToken();
+      await refreshCsrfToken();
+      return send(true);
+    }
+    throw error;
+  }
+  return send(false);
+}
+
+/** Authenticated binary GET for private evidence downloads. */
+export async function apiGetBlob(path: string): Promise<{ blob: Blob; filename: string | null }> {
+  const response = await fetch(
+    `${API_BASE}${path}`,
+    requestInit({
+      method: "GET",
+      headers: new Headers({ Accept: "*/*" }),
+    }),
+  );
+  if (!response.ok) {
+    throw await parseError(response, path);
+  }
+  const disposition = response.headers.get("Content-Disposition");
+  let filename: string | null = null;
+  if (disposition) {
+    const utfMatch = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+    const plainMatch = /filename="([^"]+)"/i.exec(disposition);
+    if (utfMatch?.[1]) {
+      try {
+        filename = decodeURIComponent(utfMatch[1]);
+      } catch {
+        filename = utfMatch[1];
+      }
+    } else if (plainMatch?.[1]) {
+      filename = plainMatch[1];
+    }
+  }
+  return { blob: await response.blob(), filename };
+}
+
 export { clearCsrfToken, getCsrfToken, setCsrfToken };

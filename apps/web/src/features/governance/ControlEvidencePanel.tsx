@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/buttons/Button";
 import { useAuthActions } from "@/features/auth/useAuthSession";
+import { EvidenceObjectPanel } from "@/features/governance/EvidenceObjectPanel";
 import { invalidateGovernanceWrites } from "@/features/governance/governance-mutations";
 import { formatTimestamp } from "@/lib/format";
 import { ApiError } from "@/services/api-client";
@@ -26,11 +27,18 @@ const SHA256_PATTERN = /^[0-9a-fA-F]{64}$/;
 type Props = {
   controlId: string;
   evidence: ControlEvidenceItem[];
+  canReadEvidence: boolean;
   canManageEvidence: boolean;
   canLink: boolean;
 };
 
-export function ControlEvidencePanel({ controlId, evidence, canManageEvidence, canLink }: Props) {
+export function ControlEvidencePanel({
+  controlId,
+  evidence,
+  canReadEvidence,
+  canManageEvidence,
+  canLink,
+}: Props) {
   const queryClient = useQueryClient();
   const { handleAccountUnauthorized } = useAuthActions();
   const [title, setTitle] = useState("");
@@ -39,12 +47,14 @@ export function ControlEvidencePanel({ controlId, evidence, canManageEvidence, c
   const [classification, setClassification] = useState<EvidenceClassificationValue>("simulated");
   const [linkEvidenceId, setLinkEvidenceId] = useState("");
   const [created, setCreated] = useState<EvidenceDetail | null>(null);
+  const [expandedObjectId, setExpandedObjectId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingUnlinkId, setPendingUnlinkId] = useState<string | null>(null);
 
   useEffect(() => {
     setCreated(null);
+    setExpandedObjectId(null);
     setSuccessMessage(null);
     setErrorMessage(null);
     setPendingUnlinkId(null);
@@ -77,7 +87,10 @@ export function ControlEvidencePanel({ controlId, evidence, canManageEvidence, c
     },
     onSuccess: async (detail) => {
       setCreated(detail);
-      setSuccessMessage(`Evidence metadata ${detail.id} created. No file was uploaded.`);
+      setExpandedObjectId(detail.id);
+      setSuccessMessage(
+        `Evidence metadata ${detail.id} created. Upload a private file below when ready.`,
+      );
       setErrorMessage(null);
       setTitle("");
       setDescription("");
@@ -115,6 +128,7 @@ export function ControlEvidencePanel({ controlId, evidence, canManageEvidence, c
           : `Evidence ${result.evidence_id} is already linked.`,
       );
       setErrorMessage(null);
+      setExpandedObjectId(result.evidence_id);
       await invalidateGovernanceWrites(queryClient, {
         controlId,
         evidenceId: result.evidence_id,
@@ -181,9 +195,14 @@ export function ControlEvidencePanel({ controlId, evidence, canManageEvidence, c
 
   return (
     <div className="space-y-4" data-testid="control-evidence-panel">
-      <p className="text-sm text-[var(--muted)]" data-testid="evidence-metadata-only-copy">
-        Evidence metadata only. No file has been uploaded or stored. A SHA-256 value is
-        caller-supplied metadata and is not verified integrity.
+      <p className="text-sm text-[var(--muted)]" data-testid="evidence-workflow-copy">
+        Workflow: metadata → private file upload through AegisBridge → server SHA-256 → authorized
+        download → optional object delete → control link. Caller-supplied SHA-256 on metadata is not
+        verified integrity.
+      </p>
+      <p className="text-xs text-[var(--muted)]" data-testid="evidence-malware-note">
+        Files are stored as opaque evidence objects. Malware scanning is not enabled in this
+        development phase.
       </p>
 
       <ul className="space-y-2" data-testid="control-evidence-list">
@@ -208,45 +227,71 @@ export function ControlEvidencePanel({ controlId, evidence, canManageEvidence, c
                     {item.sha256 ? ` · SHA-256 present` : " · no SHA-256"}
                   </p>
                 </div>
-                {canLink ? (
-                  pendingUnlinkId === item.id ? (
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        data-testid={`control-evidence-unlink-confirm-${item.id}`}
-                        disabled={unlink.isPending}
-                        onClick={() => unlink.mutate(item.id)}
-                      >
-                        Confirm unlink
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => setPendingUnlinkId(null)}
-                      >
-                        Cancel
-                      </Button>
-                      <p className="w-full text-xs text-[var(--muted)]">
-                        Removes the association only. Does not delete the evidence record or any
-                        storage object.
-                      </p>
-                    </div>
-                  ) : (
+                <div className="flex flex-wrap gap-2">
+                  {canReadEvidence || canManageEvidence ? (
                     <Button
                       type="button"
                       variant="secondary"
-                      data-testid={`control-evidence-unlink-${item.id}`}
+                      data-testid={`control-evidence-manage-file-${item.id}`}
                       onClick={() => {
-                        setPendingUnlinkId(item.id);
+                        setExpandedObjectId((current) => (current === item.id ? null : item.id));
                         setSuccessMessage(null);
                         setErrorMessage(null);
                       }}
                     >
-                      Unlink
+                      {expandedObjectId === item.id ? "Hide stored file" : "Manage stored file"}
                     </Button>
-                  )
-                ) : null}
+                  ) : null}
+                  {canLink ? (
+                    pendingUnlinkId === item.id ? (
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          data-testid={`control-evidence-unlink-confirm-${item.id}`}
+                          disabled={unlink.isPending}
+                          onClick={() => unlink.mutate(item.id)}
+                        >
+                          Confirm unlink
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => setPendingUnlinkId(null)}
+                        >
+                          Cancel
+                        </Button>
+                        <p className="w-full text-xs text-[var(--muted)]">
+                          Removes the association only. Does not delete the evidence record or any
+                          storage object.
+                        </p>
+                      </div>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        data-testid={`control-evidence-unlink-${item.id}`}
+                        onClick={() => {
+                          setPendingUnlinkId(item.id);
+                          setSuccessMessage(null);
+                          setErrorMessage(null);
+                        }}
+                      >
+                        Unlink
+                      </Button>
+                    )
+                  ) : null}
+                </div>
               </div>
+              {expandedObjectId === item.id ? (
+                <div className="mt-3">
+                  <EvidenceObjectPanel
+                    evidenceId={item.id}
+                    controlId={controlId}
+                    canReadEvidence={canReadEvidence}
+                    canManageEvidence={canManageEvidence}
+                  />
+                </div>
+              ) : null}
             </li>
           ))
         )}
@@ -261,8 +306,8 @@ export function ControlEvidencePanel({ controlId, evidence, canManageEvidence, c
             Create evidence metadata
           </h4>
           <p className="text-xs text-[var(--muted)]">
-            No file upload control is available. Object URIs and storage credentials are not
-            accepted.
+            Create metadata first, then upload one private file through the authenticated API.
+            Object URIs, bucket names, and storage credentials are not accepted.
           </p>
           <label className="block text-xs text-[var(--muted)]">
             Title
@@ -335,7 +380,7 @@ export function ControlEvidencePanel({ controlId, evidence, canManageEvidence, c
 
       {created ? (
         <div
-          className="space-y-2 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] p-4"
+          className="space-y-3 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] p-4"
           data-testid="evidence-created-summary"
         >
           <p className="text-sm text-[var(--text)]">
@@ -343,6 +388,16 @@ export function ControlEvidencePanel({ controlId, evidence, canManageEvidence, c
             {String(created.integrity_verified)}.
           </p>
           <p className="text-xs text-[var(--muted)]">{created.semantics}</p>
+          {!evidence.some((item) => item.id === created.id) ? (
+            <EvidenceObjectPanel
+              evidenceId={created.id}
+              controlId={controlId}
+              canReadEvidence={canReadEvidence}
+              canManageEvidence={canManageEvidence}
+              seed={created}
+              onDetailChange={setCreated}
+            />
+          ) : null}
           {canLink ? (
             <Button
               type="button"
