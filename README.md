@@ -28,7 +28,7 @@ Lenovo (later)
 - **Mac** is the primary coding workstation.
 - During early development, **React** and **FastAPI** run **on the Mac host** for hot reload.
 - **PostgreSQL**, **Redis/Valkey**, and **SeaweedFS** (`weed mini` S3 mode) run through **Docker Compose** (`compose.yaml`).
-- Production object storage remains **Cloudflare R2**. The API must use an **S3-compatible** storage abstraction (not SeaweedFS-specific APIs).
+- Production object storage remains **Cloudflare R2**. The API uses an **S3-compatible** storage abstraction (`apps/api/app/storage`) for private evidence objects (not SeaweedFS-specific APIs).
 - Apps stay container-ready for later full Docker / Render deployment.
 - The **Lenovo** hosts the heavier cyber range later; it is not required for Phase 1 bootstrap.
 

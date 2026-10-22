@@ -70,6 +70,8 @@ Optional later: `aegis-public-reports`
 
 Local: `aegis-dev-evidence` on SeaweedFS S3 (`127.0.0.1:8333`)
 
+The API uses an S3-compatible storage abstraction (`app/storage`). Switching hosted environments to Cloudflare R2 is a configuration change (`S3_ENDPOINT_URL`, credentials, bucket, `OBJECT_STORAGE_PROVIDER`), not a domain rewrite. Evidence objects are private; downloads are authorized API streams. Object-storage outage must not take down read-only platform readiness.
+
 ---
 
 ## 5. Local Development Topology (Approved)

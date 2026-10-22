@@ -22,11 +22,15 @@ def test_health_ready(client: TestClient) -> None:
     assert isinstance(payload["checks"], list)
     names = {item["name"] for item in payload["checks"]}
     assert "postgresql" in names
+    assert "object_storage" in names
     postgres = next(item for item in payload["checks"] if item["name"] == "postgresql")
     assert postgres["status"] == "ok"
     assert postgres["required"] is True
+    object_storage = next(item for item in payload["checks"] if item["name"] == "object_storage")
+    assert object_storage["required"] is False
     assert "database_url" not in response.text
     assert "postgresql+psycopg" not in response.text
+    assert "AWS_SECRET" not in response.text
 
 
 def test_health_aggregate(client: TestClient) -> None:

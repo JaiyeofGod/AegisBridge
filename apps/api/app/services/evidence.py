@@ -1,4 +1,4 @@
-"""Evidence metadata creation and control linking. No file upload in this slice."""
+"""Evidence metadata creation and control linking."""
 
 from __future__ import annotations
 
@@ -14,12 +14,12 @@ from app.models.identity import User
 from app.schemas.evidence import ControlEvidenceLinkResult, EvidenceCreate, EvidenceDetail
 from app.security.rbac import AuthenticatedPrincipal
 from app.services.audit_write import record_audit_event
-from app.services.support import next_human_id, normalize_sha256, person
+from app.services.evidence_objects import get_evidence_detail
+from app.services.support import next_human_id, normalize_sha256
 
 
 def get_evidence(session: Session, evidence_id: str) -> EvidenceDetail:
-    evidence = _load_evidence(session, evidence_id, for_update=False)
-    return _detail(evidence)
+    return get_evidence_detail(session, evidence_id)
 
 
 def create_evidence(
@@ -180,6 +180,7 @@ def _load_evidence(session: Session, evidence_id: str, *, for_update: bool) -> E
         .options(
             selectinload(Evidence.collected_by),
             selectinload(Evidence.control_links).selectinload(EvidenceControlLink.control),
+            selectinload(Evidence.stored_object),
         )
     )
     if for_update:
@@ -188,27 +189,6 @@ def _load_evidence(session: Session, evidence_id: str, *, for_update: bool) -> E
     if evidence is None:
         raise not_found("Evidence", evidence_id)
     return evidence
-
-
-def _detail(evidence: Evidence) -> EvidenceDetail:
-    return EvidenceDetail(
-        id=evidence.human_id,
-        title=evidence.title,
-        description=evidence.description,
-        version_label=evidence.version_label,
-        sha256=evidence.sha256,
-        size_bytes=evidence.size_bytes,
-        mime_type=evidence.mime_type,
-        data_classification=evidence.data_classification,
-        collected_at=evidence.collected_at,
-        collected_by=person(evidence.collected_by),
-        control_ids=sorted(
-            link.control.human_id for link in evidence.control_links if link.control is not None
-        ),
-        updated_at=evidence.updated_at,
-        object_stored=False,
-        integrity_verified=False,
-    )
 
 
 def _resolve_user_id(session: Session, human_id: str):

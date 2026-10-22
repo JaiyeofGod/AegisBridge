@@ -1,8 +1,8 @@
 # AegisBridge Project Status
 
 **Last updated:** October 21, 2026  
-**Current phase:** Phase 2 — auth + domain GET RBAC + CSRF-protected writes (API + frontend for preferences, risk, incidents, vulnerabilities, administration, governance control implementation/tests, evidence metadata + control linking)  
-**Next:** Remaining mutations (integrations, reports, incident tasks, binary evidence upload). MFA, SSO, password reset, rate limiting, and Cyber Range control remain out of scope.
+**Current phase:** Phase 2 — auth + domain GET RBAC + CSRF-protected writes, including private evidence object upload/download via S3-compatible storage (SeaweedFS local / R2 target)  
+**Next:** Evidence upload frontend UI; remaining mutations (integrations, reports, incident tasks). MFA, SSO, password reset, rate limiting, and Cyber Range control remain out of scope.
 
 ---
 
@@ -15,11 +15,12 @@
 | Phase 1 plan | Present (`PHASE_1_IMPLEMENTATION_PLAN.md` v1.1) — corrected routes/tooling |
 | Minimal Phase 0 docs | Complete |
 | Application code | API domain schema + web UI on local mocks |
-| Domain schema | Through `20261020_0008` (`control_tests.human_id`) |
-| Read API | `/api/v1` through reports, datasets, experiments, cyber-range, governance controls, evidence detail |
+| Domain schema | Through `20261020_0009` (`evidence_objects`) |
+| Read API | `/api/v1` through reports, datasets, experiments, cyber-range, governance controls, evidence detail + private object download |
 | Authentication | Sessions + CSRF synchronizer tokens; domain GET RBAC enforced |
-| Write API | Preferences, risk treatment, incident, vulnerability remediation, administration, control implementation/tests, evidence metadata + control link/unlink; binary upload and integration/report/cyber-range writes deferred |
-| Frontend API connection | Reads + CSRF client + preferences, risk, incident, vulnerability remediation, administration, and governance/evidence (implementation, tests, metadata, link/unlink) writes; binary upload and integration/report/cyber-range writes still disabled |
+| Write API | Preferences, risk, incident, vulnerability, administration, governance, evidence metadata/link, and private evidence object upload/delete; integration/report/cyber-range writes deferred |
+| Frontend API connection | Reads + CSRF client + preferences, risk, incident, vulnerability, administration, governance/evidence metadata writes; evidence file upload UI and integration/report/cyber-range writes still disabled |
+| Object storage | S3-compatible abstraction; SeaweedFS locally; Cloudflare R2 for hosted; optional health check |
 | Package installs | API via uv; web via pnpm (`apps/web`) |
 | Cyber range | Not started |
 | Hosting | Not started |

@@ -28,7 +28,7 @@ from app.models.detection import (
     DetectionVersion,
     ValidationRun,
 )
-from app.models.evidence import Evidence, EvidenceControlLink, EvidenceRiskLink
+from app.models.evidence import Evidence, EvidenceControlLink, EvidenceObject, EvidenceRiskLink
 from app.models.grc import (
     Control,
     ControlImplementation,
@@ -106,6 +106,7 @@ __all__ = [
     "EpssSnapshot",
     "Evidence",
     "EvidenceControlLink",
+    "EvidenceObject",
     "EvidenceRiskLink",
     "Framework",
     "FrameworkVersion",

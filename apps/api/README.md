@@ -1,6 +1,6 @@
 # AegisBridge API (`apps/api`)
 
-FastAPI service with Phase 2 domain models, session authentication, enforced RBAC on domain reads, synchronizer CSRF, and authenticated writes for account preferences, risk treatment, incidents, vulnerability remediation, administration (access reviews, user status, role assignment), governance control implementation/tests, and evidence metadata plus control linking. File upload / object storage for evidence is not implemented. Frontend guards are UX only. Integration/report/cyber-range writes, SSO/MFA, and rate limiting remain deferred.
+FastAPI service with Phase 2 domain models, session authentication, enforced RBAC on domain reads, synchronizer CSRF, and authenticated writes for account preferences, risk treatment, incidents, vulnerability remediation, administration, governance, evidence metadata/linking, and **private evidence object upload/download** via an S3-compatible storage abstraction (SeaweedFS locally / Cloudflare R2 hosted). Frontend guards are UX only. Evidence file-upload UI, integration/report/cyber-range writes, SSO/MFA, and rate limiting remain deferred.
 
 ## Commands
 
@@ -29,7 +29,16 @@ uv run --project apps/api python -m app.db.seed
 uv run --project apps/api python -m app.db.seed --reset
 ```
 
-The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. Threat-intelligence tables and `integrations.human_id` are `20261020_0003`. Report definitions and dataset registry metadata are `20261020_0004`. Cyber-range catalog tables and detection metadata columns are `20261020_0005`. Local credentials and sessions are `20261020_0006`. CSRF digests and `user_preferences` are `20261020_0007`. Control-test public ids (`control_tests.human_id`) are `20261020_0008`. Seed data is not in the migration. Re-running the seed ensures contract rows when the organization already exists.
+The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. Threat-intelligence tables and `integrations.human_id` are `20261020_0003`. Report definitions and dataset registry metadata are `20261020_0004`. Cyber-range catalog tables and detection metadata columns are `20261020_0005`. Local credentials and sessions are `20261020_0006`. CSRF digests and `user_preferences` are `20261020_0007`. Control-test public ids (`control_tests.human_id`) are `20261020_0008`. Evidence object metadata (`evidence_objects`) is `20261020_0009`. Seed data is not in the migration. Re-running the seed ensures contract rows when the organization already exists.
+
+### Evidence object storage
+
+- Bytes live outside PostgreSQL (SeaweedFS S3 locally; R2 in hosted envs).
+- `POST /api/v1/evidence/{id}/object` (multipart `file`, `evidence.manage` + CSRF): one object per evidence; server-side SHA-256; max size `EVIDENCE_MAX_UPLOAD_BYTES` (default 25 MiB).
+- `GET /api/v1/evidence/{id}/object` (`evidence.read`): authenticated private stream; no public URLs.
+- `DELETE /api/v1/evidence/{id}/object` (`evidence.manage` + CSRF): removes object bytes; keeps evidence metadata.
+- Malware scanning is not implemented. `integrity_verified` stays false (ingestion hash ≠ independent verification).
+- Object storage is an optional health check; platform readiness does not require SeaweedFS.
 
 ## Authentication (local)
 
@@ -79,7 +88,8 @@ Requires the domain migration, development seed, and a valid session cookie. Con
 - `GET /api/v1/governance/*` — `control.read`
 - `PATCH /api/v1/governance/controls/{id}/implementation`, `POST .../tests`, `PATCH .../control-tests/{id}` — `control.manage` + CSRF
 - `POST|DELETE /api/v1/governance/controls/{id}/evidence/{evidence_id}` — `control.manage` + `evidence.manage` + CSRF
-- `GET /api/v1/evidence/{id}` — `evidence.read`; `POST /api/v1/evidence` — `evidence.manage` + CSRF (metadata only)
+- `GET /api/v1/evidence/{id}` — `evidence.read`; `POST /api/v1/evidence` — `evidence.manage` + CSRF (metadata)
+- `POST|GET|DELETE /api/v1/evidence/{id}/object` — upload/download/delete private object (`evidence.manage` for mutations + CSRF; `evidence.read` for download)
 - `GET /api/v1/threat-intelligence/*` — `threat_intel.read`
 - `GET /api/v1/administration/*` — `administration.read` (+ `audit.read` / `integration.read` where documented)
 - `GET /api/v1/reports/*` — `report.read`

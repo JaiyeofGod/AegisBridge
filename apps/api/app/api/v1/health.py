@@ -11,6 +11,7 @@ from app.schemas.health import (
     LiveHealthResponse,
     ReadyHealthResponse,
 )
+from app.storage.factory import check_object_storage_ready
 
 router = APIRouter(prefix="/health", tags=["health"])
 
@@ -18,6 +19,7 @@ router = APIRouter(prefix="/health", tags=["health"])
 def _run_readiness_checks() -> list[ComponentStatus]:
     database_ok = check_database_ready()
     redis_ok = check_redis_ready()
+    object_storage_ok = check_object_storage_ready()
     return [
         ComponentStatus(
             name="postgresql",
@@ -27,6 +29,11 @@ def _run_readiness_checks() -> list[ComponentStatus]:
         ComponentStatus(
             name="redis",
             status="ok" if redis_ok else "unavailable",
+            required=False,
+        ),
+        ComponentStatus(
+            name="object_storage",
+            status="ok" if object_storage_ok else "unavailable",
             required=False,
         ),
     ]

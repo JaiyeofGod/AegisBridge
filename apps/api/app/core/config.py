@@ -51,6 +51,18 @@ class Settings(BaseSettings):
         alias="AEGIS_DEV_ADMIN_PASSWORD",
     )
 
+    # Private S3-compatible object storage (SeaweedFS local / Cloudflare R2 hosted).
+    s3_endpoint_url: str | None = Field(default="http://localhost:8333", alias="S3_ENDPOINT_URL")
+    aws_access_key_id: str | None = Field(default=None, alias="AWS_ACCESS_KEY_ID")
+    aws_secret_access_key: str | None = Field(default=None, alias="AWS_SECRET_ACCESS_KEY")
+    s3_bucket: str = Field(default="aegis-dev-evidence", alias="S3_BUCKET")
+    s3_region: str = Field(default="us-east-1", alias="S3_REGION")
+    object_storage_provider: str = Field(default="seaweedfs", alias="OBJECT_STORAGE_PROVIDER")
+    evidence_max_upload_bytes: int = Field(
+        default=25 * 1024 * 1024,
+        alias="EVIDENCE_MAX_UPLOAD_BYTES",
+    )
+
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 

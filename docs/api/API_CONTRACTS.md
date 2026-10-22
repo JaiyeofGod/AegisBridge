@@ -63,8 +63,11 @@ All domain rows require a valid session (`401` otherwise) and the permission lis
 | PATCH | `/governance/control-tests/{test_id}` | Update a manual control test; `control.manage` + CSRF |
 | POST | `/governance/controls/{control_id}/evidence/{evidence_id}` | Link evidence metadata to a control; `control.manage` + `evidence.manage` + CSRF |
 | DELETE | `/governance/controls/{control_id}/evidence/{evidence_id}` | Unlink evidence from a control; same permissions + CSRF |
-| GET | `/evidence/{evidence_id}` | Evidence metadata only (`evidence.read`); no object URI or file bytes |
-| POST | `/evidence` | Create evidence metadata only (`evidence.manage` + CSRF); no upload |
+| GET | `/evidence/{evidence_id}` | Evidence metadata (`evidence.read`); no object URI/key or credentials |
+| POST | `/evidence` | Create evidence metadata (`evidence.manage` + CSRF) |
+| POST | `/evidence/{evidence_id}/object` | Multipart upload (`file`) to private object storage (`evidence.manage` + CSRF); one object per evidence |
+| GET | `/evidence/{evidence_id}/object` | Authenticated private download stream (`evidence.read`); no CSRF |
+| DELETE | `/evidence/{evidence_id}/object` | Delete stored object bytes; keep evidence metadata (`evidence.manage` + CSRF) |
 | GET | `/threat-intelligence/summary` | Stored indicator, match, advisory, and source-status counts |
 | GET | `/threat-intelligence/indicators` | Filters: `search`, `indicator_type`, `source`, `status`, `internal_match` |
 | GET | `/threat-intelligence/indicators/{indicator_id}` | Simulated indicator, source, and stored ATT&CK link |
@@ -121,8 +124,8 @@ Validation uses the same shape with `code` `validation_error` and `details` entr
 - `cvss_severity` is a label for the CVSS base score only. There is no combined vulnerability score.
 - KEV exposure counts internet-exposed assets that have a KEV row. It does not add CVSS or EPSS.
 - Alert rows set `stored_scope` to `selected_metadata` and `source_of_record` to `wazuh`. Raw events are not stored or returned.
-- Evidence responses include SHA-256 metadata and omit object-storage URIs and file bytes. `object_stored` and `integrity_verified` are always false in this slice; a caller-supplied SHA-256 is not verification.
-- Evidence create accepts optional SHA-256 (exactly 64 hex, stored lowercase). File upload, base64 bodies, and fabricated object URIs are rejected or never generated.
+- Evidence responses include SHA-256 metadata and omit object-storage URIs, object keys, and credentials. After a successful object upload, `object_stored` is true and `hash_source` is `server_calculated_at_ingestion`. `integrity_verified` remains false (ingestion hash ≠ independent re-verification). Malware scanning is not implemented.
+- Evidence metadata create accepts optional caller-supplied SHA-256 (exactly 64 hex). Object upload calculates SHA-256 from stored bytes. Public object URLs are never issued.
 - Governance sets `licensed_text_included` to false. Control codes and stored titles are returned. CIS licensed text is not.
 - Control tests are manually recorded development data (`recording_mode: manual`). Notes include `[manual development recording]`. They are not automated assessments.
 - Governance summary counts (implementation by status, `tests_recorded`, evidence freshness) are derived from stored rows after writes.

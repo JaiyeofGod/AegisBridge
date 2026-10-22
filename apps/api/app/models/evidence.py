@@ -14,6 +14,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -54,6 +55,39 @@ class Evidence(UUIDMixin, TimestampMixin, Base):
     collected_by: Mapped[User | None] = relationship()
     control_links: Mapped[list[EvidenceControlLink]] = relationship(back_populates="evidence")
     risk_links: Mapped[list[EvidenceRiskLink]] = relationship(back_populates="evidence")
+    stored_object: Mapped[EvidenceObject | None] = relationship(
+        back_populates="evidence",
+        uselist=False,
+    )
+
+
+class EvidenceObject(UUIDMixin, TimestampMixin, Base):
+    """Private object-storage metadata for one evidence file. Bytes stay outside PostgreSQL."""
+
+    __tablename__ = "evidence_objects"
+    __table_args__ = (
+        CheckConstraint(
+            "sha256 ~ '^[0-9a-f]{64}$'",
+            name="evidence_object_sha256_hex",
+        ),
+        UniqueConstraint("evidence_id", name="uq_evidence_objects_evidence_id"),
+    )
+
+    evidence_id: Mapped[UUID] = mapped_column(ForeignKey("evidence.id"), nullable=False, index=True)
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    bucket: Mapped[str] = mapped_column(String(200), nullable=False)
+    object_key: Mapped[str] = mapped_column(String(500), nullable=False)
+    original_filename: Mapped[str] = mapped_column(String(200), nullable=False)
+    content_type: Mapped[str | None] = mapped_column(String(120))
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    stored_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=text("now()"),
+        nullable=False,
+    )
+
+    evidence: Mapped[Evidence] = relationship(back_populates="stored_object")
 
 
 class EvidenceControlLink(UUIDMixin, TimestampMixin, Base):

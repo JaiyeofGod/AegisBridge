@@ -69,7 +69,10 @@ Session cookies remain HttpOnly. CSRF uses a **synchronizer token** bound to the
 | PATCH | `/governance/controls/{control_id}/implementation` | Authenticated + `control.manage` + CSRF |
 | POST | `/governance/controls/{control_id}/tests` | Authenticated + `control.manage` + CSRF |
 | PATCH | `/governance/control-tests/{test_id}` | Authenticated + `control.manage` + CSRF |
-| POST | `/evidence` | Authenticated + `evidence.manage` + CSRF (metadata only; no file upload) |
+| POST | `/evidence` | Authenticated + `evidence.manage` + CSRF (metadata only) |
+| POST | `/evidence/{evidence_id}/object` | Authenticated + `evidence.manage` + CSRF (multipart file upload) |
+| DELETE | `/evidence/{evidence_id}/object` | Authenticated + `evidence.manage` + CSRF |
+| GET | `/evidence/{evidence_id}/object` | Authenticated + `evidence.read` (no CSRF; private stream) |
 | POST | `/governance/controls/{control_id}/evidence/{evidence_id}` | Authenticated + `control.manage` + `evidence.manage` + CSRF |
 | DELETE | `/governance/controls/{control_id}/evidence/{evidence_id}` | Authenticated + `control.manage` + `evidence.manage` + CSRF |
 
@@ -183,7 +186,7 @@ Authenticated session required (401 without a valid cookie):
 | Assets | `asset.read` | Yes |
 | Risks | `risk.read`; treatment PATCH requires `risk.manage` + CSRF | Yes (read + treatment write) |
 | Controls / governance | `control.read`; implementation/tests require `control.manage` + CSRF; evidence link requires `control.manage` + `evidence.manage` + CSRF | Yes (read + control/evidence writes) |
-| Evidence | `evidence.read`; metadata POST requires `evidence.manage` + CSRF | Yes (GET by id + metadata create; no upload) |
+| Evidence | `evidence.read`; metadata/object POST/DELETE require `evidence.manage` + CSRF; object GET requires `evidence.read` | Yes (metadata + private object upload/download/delete) |
 | Vulnerabilities | `vulnerability.read`; remediation PATCH requires `vulnerability.manage` + CSRF | Yes (read + remediation write) |
 | Alerts | `alert.read` | Yes |
 | Detections | `detection.read` (+ manage for writes later) | No dedicated list route yet |
@@ -204,14 +207,16 @@ Authenticated session required (401 without a valid cookie):
 | Incident PATCH | `incident.manage` + CSRF (+ `incident.close` to resolve/close) | Yes |
 | Vulnerability remediation PATCH | `vulnerability.manage` + CSRF | Yes |
 | Control implementation / tests | `control.manage` + CSRF | Yes |
-| Evidence metadata create | `evidence.manage` + CSRF | Yes (no file upload) |
+| Evidence metadata create | `evidence.manage` + CSRF | Yes |
+| Evidence object upload/delete | `evidence.manage` + CSRF | Yes (private S3-compatible storage) |
+| Evidence object download | `evidence.read` | Yes (backend stream; no public URL) |
 | Control ↔ evidence link/unlink | `control.manage` + `evidence.manage` + CSRF | Yes |
 
 **401** = no valid session (missing, revoked, expired, or inactive user).  
 **403** = missing permission (`forbidden`) or CSRF failure (`csrf_failed`). Error bodies do not list capability codes or tokens.  
 **409** = stale `expected_updated_at` concurrency conflict.
 
-**Remaining authenticated domain writes** (incident tasks, integration credentials, reports, cyber-range control, binary evidence upload / object storage, policy writes, access-review findings) remain deferred. No Cyber Range remote control.
+**Remaining authenticated domain writes** (incident tasks, integration credentials, reports, cyber-range control, policy writes, access-review findings) remain deferred. No Cyber Range remote control.
 
 ### Incident mutation scope (`incident.manage`)
 
@@ -242,7 +247,13 @@ Immutable: CVSS, EPSS, KEV, CVE metadata, asset criticality/exposure, SSVC `acti
 
 **Control tests** (`control.manage` + CSRF): create/update manual records only (`result` ∈ `{pass, fail, partial, inconclusive}`, optional `tested_at`, `tester`, `notes`). Public ids are `CTEST-NNNN`. Notes are tagged `[manual development recording]`. Not automated assessment or continuous monitoring.
 
-**Evidence metadata** (`evidence.manage` + CSRF): create title/description/version/optional caller-supplied SHA-256 (exactly 64 hex, normalized lowercase)/size/mime/classification/collected_at/collected_by. `object_uri` is always null and never returned. SHA-256 presence does **not** mean integrity was verified. No raw file bytes, base64, or fake object URIs.
+**Evidence metadata** (`evidence.manage` + CSRF): create title/description/version/optional caller-supplied SHA-256 (exactly 64 hex, normalized lowercase)/size/mime/classification/collected_at/collected_by. `object_uri` is never returned. Caller-supplied SHA-256 before upload is not verification.
+
+**Evidence object upload** (`evidence.manage` + CSRF): `POST /evidence/{id}/object` multipart field `file`. One object per evidence record (second upload → `409`). Server generates object keys (`evidence/{EVID-NNNN}/{random}`), streams through a temp spool, enforces `EVIDENCE_MAX_UPLOAD_BYTES` (default 25 MiB), calculates SHA-256 from bytes, and stores privately via the S3-compatible abstraction (SeaweedFS locally / R2 hosted). Malware scanning is **not** implemented. `object_stored=true` after success; `integrity_verified` stays false (hash is calculated at ingestion, not independently re-verified).
+
+**Evidence object download** (`evidence.read`): `GET /evidence/{id}/object` streams bytes through the API with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`. No public URLs, no client redirects to S3, no credential leakage.
+
+**Evidence object delete** (`evidence.manage` + CSRF): removes storage bytes and the `evidence_objects` row; preserves the evidence metadata record. PostgreSQL and S3 are not a distributed transaction (storage deleted first).
 
 **Control ↔ evidence linking** (`control.manage` + `evidence.manage` + CSRF): link or unlink existing records by human ids. Duplicate links are idempotent (`linked: true`).
 
@@ -265,6 +276,9 @@ Security-relevant actions write `audit_events` rows:
 - `CONTROL_TEST_CREATE`
 - `CONTROL_TEST_UPDATE`
 - `EVIDENCE_CREATE`
+- `EVIDENCE_OBJECT_UPLOAD`
+- `EVIDENCE_OBJECT_DOWNLOAD`
+- `EVIDENCE_OBJECT_DELETE`
 - `CONTROL_EVIDENCE_LINK`
 - `CONTROL_EVIDENCE_UNLINK`
 
@@ -282,7 +296,7 @@ Never commit the real password. Production must not rely on this variable.
 ## Production hardening still required
 
 - Login rate limiting / lockout (structure is ready; not implemented)
-- Remaining CSRF-protected domain writes (integrations, reports, cyber-range, incident tasks, binary evidence upload)
+- Remaining CSRF-protected domain writes (integrations, reports, cyber-range, incident tasks)
 - MFA/TOTP
 - Password reset email flows
 - SSO/OIDC
