@@ -1,6 +1,6 @@
 """Governance summary and authenticated control mutations."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.api.deps import DbSession, PageQuery, RequireCsrf, require_permissions
 from app.schemas.common import ErrorBody, Page
@@ -37,9 +37,52 @@ def read_governance_summary(session: DbSession) -> GovernanceSummary:
     return get_governance_summary(session)
 
 
-@router.get("/controls", response_model=Page[ControlListItem])
-def read_controls(session: DbSession, page: PageQuery) -> Page[ControlListItem]:
-    return list_controls(session, page)
+@router.get(
+    "/controls",
+    response_model=Page[ControlListItem],
+    responses={422: {"model": ErrorBody}},
+)
+def read_controls(
+    session: DbSession,
+    page: PageQuery,
+    q: str | None = Query(
+        None,
+        description=(
+            "Case-insensitive metadata substring search across control human id, "
+            "control code, title, and framework code/name. Does not search licensed "
+            "framework prose, evidence, or audit data. page_size is capped at 100."
+        ),
+    ),
+    framework: str | None = Query(
+        None,
+        description="Filter by framework code (e.g. NIST-800-53). Case-insensitive exact match.",
+    ),
+    implementation_status: str | None = Query(
+        None,
+        description=(
+            "Filter by implementation status: planned, partial, implemented, "
+            "not_implemented, not_applicable."
+        ),
+    ),
+    sort: str | None = Query(
+        None,
+        description="Allowlisted sort: id, control_code, title, created_at, updated_at.",
+    ),
+    direction: str | None = Query(
+        None,
+        description="Sort direction: asc (default) or desc.",
+    ),
+) -> Page[ControlListItem]:
+    """Paginated control catalog. Metadata only — no licensed CIS safeguard text."""
+    return list_controls(
+        session,
+        page,
+        q=q,
+        framework=framework,
+        implementation_status=implementation_status,
+        sort=sort,
+        direction=direction,
+    )
 
 
 @router.get(

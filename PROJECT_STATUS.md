@@ -2,7 +2,7 @@
 
 **Last updated:** October 22, 2026  
 **Current phase:** Phase 2 — auth + domain GET RBAC + CSRF-protected writes, including evidence objects and policy lifecycle/versioning/acknowledgement  
-**Next:** Remaining mutations (integrations, reports, incident tasks). MFA, SSO, password reset, rate limiting, and Cyber Range control remain out of scope.
+**Next:** Frontend catalog selectors can adopt control/policy `q` + filters. Remaining mutations (integrations, reports, incident tasks). MFA, SSO, password reset, rate limiting, and Cyber Range control remain out of scope.
 
 ---
 
@@ -16,7 +16,7 @@
 | Minimal Phase 0 docs | Complete |
 | Application code | API domain schema + web UI on local mocks |
 | Domain schema | Through `20261020_0011` (policy↔control mappings) |
-| Read API | `/api/v1` through reports, datasets, experiments, cyber-range, governance, policies (+ mapped controls), evidence detail + private object download |
+| Read API | `/api/v1` through reports, datasets, experiments, cyber-range, governance (controls catalog: page/`q`/framework/implementation_status/sort), policies (catalog: page/`q`/status/sort + mapped controls), evidence detail + private object download |
 | Authentication | Sessions + CSRF synchronizer tokens; domain GET RBAC enforced |
 | Write API | Preferences, risk, incident, vulnerability, administration, governance, evidence objects, policy lifecycle, and policy↔control link/unlink; integration/report/cyber-range writes deferred |
 | Frontend API connection | Reads + CSRF client + preferences, risk, incident, vulnerability, administration, governance/evidence objects + Policy Management UI (lifecycle + policy↔control mapping); integration/report/cyber-range writes still disabled |

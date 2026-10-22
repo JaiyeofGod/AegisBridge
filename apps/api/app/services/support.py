@@ -1,9 +1,10 @@
 """Small query helpers shared by domain read services."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from re import fullmatch
+from typing import Any
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, asc, desc, func, select
 from sqlalchemy.orm import Session
 
 from app.api.errors import ApiError
@@ -50,6 +51,48 @@ def require_choice(name: str, value: str | None, allowed: frozenset[str]) -> str
 def like_pattern(value: str) -> str:
     escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     return f"%{escaped}%"
+
+
+def require_sort_direction(direction: str | None) -> str:
+    """Return ``asc`` or ``desc``. Empty defaults to ascending."""
+    if direction is None or direction.strip() == "":
+        return "asc"
+    normalized = direction.strip().lower()
+    if normalized not in {"asc", "desc"}:
+        raise ApiError(
+            422,
+            "validation_error",
+            "direction is not a supported value.",
+            [ErrorDetail(loc=["query", "direction"], message="Use one of: asc, desc.")],
+        )
+    return normalized
+
+
+def resolve_order_by(
+    *,
+    sort: str | None,
+    direction: str | None,
+    allowed: Mapping[str, Any],
+    default: str,
+    tiebreak: Any,
+) -> list[Any]:
+    """Map a public sort key to explicit SQLAlchemy columns. Rejects arbitrary names."""
+    sort_direction = require_sort_direction(direction)
+    order = asc if sort_direction == "asc" else desc
+    key = default if sort is None or sort.strip() == "" else sort.strip().lower()
+    column = allowed.get(key)
+    if column is None:
+        choices = ", ".join(sorted(set(allowed)))
+        raise ApiError(
+            422,
+            "validation_error",
+            "sort is not a supported value.",
+            [ErrorDetail(loc=["query", "sort"], message=f"Use one of: {choices}.")],
+        )
+    clauses: list[Any] = [order(column)]
+    if column is not tiebreak:
+        clauses.append(asc(tiebreak))
+    return clauses
 
 
 def person(user: User | None) -> PersonRef | None:

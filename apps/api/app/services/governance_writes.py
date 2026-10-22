@@ -5,13 +5,19 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.errors import ApiError, not_found
 from app.core.config import get_settings
 from app.models.evidence import EvidenceControlLink
-from app.models.grc import Control, ControlImplementation, ControlTest, FrameworkVersion
+from app.models.grc import (
+    Control,
+    ControlImplementation,
+    ControlTest,
+    Framework,
+    FrameworkVersion,
+)
 from app.models.identity import User
 from app.models.policy import Policy, PolicyControlMapping
 from app.schemas.common import Page
@@ -28,25 +34,107 @@ from app.schemas.governance import (
 )
 from app.security.rbac import AuthenticatedPrincipal
 from app.services.audit_write import record_audit_event
-from app.services.support import PageParams, next_human_id, page, paginate, person
+from app.services.support import (
+    PageParams,
+    like_pattern,
+    next_human_id,
+    page,
+    paginate,
+    person,
+    require_choice,
+    resolve_order_by,
+)
+
+IMPLEMENTATION_STATUSES = frozenset(
+    {
+        "planned",
+        "partial",
+        "implemented",
+        "not_implemented",
+        "not_applicable",
+    }
+)
+
+_CONTROL_SORT = {
+    "control_code": Control.control_code,
+    "title": Control.title,
+    "updated_at": Control.updated_at,
+    "created_at": Control.created_at,
+    "id": Control.human_id,
+}
 
 
-def list_controls(session: Session, page_params: PageParams) -> Page[ControlListItem]:
+def list_controls(
+    session: Session,
+    page_params: PageParams,
+    *,
+    q: str | None = None,
+    framework: str | None = None,
+    implementation_status: str | None = None,
+    sort: str | None = None,
+    direction: str | None = None,
+) -> Page[ControlListItem]:
+    """Paginated control catalog. Metadata search/filters only — no licensed text."""
+    status = require_choice("implementation_status", implementation_status, IMPLEMENTATION_STATUSES)
+    order_by = resolve_order_by(
+        sort=sort,
+        direction=direction,
+        allowed=_CONTROL_SORT,
+        default="id",
+        tiebreak=Control.human_id,
+    )
     statement = (
         select(Control)
         .options(
             selectinload(Control.framework_version).selectinload(FrameworkVersion.framework),
             selectinload(Control.implementations),
-            selectinload(Control.tests),
         )
-        .order_by(Control.human_id)
+        .order_by(*order_by)
     )
+    if q and q.strip():
+        term = like_pattern(q.strip())
+        statement = statement.where(
+            or_(
+                Control.human_id.ilike(term, escape="\\"),
+                Control.control_code.ilike(term, escape="\\"),
+                Control.title.ilike(term, escape="\\"),
+                Control.framework_version.has(
+                    FrameworkVersion.framework.has(
+                        or_(
+                            Framework.code.ilike(term, escape="\\"),
+                            Framework.name.ilike(term, escape="\\"),
+                        )
+                    )
+                ),
+            )
+        )
+    if framework and framework.strip():
+        code = framework.strip().lower()
+        statement = statement.where(
+            Control.framework_version.has(
+                FrameworkVersion.framework.has(func.lower(Framework.code) == code)
+            )
+        )
+    if status is not None:
+        statement = statement.where(
+            Control.implementations.any(ControlImplementation.status == status)
+        )
+
     total, rows = paginate(session, statement, page_params)
-    evidence_counts = _evidence_counts(session, [row.id for row in rows])
+    control_ids = [row.id for row in rows]
+    evidence_counts = _evidence_counts(session, control_ids)
+    test_counts = _test_counts(session, control_ids)
     return page(
         page_params,
         total,
-        [_list_item(row, evidence_counts.get(row.id, 0)) for row in rows],
+        [
+            _list_item(
+                row,
+                evidence_count=evidence_counts.get(row.id, 0),
+                test_count=test_counts.get(row.id, 0),
+            )
+            for row in rows
+        ],
     )
 
 
@@ -285,7 +373,12 @@ def _current_implementation(
     return implementation
 
 
-def _list_item(control: Control, evidence_count: int) -> ControlListItem:
+def _list_item(
+    control: Control,
+    *,
+    evidence_count: int,
+    test_count: int | None = None,
+) -> ControlListItem:
     implementation = _latest_impl(control.implementations)
     framework = control.framework_version
     return ControlListItem(
@@ -296,14 +389,14 @@ def _list_item(control: Control, evidence_count: int) -> ControlListItem:
         framework_code=None if framework is None else framework.framework.code,
         framework_version=None if framework is None else framework.version_label,
         implementation_status=None if implementation is None else implementation.status,
-        test_count=len(control.tests),
+        test_count=len(control.tests) if test_count is None else test_count,
         evidence_count=evidence_count,
     )
 
 
 def _detail(session: Session, control: Control) -> ControlDetail:
     evidence_count = _evidence_counts(session, [control.id]).get(control.id, 0)
-    base = _list_item(control, evidence_count)
+    base = _list_item(control, evidence_count=evidence_count)
     implementation = _latest_impl(control.implementations)
     evidence_rows = session.scalars(
         select(EvidenceControlLink)
@@ -387,6 +480,17 @@ def _evidence_counts(session: Session, control_ids: list[UUID]) -> dict[UUID, in
         select(EvidenceControlLink.control_id, func.count())
         .where(EvidenceControlLink.control_id.in_(control_ids))
         .group_by(EvidenceControlLink.control_id)
+    ).all()
+    return {control_id: int(count) for control_id, count in rows}
+
+
+def _test_counts(session: Session, control_ids: list[UUID]) -> dict[UUID, int]:
+    if not control_ids:
+        return {}
+    rows = session.execute(
+        select(ControlTest.control_id, func.count())
+        .where(ControlTest.control_id.in_(control_ids))
+        .group_by(ControlTest.control_id)
     ).all()
     return {control_id: int(count) for control_id, count in rows}
 

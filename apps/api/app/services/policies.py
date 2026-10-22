@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -33,7 +34,16 @@ from app.schemas.policies import (
 )
 from app.security.rbac import AuthenticatedPrincipal
 from app.services.audit_write import record_audit_event
-from app.services.support import PageParams, next_human_id, page, paginate, person
+from app.services.support import (
+    PageParams,
+    like_pattern,
+    next_human_id,
+    page,
+    paginate,
+    person,
+    require_choice,
+    resolve_order_by,
+)
 
 # (from_status, to_status) → required permission
 _POLICY_TRANSITIONS: dict[tuple[str, str], str] = {
@@ -47,18 +57,67 @@ _POLICY_TRANSITIONS: dict[tuple[str, str], str] = {
     ("published", "retired"): "policy.approve",
 }
 
+POLICY_LIFECYCLE_STATUSES = frozenset({"draft", "in_review", "approved", "published", "retired"})
 
-def list_policies(session: Session, page_params: PageParams) -> Page[PolicyListItem]:
+_POLICY_SORT = {
+    "id": Policy.human_id,
+    "title": Policy.title,
+    "updated_at": Policy.updated_at,
+    "created_at": Policy.created_at,
+}
+
+
+def list_policies(
+    session: Session,
+    page_params: PageParams,
+    *,
+    q: str | None = None,
+    status: str | None = None,
+    sort: str | None = None,
+    direction: str | None = None,
+) -> Page[PolicyListItem]:
+    """Paginated policy catalog. Metadata search only — no version body content."""
+    lifecycle = require_choice("status", status, POLICY_LIFECYCLE_STATUSES)
+    order_by = resolve_order_by(
+        sort=sort,
+        direction=direction,
+        allowed=_POLICY_SORT,
+        default="id",
+        tiebreak=Policy.human_id,
+    )
     statement = (
         select(Policy)
         .options(
             selectinload(Policy.owner),
-            selectinload(Policy.versions).selectinload(PolicyVersion.acknowledgements),
+            selectinload(Policy.versions),
         )
-        .order_by(Policy.human_id)
+        .order_by(*order_by)
     )
+    if q and q.strip():
+        term = like_pattern(q.strip())
+        statement = statement.where(
+            or_(
+                Policy.human_id.ilike(term, escape="\\"),
+                Policy.title.ilike(term, escape="\\"),
+                Policy.owner.has(
+                    or_(
+                        User.display_name.ilike(term, escape="\\"),
+                        User.human_id.ilike(term, escape="\\"),
+                    )
+                ),
+            )
+        )
+    if lifecycle is not None:
+        statement = statement.where(Policy.status == lifecycle)
+
     total, rows = paginate(session, statement, page_params)
-    return page(page_params, total, [_list_item(row) for row in rows])
+    ack_counts = _current_ack_counts(session, rows)
+    items: list[PolicyListItem] = []
+    for row in rows:
+        version_id = _current_version_id(row)
+        ack_count = 0 if version_id is None else ack_counts.get(version_id, 0)
+        items.append(_list_item(row, acknowledgement_count=ack_count))
+    return page(page_params, total, items)
 
 
 def get_policy(
@@ -593,15 +652,42 @@ def _find_version(
     return version
 
 
-def _list_item(policy: Policy) -> PolicyListItem:
-    current = next((version for version in policy.versions if version.is_current), None)
+def _current_version(policy: Policy) -> PolicyVersion | None:
+    return next((version for version in policy.versions if version.is_current), None)
+
+
+def _current_version_id(policy: Policy) -> UUID | None:
+    current = _current_version(policy)
+    return None if current is None else current.id
+
+
+def _current_ack_counts(session: Session, policies: Sequence[Policy]) -> dict[UUID, int]:
+    version_ids = [vid for policy in policies if (vid := _current_version_id(policy)) is not None]
+    if not version_ids:
+        return {}
+    rows = session.execute(
+        select(PolicyAcknowledgement.policy_version_id, func.count())
+        .where(PolicyAcknowledgement.policy_version_id.in_(version_ids))
+        .group_by(PolicyAcknowledgement.policy_version_id)
+    ).all()
+    return {version_id: int(count) for version_id, count in rows}
+
+
+def _list_item(
+    policy: Policy,
+    *,
+    acknowledgement_count: int | None = None,
+) -> PolicyListItem:
+    current = _current_version(policy)
+    if acknowledgement_count is None:
+        acknowledgement_count = 0 if current is None else len(current.acknowledgements)
     return PolicyListItem(
         id=policy.human_id,
         title=policy.title,
         status=policy.status,  # type: ignore[arg-type]
         owner=person(policy.owner),
         current_version=None if current is None else current.version_label,
-        acknowledgement_count=0 if current is None else len(current.acknowledgements),
+        acknowledgement_count=acknowledgement_count,
         updated_at=policy.updated_at,
     )
 

@@ -94,9 +94,10 @@ Requires the domain migration, development seed, and a valid session cookie. Con
 - `GET /api/v1/alerts*` — `alert.read`
 - `GET /api/v1/incidents*` — `incident.read`
 - `GET /api/v1/governance/*` — `control.read`
+- `GET /api/v1/governance/controls` — paginated catalog; optional `q` (metadata), `framework`, `implementation_status`, allowlisted `sort`/`direction`; `page_size` max 100; no licensed CIS text
 - `PATCH /api/v1/governance/controls/{id}/implementation`, `POST .../tests`, `PATCH .../control-tests/{id}` — `control.manage` + CSRF
 - `POST|DELETE /api/v1/governance/controls/{id}/evidence/{evidence_id}` — `control.manage` + `evidence.manage` + CSRF
-- `GET /api/v1/policies*` — `policy.read`
+- `GET /api/v1/policies*` — `policy.read`; list supports metadata `q`, `status`, allowlisted `sort`/`direction` (`page_size` max 100; no version bodies in list items)
 - `POST /api/v1/policies`, `PATCH /api/v1/policies/{id}`, version create/update — `policy.manage` + CSRF
 - `POST /api/v1/policies/{id}/transition` — `policy.manage` or `policy.approve` (transition-specific) + CSRF
 - `POST /api/v1/policies/{id}/acknowledge` — self-ack current published version (`policy.read` + CSRF)

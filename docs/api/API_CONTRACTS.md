@@ -56,7 +56,7 @@ All domain rows require a valid session (`401` otherwise) and the permission lis
 | GET | `/incidents` | Filters: `search`, `severity`, `status`, `owner`, `containment_state` |
 | GET | `/incidents/{incident_id}` | Timeline, tasks, indicators, evidence, related alerts, affected assets; includes `updated_at` for concurrency |
 | GET | `/governance/summary` | Framework identifiers, counts, evidence freshness, policies, access reviews |
-| GET | `/governance/controls` | Paginated control list (codes/titles/status counts; no licensed CIS text) |
+| GET | `/governance/controls` | Paginated control catalog. Query: `page`, `page_size` (max 100), optional metadata `q`, `framework` (e.g. `NIST-800-53`), `implementation_status` (`planned`/`partial`/`implemented`/`not_implemented`/`not_applicable`), allowlisted `sort` (`id`/`control_code`/`title`/`created_at`/`updated_at`) + `direction` (`asc`/`desc`). No licensed CIS text. |
 | GET | `/governance/controls/{control_id}` | Control detail with implementation, manual tests, linked evidence metadata, mapped policy refs |
 | PATCH | `/governance/controls/{control_id}/implementation` | Update implementation status/notes/owner; `control.manage` + CSRF; `expected_updated_at` → 409 |
 | POST | `/governance/controls/{control_id}/tests` | Record a manual control test (`CTEST-NNNN`); `control.manage` + CSRF |
@@ -68,7 +68,7 @@ All domain rows require a valid session (`401` otherwise) and the permission lis
 | POST | `/evidence/{evidence_id}/object` | Multipart upload (`file`) to private object storage (`evidence.manage` + CSRF); one object per evidence |
 | GET | `/evidence/{evidence_id}/object` | Authenticated private download stream (`evidence.read`); no CSRF |
 | DELETE | `/evidence/{evidence_id}/object` | Delete stored object bytes; keep evidence metadata (`evidence.manage` + CSRF) |
-| GET | `/policies` | Paginated policy list (`policy.read`) |
+| GET | `/policies` | Paginated policy catalog (`policy.read`). Query: `page`, `page_size` (max 100), optional metadata `q` (human id/title/owner), `status` (`draft`/`in_review`/`approved`/`published`/`retired`), allowlisted `sort` (`id`/`title`/`created_at`/`updated_at`) + `direction`. List items omit version body content. |
 | GET | `/policies/{policy_id}` | Policy detail, versions, acknowledgement summary, mapped controls (`policy.read`) |
 | GET | `/policies/{policy_id}/versions` | Version summaries for a policy |
 | GET | `/policies/{policy_id}/versions/{version_label}` | Version content detail (`version_label` is the public version id) |
@@ -117,7 +117,19 @@ List routes return:
 {"page": 1, "page_size": 25, "total": 0, "items": []}
 ```
 
-`page` starts at 1. `page_size` defaults to 25 and cannot exceed 100.
+`page` starts at 1. `page_size` defaults to 25 and cannot exceed 100. Invalid `page`/`page_size` values return `422`. Out-of-range pages return `200` with `items: []` and the filtered `total`.
+
+### Catalog discovery examples
+
+```http
+GET /api/v1/governance/controls?page=1&page_size=25&q=access
+GET /api/v1/governance/controls?page=1&page_size=25&framework=NIST-800-53
+GET /api/v1/governance/controls?page=1&page_size=25&implementation_status=implemented&sort=title&direction=asc
+GET /api/v1/policies?page=1&page_size=25&q=incident
+GET /api/v1/policies?page=1&page_size=25&status=draft&sort=updated_at&direction=desc
+```
+
+Control/policy `q` is case-insensitive substring search over safe metadata only (not licensed framework prose, evidence bytes, audit rows, or policy version bodies). `total` is the count after search/filters and before offset/limit. Sort keys are server allowlists; arbitrary column names are rejected.
 
 ## Errors
 

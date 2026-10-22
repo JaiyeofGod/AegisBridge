@@ -1,6 +1,6 @@
 """Policy library, versioning, lifecycle, and acknowledgement API."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.api.deps import (
     CurrentPrincipal,
@@ -36,9 +36,41 @@ router = APIRouter(
 @router.get(
     "",
     response_model=Page[PolicyListItem],
+    responses={422: {"model": ErrorBody}},
 )
-def list_policies(session: DbSession, page: PageQuery) -> Page[PolicyListItem]:
-    return policy_service.list_policies(session, page)
+def list_policies(
+    session: DbSession,
+    page: PageQuery,
+    q: str | None = Query(
+        None,
+        description=(
+            "Case-insensitive metadata substring search across policy human id, "
+            "title, and owner display name/human id. Does not search version body "
+            "content. page_size is capped at 100."
+        ),
+    ),
+    status: str | None = Query(
+        None,
+        description="Lifecycle status: draft, in_review, approved, published, retired.",
+    ),
+    sort: str | None = Query(
+        None,
+        description="Allowlisted sort: id, title, created_at, updated_at.",
+    ),
+    direction: str | None = Query(
+        None,
+        description="Sort direction: asc (default) or desc.",
+    ),
+) -> Page[PolicyListItem]:
+    """Paginated policy catalog. List items omit version body content."""
+    return policy_service.list_policies(
+        session,
+        page,
+        q=q,
+        status=status,
+        sort=sort,
+        direction=direction,
+    )
 
 
 @router.get(
