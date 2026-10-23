@@ -19,7 +19,8 @@
 | Read API | `/api/v1` through reports, datasets, experiments, cyber-range, governance (controls catalog: page/`q`/framework/implementation_status/sort; control detail includes mapped risks), policies (catalog: page/`q`/status/sort + mapped controls), risks (detail includes mapped controls), evidence detail + private object download |
 | Authentication | Sessions + CSRF synchronizer tokens; domain GET RBAC enforced |
 | Write API | Preferences, risk treatment, risk↔control link/unlink, incident, vulnerability, administration, governance, evidence objects, policy lifecycle, and policy↔control link/unlink; integration/report/cyber-range writes deferred |
-| Local admin credential | `AEGIS_DEV_ADMIN_PASSWORD` is the only development password source. Seed rewrites the `USR-0001` Argon2id hash in local/dev; production skips it; pytest restores the prior hash |
+| Local admin credential | `AEGIS_DEV_ADMIN_PASSWORD` is the only development password source. Seed rewrites the `USR-0001` Argon2id hash in local/dev; production skips it. Pytest does not touch that row |
+| Backend tests | Dedicated PostgreSQL database via `TEST_DATABASE_URL` (default `aegis_test`). Alembic `upgrade head` once per session. Same database as `DATABASE_URL` is refused. The previous Administrator hash snapshot/restore workaround is removed |
 | Frontend API connection | Reads + CSRF client + preferences, risk treatment, risk↔control mapping UI (paginated control selector; relationship-only, no score/effectiveness changes), incident, vulnerability, administration, governance/evidence objects + Policy Management UI (lifecycle + policy↔control mapping + server-side control/policy catalog search/pagination); integration/report/cyber-range writes still disabled |
 | Object storage | S3-compatible abstraction; SeaweedFS locally; Cloudflare R2 for hosted; optional health check |
 | Package installs | API via uv; web via pnpm (`apps/web`) |

@@ -96,7 +96,7 @@ Optional truncated `user_agent` and `client_host` may be stored on sessions for 
 - Algorithm: **Argon2id** explicitly (`argon2.low_level.Type.ID`; `algorithm` column constrained to `argon2id`).
 - Development password for `USR-0001` is an Argon2id hash of `AEGIS_DEV_ADMIN_PASSWORD`. There is no built-in default.
 - `APP_ENV` `local` / `development` / `dev`: seed requires that variable and rewrites the existing credential so it matches. Blank or missing fails the seed and does not invent a password.
-- `APP_ENV=test`: seed updates the hash only when the variable is set. Pytest restores the previous `USR-0001` hash afterward because tests share `DATABASE_URL`.
+- `APP_ENV=test`: seed updates the hash only when the variable is set, and only on `TEST_DATABASE_URL`. Pytest does not open the development database.
 - `APP_ENV=production`: seed does not read or write the development Administrator password.
 - Production must never bootstrap a predictable default password.
 

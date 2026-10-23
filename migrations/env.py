@@ -8,6 +8,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from app.core.config import get_settings
+from app.db.database_target import runtime_database_url
 from app.models import Base
 
 config = context.config
@@ -18,7 +19,8 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# ConfigParser treats % as interpolation. Escape it without logging the URL.
+config.set_main_option("sqlalchemy.url", runtime_database_url(settings).replace("%", "%%"))
 
 
 def run_migrations_offline() -> None:

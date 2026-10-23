@@ -7,12 +7,13 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import Settings, get_settings
+from app.db.database_target import runtime_database_url
 
 
 def create_db_engine(settings: Settings | None = None) -> Engine:
     cfg = settings or get_settings()
     return create_engine(
-        cfg.database_url,
+        runtime_database_url(cfg),
         pool_pre_ping=True,
         future=True,
     )
@@ -20,6 +21,19 @@ def create_db_engine(settings: Settings | None = None) -> Engine:
 
 engine = create_db_engine()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+
+
+def reset_engine(settings: Settings | None = None) -> Engine:
+    """Dispose the process engine and rebind the existing session factory.
+
+    Pytest calls this after selecting ``APP_ENV=test`` so importers of
+    ``SessionLocal`` follow the test database. Production startup does not call it.
+    """
+    global engine
+    engine.dispose()
+    engine = create_db_engine(settings)
+    SessionLocal.configure(bind=engine)
+    return engine
 
 
 def get_db() -> Generator[Session]:

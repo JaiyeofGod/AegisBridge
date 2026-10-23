@@ -150,7 +150,8 @@ Do not serve uploads from arbitrary local web paths. Prefer presigned object URL
 
 | Concern | Local | Hosted |
 |---|---|---|
-| Relational | Compose PostgreSQL 18 | Render Postgres 18 |
+| Relational | Compose PostgreSQL 18, database from `DATABASE_URL` (default `aegis`) | Render Postgres 18 |
+| Backend tests | Same Compose PostgreSQL server, separate database from `TEST_DATABASE_URL` (default `aegis_test`). Not used when `APP_ENV` is local or production | Not used |
 | Queue/cache | Compose Redis/Valkey | Render Key Value |
 | Objects | SeaweedFS S3 bucket `aegis-dev-evidence` (`localhost:8333`) | R2 `aegis-stage-evidence` / `aegis-prod-evidence` |
 | Raw telemetry | Lenovo / Wazuh | Not mirrored wholesale to cloud |

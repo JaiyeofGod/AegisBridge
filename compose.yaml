@@ -6,6 +6,10 @@ name: aegisbridge
 
 services:
   postgres:
+    # One server hosts the development database (POSTGRES_DB, default aegis)
+    # and the pytest database (default aegis_test). Init scripts run only on a
+    # fresh data directory, so an existing volume does not create the test
+    # database. From apps/api: python -m app.db.test_db ensure
     image: postgres:18
     container_name: aegis-postgres
     restart: unless-stopped

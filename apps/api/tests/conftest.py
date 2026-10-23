@@ -1,22 +1,43 @@
-"""Shared pytest fixtures."""
+# isort: skip_file
+"""Shared pytest fixtures.
 
-import pytest
-from fastapi.testclient import TestClient
-from tests.dev_admin_guard import restore_dev_admin_credential, snapshot_dev_admin_credential
+The suite selects the test database before the engine is imported. Application
+code under pytest then uses that engine. ``APP_ENV=production`` in a normal
+process never takes this path.
+"""
 
-from app.core.config import get_settings
-from app.core.db import SessionLocal
-from app.main import create_app
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+os.environ["APP_ENV"] = "test"
+
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.core.config import get_settings  # noqa: E402
+from app.core.db import reset_engine  # noqa: E402
+from app.main import create_app  # noqa: E402
+
+get_settings.cache_clear()
+reset_engine()
+
+ROOT = Path(__file__).resolve().parents[3]
 
 
-@pytest.fixture(autouse=True)
-def preserve_developer_admin_credential():
-    """Pytest shares the developer database. Put the Administrator hash back afterward."""
-    with SessionLocal() as session:
-        snapshot = snapshot_dev_admin_credential(session)
-    yield
-    with SessionLocal() as session:
-        restore_dev_admin_credential(session, snapshot)
+@pytest.fixture(scope="session", autouse=True)
+def prepare_test_database() -> None:
+    """Create the test database if needed and migrate it to head once per session."""
+    from alembic import command
+    from alembic.config import Config
+
+    from app.db.test_db import ensure_test_database
+
+    ensure_test_database()
+    config = Config(str(ROOT / "alembic.ini"))
+    config.set_main_option("script_location", str(ROOT / "migrations"))
+    command.upgrade(config, "head")
 
 
 @pytest.fixture

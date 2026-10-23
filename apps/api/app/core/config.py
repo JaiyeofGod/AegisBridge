@@ -35,6 +35,8 @@ class Settings(BaseSettings):
         default="postgresql+psycopg://aegis:aegis@localhost:5432/aegis",
         alias="DATABASE_URL",
     )
+    # Pytest only. Ignored unless APP_ENV=test. Never a fallback for local or production.
+    test_database_url: str | None = Field(default=None, alias="TEST_DATABASE_URL")
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
 
     session_secret: str = Field(

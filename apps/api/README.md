@@ -11,6 +11,7 @@ uv sync
 uv run ruff check app tests
 uv run ruff format --check app tests
 uv run pyright
+uv run python -m app.db.test_db ensure
 uv run pytest
 
 # Run API against Compose Postgres (repo-root `.env`)
@@ -63,7 +64,16 @@ Re-running the seed is idempotent. In `local` / `development` / `dev` it rewrite
 
 `APP_ENV=test` updates the hash only when the variable is set, so tests can use a synthetic password. `APP_ENV=production` never synchronizes this credential. `python -m app.db.seed --check` reports whether the user, credential row, and configured password match, without printing the password or hash.
 
-Pytest uses the same `DATABASE_URL` as local development. An autouse fixture restores the `USR-0001` credential hash after each test so the suite does not leave the developer password changed.
+Pytest sets `APP_ENV=test` and opens `TEST_DATABASE_URL` only. That URL must name a different database from `DATABASE_URL`; the suite refuses to migrate or seed when the two resolve to the same database. The schema comes from Alembic `upgrade head` on the test database. The development database, including the local Administrator hash, is not modified. `APP_ENV=production` ignores `TEST_DATABASE_URL`.
+
+On an existing Compose volume, create the test database once:
+
+```bash
+python -m app.db.test_db ensure
+python -m app.db.test_db check
+```
+
+`ensure` creates the missing test database and never drops the development database. It does not print credentials. PostgreSQL init scripts do not re-run against a volume that already has data.
 
 See `docs/security/AUTHENTICATION_AND_RBAC.md`. Never commit a real password. Production must not bootstrap a default password from this variable.
 

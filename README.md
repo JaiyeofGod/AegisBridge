@@ -114,6 +114,15 @@ uv run --project apps/api python -m app.db.seed --reset
 
 `--reset` deletes domain rows only when `APP_ENV` is local. It does not drop tables.
 
+Backend tests use a second database on that same PostgreSQL server. `TEST_DATABASE_URL` must name a different database from `DATABASE_URL` (default `aegis_test`). Create it once, then run pytest:
+
+```bash
+uv run --project apps/api python -m app.db.test_db ensure
+cd apps/api && uv run pytest
+```
+
+Pytest migrates that database with Alembic and does not write to the development database. `APP_ENV=production` ignores `TEST_DATABASE_URL`. An existing Compose volume does not create the test database by itself, because PostgreSQL init scripts run only on a fresh data directory.
+
 **Web (host-run):**
 
 ```bash
@@ -130,7 +139,7 @@ Domain read routes, including threat intelligence, administration, reports, data
 
 **Not yet created:** Policy rich-text/PDF/e-sign/email, integration/report/cyber-range writes, SSO/MFA, password reset, rate limiting, external integrations, malware scanning for evidence, background jobs, Celery worker, CI workflows.
 
-Local login: set `AEGIS_DEV_ADMIN_PASSWORD` in the repo-root `.env` (no default password). From `apps/api`, run `python -m app.db.seed` so `USR-0001` (`amara.okonkwo@aegisbridge.example`) matches that value. Re-run the seed after changing it. Production does not sync this credential. Pytest restores the local hash after each test.
+Local login: set `AEGIS_DEV_ADMIN_PASSWORD` in the repo-root `.env` (no default password). From `apps/api`, run `python -m app.db.seed` so `USR-0001` (`amara.okonkwo@aegisbridge.example`) matches that value. Re-run the seed after changing it. Production does not sync this credential. Backend tests write only to `TEST_DATABASE_URL` and leave the development credential unchanged.
 
 ## Security reminders
 

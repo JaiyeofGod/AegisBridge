@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
-from tests.dev_admin_guard import restore_dev_admin_credential, snapshot_dev_admin_credential
 
 from app.core.config import get_settings
 from app.core.db import SessionLocal
@@ -43,7 +42,13 @@ def _counts() -> tuple[int, int, int]:
 
 def _hash() -> str | None:
     with SessionLocal() as session:
-        return snapshot_dev_admin_credential(session).password_hash
+        admin = session.scalar(select(User).where(User.human_id == "USR-0001"))
+        if admin is None:
+            return None
+        credential = session.scalar(
+            select(UserCredential).where(UserCredential.user_id == admin.id)
+        )
+        return None if credential is None else credential.password_hash
 
 
 def _seed(monkeypatch: pytest.MonkeyPatch, app_env: str, password: str | None) -> None:
@@ -135,14 +140,3 @@ def test_check_output_has_no_secret_material(monkeypatch: pytest.MonkeyPatch) ->
     assert "$argon2" not in report
     assert PASSWORD_A not in report
     get_settings.cache_clear()
-
-
-def test_fixture_restore_puts_back_the_pretest_hash(monkeypatch: pytest.MonkeyPatch) -> None:
-    with SessionLocal() as session:
-        original = snapshot_dev_admin_credential(session)
-    _seed(monkeypatch, "development", PASSWORD_B)
-    changed = _hash()
-    assert changed != original.password_hash
-    with SessionLocal() as session:
-        restore_dev_admin_credential(session, original)
-    assert _hash() == original.password_hash

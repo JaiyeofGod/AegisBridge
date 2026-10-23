@@ -84,6 +84,9 @@ The API uses an S3-compatible storage abstraction (`app/storage`). Switching hos
 | FastAPI | Mac host (hot reload); container-ready |
 | React (Vite) | Mac host (hot reload); container-ready |
 | Celery worker | Minimal foundation; host or Compose later; no meaningful jobs in Phase 1 |
+| Backend tests | Same Compose PostgreSQL container. Development database `aegis`. Test database `aegis_test` via `TEST_DATABASE_URL`. No extra host port |
+
+Local pytest does not use the development database. `python -m app.db.test_db ensure` creates the test database on an existing volume. Init scripts do not re-run after the first data directory is created. Production startup reads `DATABASE_URL` only.
 
 Goals: fast iteration early; Dockerfiles and Compose service definitions prepared for Phase 9 local parity and Phase 10 hosting.
 
@@ -94,7 +97,7 @@ Goals: fast iteration early; Dockerfiles and Compose service definitions prepare
 | Environment | Infra |
 |---|---|
 | Local | Mac + Compose data plane |
-| Test | Ephemeral CI services |
+| Test | Local pytest uses `TEST_DATABASE_URL` on the Compose PostgreSQL server. Hosted CI is not configured yet |
 | Staging | Separate Render services + R2 staging bucket |
 | Production / portfolio demo | Render + R2 prod + Demo Mode rules |
 | Cyber range | Lenovo VMs only |

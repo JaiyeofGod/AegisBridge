@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.db import SessionLocal
@@ -384,6 +385,16 @@ def test_empty_dev_password_does_not_create_credential(
     get_settings.cache_clear()
 
 
+def _admin_credential_state(session: Session) -> tuple[str | None, str | None]:
+    admin = session.scalar(select(User).where(User.human_id == "USR-0001"))
+    if admin is None:
+        return None, None
+    credential = session.scalar(select(UserCredential).where(UserCredential.user_id == admin.id))
+    if credential is None:
+        return None, None
+    return credential.password_hash, credential.algorithm
+
+
 def test_production_env_refuses_dev_password_bootstrap(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -395,15 +406,13 @@ def test_production_env_refuses_dev_password_bootstrap(
         "app.db.seed.hash_password",
         lambda password: hash_calls.append(password) or "unused",
     )
-    from tests.dev_admin_guard import snapshot_dev_admin_credential
-
     with SessionLocal() as session:
-        before = snapshot_dev_admin_credential(session)
+        before = _admin_credential_state(session)
         from app.db.seed import _ensure_dev_admin_password
 
         assert _ensure_dev_admin_password(session) is False
         session.commit()
-        after = snapshot_dev_admin_credential(session)
+        after = _admin_credential_state(session)
     assert hash_calls == []
     assert after == before
     get_settings.cache_clear()
