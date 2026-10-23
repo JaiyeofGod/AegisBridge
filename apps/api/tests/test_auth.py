@@ -395,12 +395,17 @@ def test_production_env_refuses_dev_password_bootstrap(
         "app.db.seed.hash_password",
         lambda password: hash_calls.append(password) or "unused",
     )
+    from tests.dev_admin_guard import snapshot_dev_admin_credential
+
     with SessionLocal() as session:
+        before = snapshot_dev_admin_credential(session)
         from app.db.seed import _ensure_dev_admin_password
 
-        _ensure_dev_admin_password(session)
+        assert _ensure_dev_admin_password(session) is False
         session.commit()
+        after = snapshot_dev_admin_credential(session)
     assert hash_calls == []
+    assert after == before
     get_settings.cache_clear()
 
 

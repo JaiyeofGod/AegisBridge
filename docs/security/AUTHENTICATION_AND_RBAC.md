@@ -94,8 +94,10 @@ Optional truncated `user_agent` and `client_host` may be stored on sessions for 
 ## Password hashing
 
 - Algorithm: **Argon2id** explicitly (`argon2.low_level.Type.ID`; `algorithm` column constrained to `argon2id`).
-- Development password for `USR-0001` is hashed only when `AEGIS_DEV_ADMIN_PASSWORD` is set and non-empty and `APP_ENV` is `local` / `development` / `dev` / `test`.
-- Empty/unset development password does not create a credential.
+- Development password for `USR-0001` is an Argon2id hash of `AEGIS_DEV_ADMIN_PASSWORD`. There is no built-in default.
+- `APP_ENV` `local` / `development` / `dev`: seed requires that variable and rewrites the existing credential so it matches. Blank or missing fails the seed and does not invent a password.
+- `APP_ENV=test`: seed updates the hash only when the variable is set. Pytest restores the previous `USR-0001` hash afterward because tests share `DATABASE_URL`.
+- `APP_ENV=production`: seed does not read or write the development Administrator password.
 - Production must never bootstrap a predictable default password.
 
 ## Seven roles
@@ -295,10 +297,16 @@ Metadata may include actor human id, target human id, action, object human id, c
 
 ## Development login setup
 
-1. Copy `.env.example` to `.env`.
-2. Set a strong local-only value: `AEGIS_DEV_ADMIN_PASSWORD=...`
-3. Run migrations and seed: `alembic upgrade head` then `python -m app.db.seed`
-4. Sign in as `amara.okonkwo@aegisbridge.example` (`USR-0001`, Administrator) with that password.
+The API loads `AegisBridge/.env` from the repository root. `python -m app.db.seed` uses that same settings object.
+
+1. Copy `.env.example` to `.env` at the repository root.
+2. Set `AEGIS_DEV_ADMIN_PASSWORD` to a local-only value. Do not commit it. There is no default.
+3. Start PostgreSQL.
+4. From `apps/api`, with the API virtualenv active, run migrations if needed (`alembic upgrade head` from the repo root) and then `python -m app.db.seed`.
+5. Start FastAPI.
+6. Sign in as `amara.okonkwo@aegisbridge.example` (`USR-0001`, Administrator) using the password from the environment.
+
+Changing `AEGIS_DEV_ADMIN_PASSWORD` does nothing to the database until the seed command is run again. `python -m app.db.seed --check` reports match/mismatch without printing the password or hash.
 
 Never commit the real password. Production must not rely on this variable.
 

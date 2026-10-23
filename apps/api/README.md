@@ -50,11 +50,20 @@ The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. T
 
 ## Authentication (local)
 
-1. Set `AEGIS_DEV_ADMIN_PASSWORD` in the repo-root `.env` (local/dev/test only).
-2. `alembic upgrade head` and `python -m app.db.seed`.
-3. `POST /api/v1/auth/login` with email `amara.okonkwo@aegisbridge.example` and that password.
-4. Cookie `aegis_session` is HttpOnly. Use it for `/api/v1/auth/me`, `/api/v1/account/*`, and all domain GET routes.
-5. Login returns `csrf_token` (or call `GET /api/v1/auth/csrf`). Send `X-CSRF-Token` on logout and all authenticated PATCH/POST mutations.
+Settings load the repository-root `.env` (`AegisBridge/.env`) through `app.core.config.Settings`. There is no second dotenv reader in the seed command.
+
+1. Set `AEGIS_DEV_ADMIN_PASSWORD` in that `.env`. There is no default password.
+2. Ensure PostgreSQL is running and migrations are at head.
+3. From `apps/api`, with the API virtualenv active: `python -m app.db.seed` (or `uv run python -m app.db.seed`).
+4. Start FastAPI and sign in as `amara.okonkwo@aegisbridge.example` with the password from the environment.
+5. Cookie `aegis_session` is HttpOnly. Use it for `/api/v1/auth/me`, `/api/v1/account/*`, and all domain GET routes.
+6. Login returns `csrf_token` (or call `GET /api/v1/auth/csrf`). Send `X-CSRF-Token` on logout and all authenticated PATCH/POST mutations.
+
+Re-running the seed is idempotent. In `local` / `development` / `dev` it rewrites the `USR-0001` Argon2id hash to the current `AEGIS_DEV_ADMIN_PASSWORD` and keeps that user active with the Administrator role. A missing or blank password in those environments stops the seed with `AEGIS_DEV_ADMIN_PASSWORD must be set before seeding development credentials.` Changing the local password requires running the seed again.
+
+`APP_ENV=test` updates the hash only when the variable is set, so tests can use a synthetic password. `APP_ENV=production` never synchronizes this credential. `python -m app.db.seed --check` reports whether the user, credential row, and configured password match, without printing the password or hash.
+
+Pytest uses the same `DATABASE_URL` as local development. An autouse fixture restores the `USR-0001` credential hash after each test so the suite does not leave the developer password changed.
 
 See `docs/security/AUTHENTICATION_AND_RBAC.md`. Never commit a real password. Production must not bootstrap a default password from this variable.
 

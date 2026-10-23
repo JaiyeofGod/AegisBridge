@@ -130,7 +130,7 @@ Domain read routes, including threat intelligence, administration, reports, data
 
 **Not yet created:** Policy rich-text/PDF/e-sign/email, integration/report/cyber-range writes, SSO/MFA, password reset, rate limiting, external integrations, malware scanning for evidence, background jobs, Celery worker, CI workflows.
 
-Local login seed: set `AEGIS_DEV_ADMIN_PASSWORD` in `.env`, run migrations + `python -m app.db.seed`, then use `amara.okonkwo@aegisbridge.example` (`USR-0001`).
+Local login: set `AEGIS_DEV_ADMIN_PASSWORD` in the repo-root `.env` (no default password). From `apps/api`, run `python -m app.db.seed` so `USR-0001` (`amara.okonkwo@aegisbridge.example`) matches that value. Re-run the seed after changing it. Production does not sync this credential. Pytest restores the local hash after each test.
 
 ## Security reminders
 

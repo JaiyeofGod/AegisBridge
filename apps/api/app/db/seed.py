@@ -93,13 +93,14 @@ def reset_domain_tables(session: Session) -> None:
     session.commit()
 
 
-def seed_development(session: Session) -> None:
+def seed_development(session: Session) -> bool:
+    """Load deterministic development rows. Returns whether the dev admin hash was written."""
     existing = session.scalar(select(Organization).where(Organization.slug == ORG_SLUG))
     if existing is not None:
         _ensure_contract_records(session, existing)
-        _ensure_auth_foundation(session, existing)
+        synced = _ensure_auth_foundation(session, existing)
         session.commit()
-        return
+        return synced
 
     org = Organization(
         name="AegisBridge Technologies",
@@ -654,11 +655,12 @@ def seed_development(session: Session) -> None:
         )
     )
     _ensure_contract_records(session, org)
-    _ensure_auth_foundation(session, org)
+    synced = _ensure_auth_foundation(session, org)
     session.commit()
+    return synced
 
 
-def _ensure_auth_foundation(session: Session, org: Organization) -> None:
+def _ensure_auth_foundation(session: Session, org: Organization) -> bool:
     """Permission catalog, role entitlements, and optional local admin password hash."""
     existing = {row.code: row for row in session.scalars(select(Permission)).all()}
     for code, description in PERMISSION_CATALOG.items():
@@ -693,20 +695,41 @@ def _ensure_auth_foundation(session: Session, org: Organization) -> None:
                 )
             )
 
-    _ensure_dev_admin_password(session)
+    return _ensure_dev_admin_password(session)
 
 
-def _ensure_dev_admin_password(session: Session) -> None:
-    """Hash AEGIS_DEV_ADMIN_PASSWORD for USR-0001 in local/dev/test only."""
+class DevCredentialConfigError(RuntimeError):
+    """Development seed was asked to sync a credential without a configured password."""
+
+
+_DEV_SYNC_ENVS = frozenset({"local", "development", "dev"})
+_PRODUCTION_ENVS = frozenset({"production", "prod"})
+
+
+def _ensure_dev_admin_password(session: Session) -> bool:
+    """Align USR-0001's Argon2id hash with AEGIS_DEV_ADMIN_PASSWORD.
+
+    Local/development require the variable. Test syncs only when it is set, so
+    pytest can supply a synthetic password. Production never writes this credential.
+    Returns True when a hash was written.
+    """
     settings = get_settings()
-    if settings.app_env.lower() not in {"local", "development", "dev", "test"}:
-        return
+    env_name = settings.app_env.lower()
+    if env_name in _PRODUCTION_ENVS or env_name not in _DEV_SYNC_ENVS | {"test"}:
+        return False
     password = settings.aegis_dev_admin_password
     if password is None or password.strip() == "":
-        return
+        if env_name == "test":
+            return False
+        raise DevCredentialConfigError(
+            "AEGIS_DEV_ADMIN_PASSWORD must be set before seeding development credentials."
+        )
     admin = session.scalar(select(User).where(User.human_id == "USR-0001"))
     if admin is None:
-        return
+        return False
+    if admin.account_status != "active":
+        admin.account_status = "active"
+    _ensure_administrator_role(session, admin)
     digest = hash_password(password)
     credential = session.scalar(select(UserCredential).where(UserCredential.user_id == admin.id))
     if credential is None:
@@ -720,6 +743,23 @@ def _ensure_dev_admin_password(session: Session) -> None:
     else:
         credential.password_hash = digest
         credential.algorithm = "argon2id"
+    return True
+
+
+def _ensure_administrator_role(session: Session, admin: User) -> None:
+    role = session.scalar(
+        select(Role).where(
+            Role.organization_id == admin.organization_id,
+            Role.name == "Administrator",
+        )
+    )
+    if role is None:
+        return
+    link = session.scalar(
+        select(UserRole).where(UserRole.user_id == admin.id, UserRole.role_id == role.id)
+    )
+    if link is None:
+        session.add(UserRole(user_id=admin.id, role_id=role.id))
 
 
 def _ensure_contract_records(session: Session, org: Organization) -> None:
@@ -1959,6 +1999,32 @@ def _ensure_lab_scenarios(
                 )
 
 
+def check_dev_admin_credential(session: Session) -> str:
+    """Safe development credential status. Never includes a password or hash."""
+    settings = get_settings()
+    env_name = settings.app_env.lower()
+    if env_name in _PRODUCTION_ENVS:
+        return "Development Administrator credential synchronization is disabled."
+    admin = session.scalar(select(User).where(User.human_id == "USR-0001"))
+    if admin is None:
+        return "Administrator user exists: no"
+    credential = session.scalar(select(UserCredential).where(UserCredential.user_id == admin.id))
+    if credential is None:
+        return "Administrator user exists: yes\nCredential row exists: no"
+    password = settings.aegis_dev_admin_password
+    if env_name not in _DEV_SYNC_ENVS | {"test"} or password is None or password.strip() == "":
+        verified = "not-configured"
+    else:
+        from app.security.passwords import verify_password
+
+        verified = "yes" if verify_password(credential.password_hash, password) else "no"
+    return (
+        "Administrator user exists: yes\n"
+        "Credential row exists: yes\n"
+        f"Configured development credential verifies: {verified}"
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Load deterministic development domain seed.")
     parser.add_argument(
@@ -1966,11 +2032,26 @@ def main() -> None:
         action="store_true",
         help="Delete domain rows first. Allowed only when APP_ENV is local.",
     )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Report whether the development Administrator credential matches the environment.",
+    )
     args = parser.parse_args()
-    with SessionLocal() as session:
-        if args.reset:
-            reset_domain_tables(session)
-        seed_development(session)
+    synced = False
+    try:
+        with SessionLocal() as session:
+            if args.check:
+                print(check_dev_admin_credential(session))
+                return
+            if args.reset:
+                reset_domain_tables(session)
+            synced = seed_development(session)
+    except DevCredentialConfigError as exc:
+        raise SystemExit(str(exc)) from None
+    print("Seed complete.")
+    if synced:
+        print("Development Administrator credential synchronized.")
 
 
 if __name__ == "__main__":
