@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 
 import { Button } from "@/components/buttons/Button";
 import { Panel } from "@/components/cards/Panel";
@@ -56,8 +57,18 @@ export function GovernancePage() {
   const canManagePolicies = permissions.includes("policy.manage");
   const canApprovePolicies = permissions.includes("policy.approve");
   const governance = useGovernanceSummary();
-  const [section, setSection] = useState<GovernanceSectionId>("summary");
-  const [focusControlId, setFocusControlId] = useState<string | null>(null);
+  const location = useLocation();
+  const requestedControlId =
+    location.state &&
+    typeof location.state === "object" &&
+    "focusControlId" in location.state &&
+    typeof location.state.focusControlId === "string"
+      ? location.state.focusControlId
+      : "";
+  const [section, setSection] = useState<GovernanceSectionId>(
+    requestedControlId ? "controls" : "summary",
+  );
+  const [focusControlId, setFocusControlId] = useState<string | null>(requestedControlId || null);
   const generatedAt = governance.dataUpdatedAt
     ? new Date(governance.dataUpdatedAt).toISOString()
     : new Date().toISOString();
@@ -628,6 +639,46 @@ function ControlsSection({
                                 {policy.current_version
                                   ? ` · current ${policy.current_version}`
                                   : ""}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </Panel>
+
+                  <Panel
+                    title="Mapped risks"
+                    description="Risks associated with this control. Mapping does not change scores or prove effectiveness."
+                  >
+                    <div data-testid="control-mapped-risks">
+                      <p className="mb-3 text-xs text-[var(--muted)]">
+                        Mapping a control to a risk does not change the risk score or prove the
+                        control is effective.
+                      </p>
+                      {(detail.data.risks ?? []).length === 0 ? (
+                        <p
+                          className="text-sm text-[var(--muted)]"
+                          data-testid="control-mapped-risks-empty"
+                        >
+                          No risks are mapped to this control.
+                        </p>
+                      ) : (
+                        <ul className="space-y-2" data-testid="control-mapped-risks-list">
+                          {detail.data.risks?.map((risk) => (
+                            <li
+                              key={risk.id}
+                              className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--canvas)] px-3 py-2"
+                              data-testid={`control-mapped-risk-${risk.id}`}
+                            >
+                              <p className="text-sm font-medium text-[var(--text)]">
+                                {risk.id} · {risk.title}
+                              </p>
+                              <p className="mt-1 text-xs text-[var(--muted)]">
+                                Likelihood {risk.likelihood ?? "Not recorded"} · Impact{" "}
+                                {risk.impact ?? "Not recorded"} · Score{" "}
+                                {risk.score ?? "Not recorded"} · Treatment{" "}
+                                {risk.treatment_status?.replaceAll("_", " ") ?? "Not recorded"}
                               </p>
                             </li>
                           ))}

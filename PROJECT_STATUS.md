@@ -19,7 +19,7 @@
 | Read API | `/api/v1` through reports, datasets, experiments, cyber-range, governance (controls catalog: page/`q`/framework/implementation_status/sort; control detail includes mapped risks), policies (catalog: page/`q`/status/sort + mapped controls), risks (detail includes mapped controls), evidence detail + private object download |
 | Authentication | Sessions + CSRF synchronizer tokens; domain GET RBAC enforced |
 | Write API | Preferences, risk treatment, risk↔control link/unlink, incident, vulnerability, administration, governance, evidence objects, policy lifecycle, and policy↔control link/unlink; integration/report/cyber-range writes deferred |
-| Frontend API connection | Reads + CSRF client + preferences, risk, incident, vulnerability, administration, governance/evidence objects + Policy Management UI (lifecycle + policy↔control mapping + server-side control/policy catalog search/pagination; Add Control selector no longer assumes first 50); integration/report/cyber-range writes still disabled |
+| Frontend API connection | Reads + CSRF client + preferences, risk treatment, risk↔control mapping UI (paginated control selector; relationship-only, no score/effectiveness changes), incident, vulnerability, administration, governance/evidence objects + Policy Management UI (lifecycle + policy↔control mapping + server-side control/policy catalog search/pagination); integration/report/cyber-range writes still disabled |
 | Object storage | S3-compatible abstraction; SeaweedFS locally; Cloudflare R2 for hosted; optional health check |
 | Package installs | API via uv; web via pnpm (`apps/web`) |
 | Cyber range | Not started |

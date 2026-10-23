@@ -1,6 +1,7 @@
-import { apiGet, apiPatch } from "@/services/api-client";
+import { apiDelete, apiGet, apiPatch, apiPostCsrf } from "@/services/api-client";
 import type {
   PageResponse,
+  RiskControlLinkResult,
   RiskDetailResponse,
   RiskListItem,
   RiskQuery,
@@ -26,5 +27,19 @@ export function updateRiskTreatment(riskId: string, patch: RiskTreatmentUpdate) 
   return apiPatch<RiskDetailResponse>(
     `/api/v1/risks/${encodeURIComponent(riskId)}/treatment`,
     patch,
+  );
+}
+
+/** Link by human ids only. No request body. */
+export function linkRiskControl(riskId: string, controlId: string) {
+  return apiPostCsrf<RiskControlLinkResult>(
+    `/api/v1/risks/${encodeURIComponent(riskId)}/controls/${encodeURIComponent(controlId)}`,
+  );
+}
+
+/** Unlink relationship only. No request body. */
+export function unlinkRiskControl(riskId: string, controlId: string) {
+  return apiDelete<RiskControlLinkResult>(
+    `/api/v1/risks/${encodeURIComponent(riskId)}/controls/${encodeURIComponent(controlId)}`,
   );
 }

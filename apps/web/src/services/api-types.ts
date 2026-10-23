@@ -111,11 +111,30 @@ export type RiskListItem = {
   asset_hostname: string | null;
 };
 
+export type RiskMappedControl = {
+  id: string;
+  control_code: string;
+  title: string;
+  framework_code: string | null;
+  framework_name: string | null;
+  framework_version: string | null;
+  implementation_status: string | null;
+  licensed_text_included: boolean;
+};
+
+export type RiskControlLinkResult = {
+  linked: boolean;
+  risk_id: string;
+  control_id: string;
+};
+
 export type RiskDetailResponse = RiskListItem & {
   statement: string;
   treatment_notes: string | null;
   evidence: RelatedRecord[];
   reviews: RelatedRecord[];
+  control_mappings?: RiskMappedControl[];
+  control_mapping_semantics?: string;
   treatment_updated_at?: string | null;
 };
 
@@ -554,11 +573,21 @@ export type ControlEvidenceItem = {
   collected_at: string | null;
 };
 
+export type ControlMappedRisk = {
+  id: string;
+  title: string;
+  likelihood: number | null;
+  impact: number | null;
+  score: number | null;
+  treatment_status: string | null;
+};
+
 export type ControlDetail = ControlListItem & {
   implementation: ControlImplementationDetail | null;
   tests: ControlTestItem[];
   evidence: ControlEvidenceItem[];
   policies: ControlMappedPolicy[];
+  risks?: ControlMappedRisk[];
   licensed_text_included: boolean;
   updated_at: string | null;
 };

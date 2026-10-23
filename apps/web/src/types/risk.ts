@@ -1,3 +1,4 @@
+import type { RiskMappedControl } from "@/services/api-types";
 import type { OverviewMetric } from "@/types/overview";
 
 export type RiskSectionId = "register" | "treatments" | "exceptions" | "vendors";
@@ -38,6 +39,7 @@ export type RiskRecord = {
   acceptedException: boolean;
   vendorName?: string;
   open: boolean;
+  controlMappings?: RiskMappedControl[];
 };
 
 export type RiskSnapshot = {

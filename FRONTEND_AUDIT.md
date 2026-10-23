@@ -72,7 +72,7 @@ Unknown paths redirect to `/signin`. Auth status unknown shows a session loading
 ## Issues intentionally deferred
 
 - Incident task writes, integration credential writes, Cyber Range control, reports.
-- Policy rich-text editors, PDF/document generation, e-signature, email notifications, AI generation, attachments, policy↔risk/evidence mappings, bulk/drag-drop mapping, URL-persisted catalog query state, infinite scroll.
+- Policy rich-text editors, PDF/document generation, e-signature, email notifications, AI generation, attachments, policy↔risk mappings, evidence↔risk direct mappings, bulk/drag-drop mapping, graph views, URL-persisted catalog query state, infinite scroll.
 - Evidence malware scanning, independent integrity re-verification, public evidence URLs, browser-to-S3 uploads, R2 production cutover UI.
 - MFA enrollment, SSO/OIDC, password reset.
 - Profile/security field writes beyond preferences.
@@ -90,4 +90,4 @@ Route-level lazy loading remains. Auth adds a small session query on protected a
 
 ## Readiness assessment
 
-Frontend CSRF handling, preferences, risk treatment, incident updates, vulnerability remediation, administration (access reviews, user status, role assignment), and governance (control implementation, manual tests, evidence metadata + private object storage + linking) are wired. **Backend remains the authorization boundary.** Files flow only through authenticated FastAPI; SHA-256 is server-calculated at ingestion; `integrity_verified` stays false; malware scanning is not claimed. Integration/credential and remaining write APIs stay disabled in the UI.
+Frontend CSRF handling, preferences, risk treatment, risk↔control mapping, incident updates, vulnerability remediation, administration (access reviews, user status, role assignment), and governance (control implementation, manual tests, evidence metadata + private object storage + linking, mapped risks on control detail) are wired. Risk detail can link an existing control through the server-paginated catalog (`page_size` 20). Mapping is relationship-only: it does not change likelihood, impact, score, treatment, or implementation status, and it does not claim the control is effective. Open control navigates to Governance control detail (tests and evidence). Licensed CIS safeguard prose is not shown. **Backend remains the authorization boundary.** Files flow only through authenticated FastAPI; SHA-256 is server-calculated at ingestion; `integrity_verified` stays false; malware scanning is not claimed. Integration/credential and remaining write APIs stay disabled in the UI.

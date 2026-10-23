@@ -532,6 +532,9 @@ export const riskDetail: RiskDetailResponse = {
     },
   ],
   reviews: [],
+  control_mappings: [],
+  control_mapping_semantics:
+    "A risk-control mapping records an association only. It does not change likelihood, impact, score, or treatment, and it does not prove the control is effective.",
 };
 
 const finAsset = {
@@ -810,6 +813,7 @@ export const controlDetailSeed: ControlDetail = {
     },
   ],
   policies: [],
+  risks: [],
   licensed_text_included: false,
   updated_at: "2026-10-20T18:00:00+00:00",
 };
@@ -2150,6 +2154,8 @@ export function installApiFetch(
   };
   /** policy human id → linked control human ids */
   const policyControlLinks = new Map<string, Set<string>>();
+  /** risk human id → linked control human ids */
+  const riskControlLinks = new Map<string, Set<string>>();
   let controlListState: ControlListItem = { ...controlListItem };
   const controlCatalogState: ControlListItem[] = [
     { ...controlListItem },
@@ -2291,8 +2297,22 @@ export function installApiFetch(
         policy.control_mappings = [];
       }
     }
+    const mappedRisks =
+      riskControlLinks.get(riskDetailState.id)?.has(controlDetailState.id) === true
+        ? [
+            {
+              id: riskDetailState.id,
+              title: riskDetailState.title,
+              likelihood: riskDetailState.likelihood,
+              impact: riskDetailState.impact,
+              score: riskDetailState.score,
+              treatment_status: riskDetailState.treatment_status,
+            },
+          ]
+        : [];
     controlDetailState = {
       ...controlDetailState,
+      risks: mappedRisks,
       policies: [...policyControlLinks.entries()]
         .filter(([, controls]) => controls.has(controlDetailState.id))
         .map(([policyId]) => {
@@ -2498,6 +2518,57 @@ export function installApiFetch(
     if (url.includes("/api/v1/assets")) {
       if (url.includes("criticality=critical")) return jsonResponse(assetPage([finAppListItem]));
       return jsonResponse(assetPage(assetListItems));
+    }
+    if (/\/api\/v1\/risks\/[^/?]+\/controls\/[^/?]+/.test(url)) {
+      const path = url.split("/risks/")[1] ?? "";
+      const riskId = decodeURIComponent(path.split("/controls/")[0] ?? "");
+      const controlId = decodeURIComponent(path.split("/controls/")[1]?.split("?")[0] ?? "");
+      if (init?.method === "POST" || init?.method === "DELETE") {
+        const provided = headerValue(init, "X-CSRF-Token");
+        if (!provided) {
+          return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+        }
+        if (init.body && String(init.body).trim() && String(init.body).trim() !== "null") {
+          return jsonResponse(
+            { code: "validation_error", message: "This request does not accept a body." },
+            422,
+          );
+        }
+        if (riskId !== riskDetailState.id) {
+          return jsonResponse({ code: "not_found", message: "Risk was not found." }, 404);
+        }
+        const known = controlCatalogState.some((item) => item.id === controlId);
+        if (!known) {
+          return jsonResponse({ code: "not_found", message: "Control was not found." }, 404);
+        }
+        const linked = riskControlLinks.get(riskId) ?? new Set<string>();
+        if (init.method === "DELETE" && !linked.has(controlId)) {
+          return jsonResponse(
+            { code: "not_found", message: "Control is not linked to this risk." },
+            404,
+          );
+        }
+        if (init.method === "POST") linked.add(controlId);
+        if (init.method === "DELETE") linked.delete(controlId);
+        riskControlLinks.set(riskId, linked);
+        riskDetailState = {
+          ...riskDetailState,
+          likelihood: riskDetailState.likelihood,
+          impact: riskDetailState.impact,
+          score: riskDetailState.score,
+          treatment_status: riskDetailState.treatment_status,
+          control_mappings: [...linked].map((id) => ({
+            ...mappedControlPayload(id),
+            framework_name: null,
+          })),
+        };
+        syncPolicyControlMappings();
+        return jsonResponse({
+          linked: init.method === "POST",
+          risk_id: riskId,
+          control_id: controlId,
+        });
+      }
     }
     if (/\/api\/v1\/risks\/[^/?]+\/treatment/.test(url) && init?.method === "PATCH") {
       const provided = headerValue(init, "X-CSRF-Token");
@@ -2989,6 +3060,7 @@ export function installApiFetch(
           tests: [],
           evidence: [],
           policies: [],
+          risks: [],
           licensed_text_included: false,
           updated_at: null,
         } satisfies ControlDetail);

@@ -47,6 +47,7 @@ export function mapRiskListItem(item: RiskListItem): RiskRecord {
     overdue: false,
     acceptedException: accepted,
     open: !closed(item.status) && !accepted,
+    controlMappings: [],
   };
 }
 
@@ -67,6 +68,7 @@ export function applyRiskDetail(detail: RiskDetailResponse): RiskRecord {
     treatmentNotesRaw: detail.treatment_notes,
     treatmentUpdatedAt: detail.treatment_updated_at ?? null,
     linkedRecords: `${mapRiskListItem(detail).linkedRecords} Evidence: ${evidence}. Reviews: ${reviews}.`,
+    controlMappings: detail.control_mappings ?? [],
   };
 }
 

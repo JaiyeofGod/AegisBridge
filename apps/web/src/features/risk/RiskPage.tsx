@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/status/StatusBadge";
 import { StaleDataIndicator } from "@/components/status/StaleDataIndicator";
 import { SEEDED_DATA_LABEL, SEEDED_DATA_NOTE } from "@/features/data-origin";
 import { mapRiskInventory } from "@/features/risk/mapRisk";
+import { RiskControlMappingsPanel } from "@/features/risk/RiskControlMappingsPanel";
 import { impactLabel, likelihoodLabel, riskBand } from "@/features/risk/risk-model";
 import { RiskTreatmentEditor } from "@/features/risk/RiskTreatmentEditor";
 import { RiskRegisterTable, type RiskTableFilters } from "@/features/risk/RiskRegisterTable";
@@ -133,6 +134,8 @@ export function RiskPage() {
                   hasServerFilters ? (filtered.data?.total ?? openRisks.length) : catalog.data.total
                 }
                 selected={selected}
+                mappingsStatus={detail.isError ? "error" : detail.isSuccess ? "ready" : "loading"}
+                onRetryMappings={() => void detail.refetch()}
                 selectedId={selected?.id ?? ""}
                 onSelect={setSelectedId}
                 notes={snapshot.interpretationNotes}
@@ -165,6 +168,8 @@ function RegisterSection({
   openRisks,
   total,
   selected,
+  mappingsStatus,
+  onRetryMappings,
   selectedId,
   onSelect,
   notes,
@@ -177,6 +182,8 @@ function RegisterSection({
   openRisks: RiskRecord[];
   total: number;
   selected: RiskRecord | undefined;
+  mappingsStatus: "loading" | "error" | "ready";
+  onRetryMappings: () => void;
   selectedId: string;
   onSelect: (id: string) => void;
   notes: string[];
@@ -226,7 +233,13 @@ function RegisterSection({
           description="Stored likelihood, impact, and score. Related modules stay closed."
           className="h-full"
         >
-          {selected ? <SelectedRisk risk={selected} /> : null}
+          {selected ? (
+            <SelectedRisk
+              risk={selected}
+              mappingsStatus={mappingsStatus}
+              onRetryMappings={onRetryMappings}
+            />
+          ) : null}
         </Panel>
         <Panel
           title="Workflow & interpretation"
@@ -249,7 +262,15 @@ function RegisterSection({
   );
 }
 
-function SelectedRisk({ risk }: { risk: RiskRecord }) {
+function SelectedRisk({
+  risk,
+  mappingsStatus,
+  onRetryMappings,
+}: {
+  risk: RiskRecord;
+  mappingsStatus: "loading" | "error" | "ready";
+  onRetryMappings: () => void;
+}) {
   const auth = useAuthStatus();
   const canManage = auth.user?.permissions.includes("risk.manage") === true;
   const inherent =
@@ -301,6 +322,13 @@ function SelectedRisk({ risk }: { risk: RiskRecord }) {
           <p className="mt-2 text-xs text-[var(--muted)]">Review {risk.reviewDueLabel}.</p>
         </dd>
       </div>
+      <RiskControlMappingsPanel
+        riskId={risk.riskId}
+        mappings={risk.controlMappings ?? []}
+        canManage={canManage}
+        status={mappingsStatus}
+        onRetry={onRetryMappings}
+      />
     </dl>
   );
 }
