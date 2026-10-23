@@ -43,6 +43,8 @@ READ_PATHS = [
     "/api/v1/alerts/{alert_id}",
     "/api/v1/incidents",
     "/api/v1/incidents/{incident_id}",
+    "/api/v1/incidents/{incident_id}/tasks",
+    "/api/v1/incidents/{incident_id}/tasks/{task_id}",
     "/api/v1/governance/summary",
     "/api/v1/threat-intelligence/summary",
     "/api/v1/threat-intelligence/indicators",
@@ -229,7 +231,8 @@ def test_incident_detail_uses_empty_states(client: TestClient) -> None:
     assert hidden["total"] == 0
     detail = client.get("/api/v1/incidents/INC-0001").json()
     assert detail["timeline"]
-    assert detail["tasks"] == []
+    assert [task["id"] for task in detail["tasks"]] == ["TASK-0001", "TASK-0002", "TASK-0003"]
+    assert listed["items"][0]["open_task_count"] == 3
     assert detail["indicators"] == []
     assert detail["evidence"][0]["id"] == "EVID-0041"
     assert detail["evidence"][0]["sha256"]

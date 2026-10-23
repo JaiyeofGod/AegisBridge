@@ -18,6 +18,9 @@ IncidentStatus = Literal[
 ]
 
 CLOSED_STATUSES = frozenset({"resolved", "closed"})
+IncidentTaskStatus = Literal["open", "in_progress", "blocked", "completed", "cancelled"]
+ACTIVE_TASK_STATUSES = frozenset({"open", "in_progress", "blocked"})
+TERMINAL_TASK_STATUSES = frozenset({"completed", "cancelled"})
 
 
 class IncidentListItem(BaseModel):
@@ -38,9 +41,50 @@ class TimelineEvent(BaseModel):
 
 
 class IncidentTaskItem(BaseModel):
+    id: str
     title: str
     status: str
     assignee: PersonRef | None = None
+
+
+class IncidentTaskRecord(BaseModel):
+    """Public incident task. Internal UUIDs stay off this contract."""
+
+    id: str
+    incident_id: str
+    title: str
+    status: str
+    assignee: PersonRef | None = None
+    completed_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class IncidentTaskCreate(BaseModel):
+    """Create a response task. The server assigns TASK-NNNN."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=200)
+    status: IncidentTaskStatus = "open"
+    assignee: str | None = Field(
+        default=None,
+        description="Assignee user human id, such as USR-0004. Null leaves the task unassigned.",
+    )
+
+
+class IncidentTaskUpdate(BaseModel):
+    """Partial task patch. completed_at is server-owned."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    status: IncidentTaskStatus | None = None
+    assignee: str | None = Field(
+        default=None,
+        description="Assignee user human id. Null clears the assignee.",
+    )
+    expected_updated_at: datetime | None = None
 
 
 class IncidentIndicatorItem(BaseModel):

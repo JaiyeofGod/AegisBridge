@@ -45,6 +45,7 @@ from app.models import (
     Incident,
     IncidentEvent,
     IncidentEvidence,
+    IncidentTask,
     Integration,
     Investigation,
     KevRecord,
@@ -899,6 +900,42 @@ def _ensure_contract_records(session: Session, org: Organization) -> None:
     systems = _ensure_lab_zones_and_systems(session, org)
     _ensure_lab_scenarios(session, org, systems, detections)
     _ensure_policy_seed_shape(session, org)
+    _ensure_incident_tasks(session, org)
+
+
+def _ensure_incident_tasks(session: Session, org: Organization) -> None:
+    """Simulated response tasks for INC-0001. Not a record of real containment."""
+    incident = session.scalar(
+        select(Incident).where(
+            Incident.organization_id == org.id,
+            Incident.human_id == "INC-0001",
+        )
+    )
+    if incident is None:
+        return
+    assignee = session.scalar(select(User).where(User.human_id == "USR-0004"))
+    rows = (
+        ("TASK-0001", "Review affected host telemetry", "open", None),
+        (
+            "TASK-0002",
+            "Validate containment evidence",
+            "in_progress",
+            None if assignee is None else assignee.id,
+        ),
+        ("TASK-0003", "Document recovery verification", "open", None),
+    )
+    for human_id, title, status, assignee_id in rows:
+        if session.scalar(select(IncidentTask).where(IncidentTask.human_id == human_id)):
+            continue
+        session.add(
+            IncidentTask(
+                incident_id=incident.id,
+                assignee_user_id=assignee_id,
+                human_id=human_id,
+                title=title,
+                status=status,
+            )
+        )
 
 
 def _ensure_policy_seed_shape(session: Session, org: Organization) -> None:

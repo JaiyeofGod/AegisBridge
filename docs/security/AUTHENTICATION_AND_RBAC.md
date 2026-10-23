@@ -1,6 +1,6 @@
 # Authentication and RBAC
 
-**Status:** Backend authentication, domain read authorization, **CSRF-protected authenticated writes** (preferences, risk treatment, risk↔control link/unlink, incident update, vulnerability remediation, administration access reviews/users/roles, governance control implementation/tests, evidence metadata + control linking, policy lifecycle + policy↔control mapping), and session CSRF foundation are in place. Frontend route guards remain UX only. SSO/OIDC, MFA, email reset, rate limiting, and remaining domain writes (integrations, reports, cyber-range control, incident tasks) remain deferred.
+**Status:** Backend authentication, domain read authorization, **CSRF-protected authenticated writes** (preferences, risk treatment, risk↔control link/unlink, incident update, incident response tasks, vulnerability remediation, administration access reviews/users/roles, governance control implementation/tests, evidence metadata + control linking, policy lifecycle + policy↔control mapping), and session CSRF foundation are in place. Frontend route guards remain UX only. SSO/OIDC, MFA, email reset, rate limiting, and remaining domain writes (integrations, reports, cyber-range control) remain deferred.
 
 ## Authentication model
 
@@ -66,6 +66,10 @@ Session cookies remain HttpOnly. CSRF uses a **synchronizer token** bound to the
 | PATCH | `/risks/{risk_id}/treatment` | Authenticated + `risk.manage` + CSRF |
 | POST/DELETE | `/risks/{risk_id}/controls/{control_id}` | Authenticated + `risk.manage` + CSRF |
 | PATCH | `/incidents/{incident_id}` | Authenticated + `incident.manage` + CSRF (`incident.close` when closing) |
+| GET | `/incidents/{incident_id}/tasks` | Authenticated + `incident.read` |
+| POST | `/incidents/{incident_id}/tasks` | Authenticated + `incident.manage` + CSRF |
+| GET | `/incidents/{incident_id}/tasks/{task_id}` | Authenticated + `incident.read` |
+| PATCH | `/incidents/{incident_id}/tasks/{task_id}` | Authenticated + `incident.manage` + CSRF |
 | PATCH | `/vulnerabilities/{vulnerability_id}/remediation` | Authenticated + `vulnerability.manage` + CSRF |
 | PATCH | `/governance/controls/{control_id}/implementation` | Authenticated + `control.manage` + CSRF |
 | POST | `/governance/controls/{control_id}/tests` | Authenticated + `control.manage` + CSRF |
@@ -193,7 +197,7 @@ Authenticated session required (401 without a valid cookie):
 | Vulnerabilities | `vulnerability.read`; remediation PATCH requires `vulnerability.manage` + CSRF | Yes (read + remediation write) |
 | Alerts | `alert.read` | Yes |
 | Detections | `detection.read` (+ manage for writes later) | No dedicated list route yet |
-| Incidents | `incident.read`; PATCH requires `incident.manage` + CSRF; close statuses also need `incident.close` | Yes (read + incident write) |
+| Incidents | `incident.read`; incident PATCH and task create/update require `incident.manage` + CSRF; closing an incident also needs `incident.close`. Completing a task does not. | Yes (read + incident write + response tasks) |
 | Threat intelligence | `threat_intel.read` | Yes |
 | Reports | `report.read` (+ manage for writes later) | Yes (read) |
 | Datasets / experiments | `dataset.read` (+ manage for writes later) | Yes (read) |
@@ -209,6 +213,7 @@ Authenticated session required (401 without a valid cookie):
 | Risk treatment PATCH | `risk.manage` + CSRF | Yes |
 | Risk↔control link/unlink | `risk.manage` + CSRF | Yes |
 | Incident PATCH | `incident.manage` + CSRF (+ `incident.close` to resolve/close) | Yes |
+| Incident task create/update | `incident.manage` + CSRF. `incident.close` is not required to complete a task. | Yes |
 | Vulnerability remediation PATCH | `vulnerability.manage` + CSRF | Yes |
 | Control implementation / tests | `control.manage` + CSRF | Yes |
 | Evidence metadata create | `evidence.manage` + CSRF | Yes |
@@ -223,13 +228,20 @@ Authenticated session required (401 without a valid cookie):
 
 **Policy lifecycle** (`policy.read` / `policy.manage` / `policy.approve` + CSRF on mutations): create/edit drafts, transition/publish, self-acknowledge published versions, link/unlink controls. Published versions are immutable; replacements create new drafts. External e-signature and email notification are not implemented.
 
-**Remaining authenticated domain writes** (incident tasks, integration credentials, reports, cyber-range control, access-review findings) remain deferred. No Cyber Range remote control.
+**Remaining authenticated domain writes** (integration credentials, reports, cyber-range control, access-review findings) remain deferred. No Cyber Range remote control. Automated containment, host isolation, and SOAR are not implemented.
 
 ### Incident mutation scope (`incident.manage`)
 
 Writable: `title`, `severity`, `status`, `summary`, `owner` (user human id).  
-Not writable: `containment_state` (no column), related alerts/assets, tasks (no public task ids yet).  
+Not writable: `containment_state` (no column), related alerts/assets.  
 Closing (`resolved` / `closed`) additionally requires `incident.close`.
+
+### Incident response tasks (`incident.manage`)
+
+Public id: `TASK-NNNN`, server-assigned. Writable: `title`, `status` (`open`, `in_progress`, `blocked`, `completed`, `cancelled`), `assignee` (user human id in the same organization, active).  
+`completed_at` is written only by the server when status becomes `completed`, and cleared if the task leaves `completed`. `cancelled` does not set `completed_at`.  
+Not writable: task human id, internal UUID, `completed_at`, incident severity/status, priority, due date.  
+Hard deletion is deferred so investigation history stays. Task completion does not resolve, close, or otherwise change the incident. Automated containment and SOAR are unsupported.
 
 ### Vulnerability remediation scope (`vulnerability.manage`)
 
@@ -313,7 +325,7 @@ Never commit the real password. Production must not rely on this variable.
 ## Production hardening still required
 
 - Login rate limiting / lockout (structure is ready; not implemented)
-- Remaining CSRF-protected domain writes (integrations, reports, cyber-range, incident tasks)
+- Remaining CSRF-protected domain writes (integrations, reports, cyber-range)
 - MFA/TOTP
 - Password reset email flows
 - SSO/OIDC

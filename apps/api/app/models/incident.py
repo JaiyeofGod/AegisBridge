@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint, text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin, human_id_column
@@ -56,13 +56,21 @@ class IncidentEvent(UUIDMixin, TimestampMixin, Base):
 
 class IncidentTask(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "incident_tasks"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('open', 'in_progress', 'blocked', 'completed', 'cancelled')",
+            name="task_status",
+        ),
+    )
 
     incident_id: Mapped[UUID] = mapped_column(
         ForeignKey("incidents.id"), nullable=False, index=True
     )
     assignee_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
+    human_id: Mapped[str] = human_id_column()
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     incident: Mapped[Incident] = relationship(back_populates="tasks")
     assignee: Mapped[User | None] = relationship()

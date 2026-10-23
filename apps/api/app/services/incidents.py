@@ -13,6 +13,7 @@ from app.models.identity import User
 from app.models.incident import Incident, IncidentEvidence, IncidentTask
 from app.schemas.common import Page
 from app.schemas.incidents import (
+    ACTIVE_TASK_STATUSES,
     CLOSED_STATUSES,
     IncidentDetail,
     IncidentEvidenceItem,
@@ -24,7 +25,7 @@ from app.schemas.incidents import (
 )
 from app.security.rbac import AuthenticatedPrincipal
 from app.services.audit_write import record_audit_event
-from app.services.support import CLOSED_INCIDENT, PageParams, like_pattern, page, paginate, person
+from app.services.support import PageParams, like_pattern, page, paginate, person
 
 
 def list_incidents(
@@ -173,11 +174,12 @@ def _detail(incident: Incident) -> IncidentDetail:
         ],
         tasks=[
             IncidentTaskItem(
+                id=task.human_id,
                 title=task.title,
                 status=task.status,
                 assignee=person(task.assignee),
             )
-            for task in incident.tasks
+            for task in sorted(incident.tasks, key=lambda task: task.human_id)
         ],
         indicators=[
             IncidentIndicatorItem(
@@ -220,7 +222,7 @@ def _assert_fresh(current: datetime, expected: datetime, message: str) -> None:
 
 
 def _list_item(incident: Incident) -> IncidentListItem:
-    open_tasks = sum(1 for task in incident.tasks if task.status.lower() not in CLOSED_INCIDENT)
+    open_tasks = sum(1 for task in incident.tasks if task.status.lower() in ACTIVE_TASK_STATUSES)
     return IncidentListItem(
         id=incident.human_id,
         title=incident.title,

@@ -1,6 +1,6 @@
 # AegisBridge API (`apps/api`)
 
-FastAPI service with Phase 2 domain models, session authentication, enforced RBAC on domain reads, synchronizer CSRF, and authenticated writes for account preferences, risk treatment, incidents, vulnerability remediation, administration, governance, evidence (including private objects), **policy lifecycle / versioning / acknowledgement**, and **policy↔control mapping**. Object storage uses an S3-compatible abstraction (SeaweedFS locally / Cloudflare R2 hosted). Frontend guards are UX only. Integration/report/cyber-range writes, SSO/MFA, and rate limiting remain deferred.
+FastAPI service with Phase 2 domain models, session authentication, enforced RBAC on domain reads, synchronizer CSRF, and authenticated writes for account preferences, risk treatment, incidents, vulnerability remediation, administration, governance, evidence (including private objects), **policy lifecycle / versioning / acknowledgement**, **policy↔control mapping**, and **incident response tasks**. Object storage uses an S3-compatible abstraction (SeaweedFS locally / Cloudflare R2 hosted). Frontend guards are UX only. Integration/report/cyber-range writes, SSO/MFA, and rate limiting remain deferred. Task completion does not close an incident. Automated containment and SOAR are not implemented.
 
 ## Commands
 
@@ -30,7 +30,7 @@ uv run --project apps/api python -m app.db.seed
 uv run --project apps/api python -m app.db.seed --reset
 ```
 
-The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. Threat-intelligence tables and `integrations.human_id` are `20261020_0003`. Report definitions and dataset registry metadata are `20261020_0004`. Cyber-range catalog tables and detection metadata columns are `20261020_0005`. Local credentials and sessions are `20261020_0006`. CSRF digests and `user_preferences` are `20261020_0007`. Control-test public ids (`control_tests.human_id`) are `20261020_0008`. Evidence object metadata (`evidence_objects`) is `20261020_0009`. Policy version lifecycle (`policy_versions.status`, `change_summary`, policy status check) is `20261020_0010`. Policy↔control relationship table (`policy_control_mappings`) is `20261020_0011`. Risk↔control relationship table (`risk_control_mappings`) is `20261020_0012`. Seed data is not in the migration. Re-running the seed ensures contract rows when the organization already exists.
+The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. Threat-intelligence tables and `integrations.human_id` are `20261020_0003`. Report definitions and dataset registry metadata are `20261020_0004`. Cyber-range catalog tables and detection metadata columns are `20261020_0005`. Local credentials and sessions are `20261020_0006`. CSRF digests and `user_preferences` are `20261020_0007`. Control-test public ids (`control_tests.human_id`) are `20261020_0008`. Evidence object metadata (`evidence_objects`) is `20261020_0009`. Policy version lifecycle (`policy_versions.status`, `change_summary`, policy status check) is `20261020_0010`. Policy↔control relationship table (`policy_control_mappings`) is `20261020_0011`. Risk↔control relationship table (`risk_control_mappings`) is `20261020_0012`. Incident task public ids and completion time (`incident_tasks.human_id`, `completed_at`) are `20261020_0013`. Seed data is not in the migration. Re-running the seed ensures contract rows when the organization already exists.
 
 ### Policy ↔ control mappings
 
@@ -97,6 +97,7 @@ See `docs/security/AUTHENTICATION_AND_RBAC.md`. Never commit a real password. Pr
 - `GET /api/v1/account/workspace`
 - `PATCH /api/v1/risks/{risk_id}/treatment` (`risk.manage` + CSRF)
 - `PATCH /api/v1/incidents/{incident_id}` (`incident.manage` + CSRF; `incident.close` to resolve/close)
+- `GET|POST /api/v1/incidents/{incident_id}/tasks` and `GET|PATCH /api/v1/incidents/{incident_id}/tasks/{task_id}` (`incident.read` to view, `incident.manage` + CSRF to create/update). Public ids are `TASK-NNNN`. Completing a task does not close the incident. Cancel keeps the row; hard delete is not implemented.
 - `PATCH /api/v1/vulnerabilities/{vulnerability_id}/remediation` (`vulnerability.manage` + CSRF)
 - `PATCH /api/v1/administration/access-reviews/{review_id}` (`administration.manage` + CSRF)
 - `PATCH /api/v1/administration/users/{user_id}` (`administration.manage` + CSRF; status only)

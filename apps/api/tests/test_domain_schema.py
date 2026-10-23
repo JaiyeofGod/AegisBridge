@@ -168,6 +168,7 @@ def test_human_ids_are_unique_and_foreign_keys_exist() -> None:
         "vulnerabilities",
         "detections",
         "incidents",
+        "incident_tasks",
         "evidence",
         "policies",
         "vendors",
