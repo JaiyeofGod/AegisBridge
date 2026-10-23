@@ -27,6 +27,14 @@ Login body: `{ "email", "password" }`. Responses never include password hashes, 
 | PATCH | `/account/preferences` | CSRF. Partial update of `theme`, `density`, `landing_page`, `reduced_motion`. Current user only. |
 | GET | `/account/workspace` | Organization, roles, permissions, privileged flag |
 
+## Operational directory
+
+| Method | Path | Permission | Notes |
+|---|---|---|---|
+| GET | `/directory/users` | `directory.read` | Active users in the caller's organization only. Page contract (`page`, `page_size` max 100, default 25). Optional `q` matches human id, display name, and department name. Fields: `id` (user human id), `display_name`, `account_status`, `department`, `job_title`. No email, roles, permissions, credentials, sessions, or internal UUID. No organization query parameter. Not an Administration endpoint. GET only. |
+
+`directory.read` is held by Administrator, GRC Analyst, SOC Analyst, and Security Engineer. CISO, Auditor, and Read Only do not receive it. `administration.read` is not required. Account changes, roles, and user status remain on `/administration`.
+
 ## Domain write endpoints
 
 | Method | Path | Permission | Notes |

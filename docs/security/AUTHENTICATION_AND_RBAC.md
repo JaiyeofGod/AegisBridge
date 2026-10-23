@@ -126,7 +126,7 @@ Capability codes live in `app/security/permissions.py` (`PERMISSION_CATALOG`). T
 
 `risk.accept`, `control.update`, `evidence.download`, `incident.close`, `integration.manage`, `user.role.manage`, `detection.manage`, `policy.approve`
 
-plus domain `.read` / `.manage` capabilities enforced on current routes (including `policy.read` / `policy.manage`).
+plus domain `.read` / `.manage` capabilities enforced on current routes (including `policy.read` / `policy.manage` and `directory.read`). There is no `directory.manage`.
 
 Effective permissions for a principal are the **union** of permissions for their assigned roles from `ROLE_PERMISSIONS`. Stored `access_entitlements` remain labels aligned to the catalog; they are not a second policy engine.
 
@@ -136,13 +136,15 @@ Effective permissions for a principal are the **union** of permissions for their
 |---|---|
 | Administrator | All catalog permissions |
 | CISO | Broad `*.read` across domains + `audit.read` + `policy.approve` (no draft `policy.manage`) |
-| GRC Analyst | Risk/control/policy/evidence/report/dataset + `risk.accept`, `control.update`, `evidence.download`, `policy.manage` |
-| SOC Analyst | Alert/detection/incident/threat intel/policy reads + `incident.manage`, `incident.close` |
-| Security Engineer | Detection/vuln/integration/cyber-range/dataset/policy reads + `detection.manage`, `integration.manage` |
+| GRC Analyst | Risk/control/policy/evidence/report/dataset + `risk.accept`, `control.update`, `evidence.download`, `policy.manage`, `directory.read` |
+| SOC Analyst | Alert/detection/incident/threat intel/policy reads + `incident.manage`, `incident.close`, `directory.read` |
+| Security Engineer | Detection/vuln/integration/cyber-range/dataset/policy reads + `detection.manage`, `integration.manage`, `directory.read` |
 | Auditor | Read-heavy GRC/policy/evidence/audit + `evidence.download` |
 | Read Only | Limited reads (assets, risk, control, policy, vuln, alert, detection, incident, threat intel, report, dataset, cyber range) |
 
 See `ROLE_PERMISSIONS` in code for the authoritative set.
+
+`directory.read` is the operational identity-selection permission. It is granted to Administrator, GRC Analyst, SOC Analyst, and Security Engineer because those roles already assign an owner or assignee (`incident.manage`, `risk.manage` / `control.manage` / `policy.manage`, `vulnerability.manage` / `detection.manage`). CISO, Auditor, and Read Only do not assign operational owners, so they do not receive `directory.read`. Auditor still uses `administration.read` for account review. `directory.read` is not inferred from a role name on the route.
 
 ## Authorization helpers
 
@@ -198,6 +200,7 @@ Authenticated session required (401 without a valid cookie):
 | Alerts | `alert.read` | Yes |
 | Detections | `detection.read` (+ manage for writes later) | No dedicated list route yet |
 | Incidents | `incident.read`; incident PATCH and task create/update require `incident.manage` + CSRF; closing an incident also needs `incident.close`. Completing a task does not. | Yes (read + incident write + response tasks) |
+| Operational directory | `directory.read`. Active same-organization users for assignee/owner selection. Not `administration.read`. | Yes (GET only) |
 | Threat intelligence | `threat_intel.read` | Yes |
 | Reports | `report.read` (+ manage for writes later) | Yes (read) |
 | Datasets / experiments | `dataset.read` (+ manage for writes later) | Yes (read) |

@@ -16,7 +16,7 @@
 | Minimal Phase 0 docs | Complete |
 | Application code | API domain schema + web UI on local mocks |
 | Domain schema | Through `20261020_0013` (incident task public ids) |
-| Read API | `/api/v1` through reports, datasets, experiments, cyber-range, governance (controls catalog: page/`q`/framework/implementation_status/sort; control detail includes mapped risks), policies (catalog: page/`q`/status/sort + mapped controls), risks (detail includes mapped controls), incidents (detail task summaries + `/incidents/{id}/tasks`), evidence detail + private object download |
+| Read API | `/api/v1` through reports, datasets, experiments, cyber-range, governance (controls catalog: page/`q`/framework/implementation_status/sort; control detail includes mapped risks), policies (catalog: page/`q`/status/sort + mapped controls), risks (detail includes mapped controls), incidents (detail task summaries + `/incidents/{id}/tasks`), operational directory (`GET /directory/users`, `directory.read`, active same-organization users only), evidence detail + private object download |
 | Authentication | Sessions + CSRF synchronizer tokens; domain GET RBAC enforced |
 | Write API | Preferences, risk treatment, risk↔control link/unlink, incident update, incident response tasks (`TASK-NNNN`; completion does not close the incident), vulnerability, administration, governance, evidence objects, policy lifecycle, and policy↔control link/unlink; integration/report/cyber-range writes deferred |
 | Local admin credential | `AEGIS_DEV_ADMIN_PASSWORD` is the only development password source. Seed rewrites the `USR-0001` Argon2id hash in local/dev; production skips it. Pytest does not touch that row |

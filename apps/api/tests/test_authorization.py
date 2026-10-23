@@ -47,6 +47,7 @@ ROUTE_PERMISSIONS = [
     ("/api/v1/dataset-experiments", "dataset.read"),
     ("/api/v1/cyber-range/summary", "cyber_range.read"),
     ("/api/v1/administration/summary", "administration.read"),
+    ("/api/v1/directory/users", "directory.read"),
 ]
 
 

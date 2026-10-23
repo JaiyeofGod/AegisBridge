@@ -9,7 +9,7 @@ Internal primary keys are UUIDs. Operational records also have a unique `human_i
 | Boundary | Owns | Does not own |
 |---|---|---|
 | Organization | Tenant, departments, business processes | Workspace display name from the UI |
-| Identity | Users, role catalog, permission labels, entitlements, access reviews | Machine/API credentials (`api_credentials` deferred) |
+| Identity | Users, role catalog, permission labels, entitlements, access reviews. `GET /directory/users` is a read of active users in the caller's organization, not a new table. | Machine/API credentials (`api_credentials` deferred) |
 | Auth | `user_credentials` (Argon2id hashes), `sessions` (token + CSRF digests only) | Raw session/CSRF tokens, plaintext passwords, MFA secrets |
 | Preferences | `user_preferences` (theme, density, landing_page, reduced_motion) | Server-side theme application |
 | Assets | Inventory, software, data-asset relationships, criticality, exposure | Vulnerability findings |
