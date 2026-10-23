@@ -58,7 +58,7 @@ from app.models.organization import BusinessProcess, Department, Organization
 from app.models.policy import Policy, PolicyAcknowledgement, PolicyControlMapping, PolicyVersion
 from app.models.preferences import UserPreferences
 from app.models.report import ReportDefinition
-from app.models.risk import Risk, RiskAssessment, RiskReview, RiskTreatment
+from app.models.risk import Risk, RiskAssessment, RiskControlMapping, RiskReview, RiskTreatment
 from app.models.soc import AlertReference, Investigation
 from app.models.threat_intel import ThreatAdvisory, ThreatIndicator, ThreatIntelSource
 from app.models.vendor import Vendor, VendorAssessment, VendorFinding, VendorService
@@ -134,6 +134,7 @@ __all__ = [
     "ReportDefinition",
     "Risk",
     "RiskAssessment",
+    "RiskControlMapping",
     "RiskReview",
     "RiskTreatment",
     "Role",

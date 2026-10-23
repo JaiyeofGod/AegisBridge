@@ -1,6 +1,6 @@
 # Authentication and RBAC
 
-**Status:** Backend authentication, domain read authorization, **CSRF-protected authenticated writes** (preferences, risk treatment, incident update, vulnerability remediation, administration access reviews/users/roles, governance control implementation/tests, evidence metadata + control linking, policy lifecycle + policy↔control mapping), and session CSRF foundation are in place. Frontend route guards remain UX only. SSO/OIDC, MFA, email reset, rate limiting, and remaining domain writes (integrations, reports, cyber-range control, incident tasks) remain deferred.
+**Status:** Backend authentication, domain read authorization, **CSRF-protected authenticated writes** (preferences, risk treatment, risk↔control link/unlink, incident update, vulnerability remediation, administration access reviews/users/roles, governance control implementation/tests, evidence metadata + control linking, policy lifecycle + policy↔control mapping), and session CSRF foundation are in place. Frontend route guards remain UX only. SSO/OIDC, MFA, email reset, rate limiting, and remaining domain writes (integrations, reports, cyber-range control, incident tasks) remain deferred.
 
 ## Authentication model
 
@@ -64,6 +64,7 @@ Session cookies remain HttpOnly. CSRF uses a **synchronizer token** bound to the
 | POST | `/auth/logout-all` | Authenticated + CSRF |
 | PATCH | `/account/preferences` | Authenticated + CSRF |
 | PATCH | `/risks/{risk_id}/treatment` | Authenticated + `risk.manage` + CSRF |
+| POST/DELETE | `/risks/{risk_id}/controls/{control_id}` | Authenticated + `risk.manage` + CSRF |
 | PATCH | `/incidents/{incident_id}` | Authenticated + `incident.manage` + CSRF (`incident.close` when closing) |
 | PATCH | `/vulnerabilities/{vulnerability_id}/remediation` | Authenticated + `vulnerability.manage` + CSRF |
 | PATCH | `/governance/controls/{control_id}/implementation` | Authenticated + `control.manage` + CSRF |
@@ -184,7 +185,7 @@ Authenticated session required (401 without a valid cookie):
 |---|---|---|
 | Overview | Authenticated session (any role). Sections omit data the caller lacks `*.read` for. | Yes |
 | Assets | `asset.read` | Yes |
-| Risks | `risk.read`; treatment PATCH requires `risk.manage` + CSRF | Yes (read + treatment write) |
+| Risks | `risk.read`; treatment PATCH and risk↔control link/unlink require `risk.manage` + CSRF. Mapped controls are visible with `risk.read`. Mapped risks on a control require `control.read`. | Yes (read + treatment write + mapping) |
 | Controls / governance | `control.read`; implementation/tests require `control.manage` + CSRF; evidence link requires `control.manage` + `evidence.manage` + CSRF | Yes (read + control/evidence writes) |
 | Evidence | `evidence.read`; metadata/object POST/DELETE require `evidence.manage` + CSRF; object GET requires `evidence.read` | Yes (metadata + private object upload/download/delete) |
 | Vulnerabilities | `vulnerability.read`; remediation PATCH requires `vulnerability.manage` + CSRF | Yes (read + remediation write) |
@@ -204,6 +205,7 @@ Authenticated session required (401 without a valid cookie):
 | Auth session/me | authenticated (`/me`); `/session` public | Yes |
 | Account | authenticated; preferences PATCH + CSRF | Yes |
 | Risk treatment PATCH | `risk.manage` + CSRF | Yes |
+| Risk↔control link/unlink | `risk.manage` + CSRF | Yes |
 | Incident PATCH | `incident.manage` + CSRF (+ `incident.close` to resolve/close) | Yes |
 | Vulnerability remediation PATCH | `vulnerability.manage` + CSRF | Yes |
 | Control implementation / tests | `control.manage` + CSRF | Yes |

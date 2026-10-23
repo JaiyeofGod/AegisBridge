@@ -32,6 +32,8 @@ Login body: `{ "email", "password" }`. Responses never include password hashes, 
 | Method | Path | Permission | Notes |
 |---|---|---|---|
 | PATCH | `/risks/{risk_id}/treatment` | `risk.manage` + CSRF | Partial update of `strategy`, `status`, `notes`. Optional `expected_updated_at` → `409` on stale. |
+| POST | `/risks/{risk_id}/controls/{control_id}` | `risk.manage` + CSRF | Link by human ids. No body (`422` if present). Duplicate is idempotent. Does not change likelihood, impact, score, treatment, or control implementation status. |
+| DELETE | `/risks/{risk_id}/controls/{control_id}` | `risk.manage` + CSRF | Removes the relationship only. Missing mapping → `404`. |
 | PATCH | `/incidents/{incident_id}` | `incident.manage` + CSRF | Partial update of `title`, `severity`, `status`, `summary`, `owner` (user human id). Setting `status` to `resolved`/`closed` also requires `incident.close`. Optional `expected_updated_at` → `409`. `containment_state` is not stored and cannot be written. Incident task PATCH is deferred (tasks lack public ids). |
 | PATCH | `/vulnerabilities/{vulnerability_id}/remediation` | `vulnerability.manage` + CSRF | Partial update of remediation `status`, `title`, `due_on`, `owner`. Optional `asset_id` (required when multiple asset findings). Optional `expected_updated_at` → `409`. CVSS, EPSS, KEV, SSVC/`action_decision`, and source enrichment are immutable. |
 | PATCH | `/administration/access-reviews/{review_id}` | `administration.manage` + CSRF | Partial update of `name`, `status` (`in_progress` / `closed` / `completed` / `cancelled`). Optional `expected_updated_at` → `409`. Owner/due/notes are not stored. Finding updates deferred (findings lack public ids). |
@@ -48,7 +50,7 @@ All domain rows require a valid session (`401` otherwise) and the permission lis
 | GET | `/assets` | Filters: `search`, `asset_type`, `criticality`, `environment`, `telemetry_status` |
 | GET | `/assets/{asset_id}` | Vulnerabilities, alerts, risks, controls, and evidence summaries |
 | GET | `/risks` | Filters: `search`, `risk_level`, `treatment_status`, `owner` |
-| GET | `/risks/{risk_id}` | Likelihood, impact, and score stay separate |
+| GET | `/risks/{risk_id}` | Likelihood, impact, and score stay separate. `control_mappings` lists related controls (human id, code, title, framework metadata, implementation status, `licensed_text_included=false`) without nested tests or evidence. |
 | GET | `/vulnerabilities` | Filters: `search`, `severity`, `kev`, `action_decision`, `remediation_status`, `asset_criticality` |
 | GET | `/vulnerabilities/{vulnerability_id}` | CVSS, EPSS, KEV, exposure, criticality, and SSVC stay separate; asset contexts may include `remediation_updated_at` |
 | GET | `/alerts` | Filters: `search`, `severity`, `status`, `asset`, `attack_technique` |
@@ -154,6 +156,7 @@ Validation uses the same shape with `code` `validation_error` and `details` entr
 - Control tests are manually recorded development data (`recording_mode: manual`). Notes include `[manual development recording]`. They are not automated assessments.
 - Governance summary counts (implementation by status, `tests_recorded`, evidence freshness) are derived from stored rows after writes.
 - Policies use closed lifecycle statuses `draft` → `in_review` → `approved` → `published` → `retired` (plus `published` → `published` to replace the current version). Version statuses are `draft`, `published`, and `superseded`. Published/superseded content is immutable. Acknowledgements bind to a specific published version and remain after supersession. Acknowledgement responses expose counts only (no invented completion percentage). Policy↔control mappings are relationship-only (`policy_control_mappings`); responses never duplicate licensed CIS text (`licensed_text_included=false`). Unlink removes the relationship only. External e-signature and email workflows are unsupported.
+- Traceability is Risk → Control → Test → Evidence, and separately Policy → Control. `risk_control_mappings` records that a control is associated with managing a risk. Mapping does not prove effectiveness, does not create residual-risk values, and does not change likelihood, impact, score, treatment status, or control implementation status. Control detail `risks` exposes current assessment and treatment status only.
 - Policy permissions: `policy.read` (read + self-acknowledge + view mappings), `policy.manage` (create/edit drafts and metadata; draft↔in_review; link/unlink controls), `policy.approve` (approve/publish/retire; sensitive).
 - Telemetry `active` counts only `active` or `reporting`. Seed values `reference_only` and `not_connected` stay at zero because the feed is absent.
 - Incident `containment_state` is null. Filtering it returns an empty page because the column is not stored. Related alerts and affected assets are empty for the same reason.

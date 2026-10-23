@@ -117,11 +117,23 @@ class ControlMappedPolicy(BaseModel):
     current_version: str | None = None
 
 
+class ControlMappedRisk(BaseModel):
+    """Minimal risk reference from a control. No treatment history or residual metrics."""
+
+    id: str
+    title: str
+    likelihood: int | None = None
+    impact: int | None = None
+    score: int | None = None
+    treatment_status: str | None = None
+
+
 class ControlDetail(ControlListItem):
     implementation: ControlImplementationDetail | None = None
     tests: list[ControlTestItem] = Field(default_factory=list)
     evidence: list[ControlEvidenceItem] = Field(default_factory=list)
     policies: list[ControlMappedPolicy] = Field(default_factory=list)
+    risks: list[ControlMappedRisk] = Field(default_factory=list)
     licensed_text_included: bool = False
     updated_at: datetime | None = None
 

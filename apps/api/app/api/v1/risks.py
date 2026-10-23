@@ -1,11 +1,18 @@
 """Risk register reads and treatment updates."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from app.api.deps import DbSession, PageQuery, RequireCsrf, require_permissions
+from app.api.errors import ApiError
 from app.schemas.common import ErrorBody, Page
-from app.schemas.risks import RiskDetail, RiskListItem, RiskTreatmentUpdate
-from app.services.risks import get_risk, list_risks, update_risk_treatment
+from app.schemas.risks import RiskControlLinkResult, RiskDetail, RiskListItem, RiskTreatmentUpdate
+from app.services.risks import (
+    get_risk,
+    link_risk_control,
+    list_risks,
+    unlink_risk_control,
+    update_risk_treatment,
+)
 
 router = APIRouter(
     prefix="/risks",
@@ -51,3 +58,45 @@ def patch_risk_treatment(
     principal: RequireCsrf,
 ) -> RiskDetail:
     return update_risk_treatment(session, principal, risk_id, body)
+
+
+async def _reject_request_body(request: Request) -> None:
+    raw = await request.body()
+    if raw.strip() not in {b"", b"null"}:
+        raise ApiError(
+            422,
+            "validation_error",
+            "This request does not accept a body.",
+        )
+
+
+@router.post(
+    "/{risk_id}/controls/{control_id}",
+    response_model=RiskControlLinkResult,
+    responses={404: {"model": ErrorBody}, 409: {"model": ErrorBody}, 422: {"model": ErrorBody}},
+    dependencies=[Depends(require_permissions("risk.manage")), Depends(_reject_request_body)],
+)
+def post_risk_control_link(
+    risk_id: str,
+    control_id: str,
+    session: DbSession,
+    principal: RequireCsrf,
+) -> RiskControlLinkResult:
+    """Link a control to a risk by human ids. CSRF required. No body. Does not change scores."""
+    return link_risk_control(session, principal, risk_id, control_id)
+
+
+@router.delete(
+    "/{risk_id}/controls/{control_id}",
+    response_model=RiskControlLinkResult,
+    responses={404: {"model": ErrorBody}},
+    dependencies=[Depends(require_permissions("risk.manage")), Depends(_reject_request_body)],
+)
+def delete_risk_control_link(
+    risk_id: str,
+    control_id: str,
+    session: DbSession,
+    principal: RequireCsrf,
+) -> RiskControlLinkResult:
+    """Remove the risk↔control relationship only. CSRF required. Missing link → 404."""
+    return unlink_risk_control(session, principal, risk_id, control_id)

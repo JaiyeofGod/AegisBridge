@@ -20,6 +20,7 @@ from app.models.grc import (
 )
 from app.models.identity import User
 from app.models.policy import Policy, PolicyControlMapping
+from app.models.risk import Risk, RiskControlMapping
 from app.schemas.common import Page
 from app.schemas.governance import (
     ControlDetail,
@@ -28,6 +29,7 @@ from app.schemas.governance import (
     ControlImplementationUpdate,
     ControlListItem,
     ControlMappedPolicy,
+    ControlMappedRisk,
     ControlTestCreate,
     ControlTestItem,
     ControlTestUpdate,
@@ -412,6 +414,15 @@ def _detail(session: Session, control: Control) -> ControlDetail:
         )
         .order_by(PolicyControlMapping.created_at)
     ).all()
+    risk_rows = session.scalars(
+        select(RiskControlMapping)
+        .where(RiskControlMapping.control_id == control.id)
+        .options(
+            selectinload(RiskControlMapping.risk).selectinload(Risk.assessments),
+            selectinload(RiskControlMapping.risk).selectinload(Risk.treatments),
+        )
+        .order_by(RiskControlMapping.created_at)
+    ).all()
     return ControlDetail(
         **base.model_dump(),
         implementation=(
@@ -436,8 +447,23 @@ def _detail(session: Session, control: Control) -> ControlDetail:
             if link.evidence is not None
         ],
         policies=[_mapped_policy(link.policy) for link in policy_rows if link.policy is not None],
+        risks=[_mapped_risk(link.risk) for link in risk_rows if link.risk is not None],
         licensed_text_included=False,
         updated_at=control.updated_at,
+    )
+
+
+def _mapped_risk(risk: Risk) -> ControlMappedRisk:
+    current = [item for item in risk.assessments if item.is_current]
+    assessment = current[0] if current else (risk.assessments[-1] if risk.assessments else None)
+    treatment = max(risk.treatments, key=lambda item: item.created_at) if risk.treatments else None
+    return ControlMappedRisk(
+        id=risk.human_id,
+        title=risk.title,
+        likelihood=None if assessment is None else assessment.likelihood,
+        impact=None if assessment is None else assessment.impact,
+        score=None if assessment is None else assessment.score,
+        treatment_status=None if treatment is None else treatment.status,
     )
 
 

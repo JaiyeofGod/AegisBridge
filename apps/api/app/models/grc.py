@@ -14,6 +14,7 @@ from app.models.base import Base, TimestampMixin, UUIDMixin, human_id_column
 if TYPE_CHECKING:
     from app.models.identity import User
     from app.models.organization import Organization
+    from app.models.risk import RiskControlMapping
 
 
 class Framework(UUIDMixin, TimestampMixin, Base):
@@ -58,6 +59,7 @@ class Control(UUIDMixin, TimestampMixin, Base):
     framework_version: Mapped[FrameworkVersion] = relationship(back_populates="controls")
     implementations: Mapped[list[ControlImplementation]] = relationship(back_populates="control")
     tests: Mapped[list[ControlTest]] = relationship(back_populates="control")
+    risk_links: Mapped[list[RiskControlMapping]] = relationship(back_populates="control")
 
 
 class ControlMapping(UUIDMixin, TimestampMixin, Base):

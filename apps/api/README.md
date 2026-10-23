@@ -29,7 +29,7 @@ uv run --project apps/api python -m app.db.seed
 uv run --project apps/api python -m app.db.seed --reset
 ```
 
-The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. Threat-intelligence tables and `integrations.human_id` are `20261020_0003`. Report definitions and dataset registry metadata are `20261020_0004`. Cyber-range catalog tables and detection metadata columns are `20261020_0005`. Local credentials and sessions are `20261020_0006`. CSRF digests and `user_preferences` are `20261020_0007`. Control-test public ids (`control_tests.human_id`) are `20261020_0008`. Evidence object metadata (`evidence_objects`) is `20261020_0009`. Policy version lifecycle (`policy_versions.status`, `change_summary`, policy status check) is `20261020_0010`. Policy↔control relationship table (`policy_control_mappings`) is `20261020_0011`. Seed data is not in the migration. Re-running the seed ensures contract rows when the organization already exists.
+The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. Threat-intelligence tables and `integrations.human_id` are `20261020_0003`. Report definitions and dataset registry metadata are `20261020_0004`. Cyber-range catalog tables and detection metadata columns are `20261020_0005`. Local credentials and sessions are `20261020_0006`. CSRF digests and `user_preferences` are `20261020_0007`. Control-test public ids (`control_tests.human_id`) are `20261020_0008`. Evidence object metadata (`evidence_objects`) is `20261020_0009`. Policy version lifecycle (`policy_versions.status`, `change_summary`, policy status check) is `20261020_0010`. Policy↔control relationship table (`policy_control_mappings`) is `20261020_0011`. Risk↔control relationship table (`risk_control_mappings`) is `20261020_0012`. Seed data is not in the migration. Re-running the seed ensures contract rows when the organization already exists.
 
 ### Policy ↔ control mappings
 
@@ -102,6 +102,7 @@ Requires the domain migration, development seed, and a valid session cookie. Con
 - `POST /api/v1/policies/{id}/transition` — `policy.manage` or `policy.approve` (transition-specific) + CSRF
 - `POST /api/v1/policies/{id}/acknowledge` — self-ack current published version (`policy.read` + CSRF)
 - `POST|DELETE /api/v1/policies/{id}/controls/{control_id}` — link/unlink control (`policy.manage` + CSRF); relationship only
+- `POST|DELETE /api/v1/risks/{id}/controls/{control_id}` — link/unlink control (`risk.manage` + CSRF, no body). Mapping does not change scores, treatment, or implementation status and does not prove effectiveness. Risk detail `control_mappings` and control detail `risks` use human ids only.
 - `GET /api/v1/evidence/{id}` — `evidence.read`; `POST /api/v1/evidence` — `evidence.manage` + CSRF (metadata)
 - `POST|GET|DELETE /api/v1/evidence/{id}/object` — upload/download/delete private object (`evidence.manage` for mutations + CSRF; `evidence.read` for download)
 - `GET /api/v1/threat-intelligence/*` — `threat_intel.read`

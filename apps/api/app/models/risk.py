@@ -15,6 +15,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -23,6 +24,7 @@ from app.models.base import Base, TimestampMixin, UUIDMixin, human_id_column
 
 if TYPE_CHECKING:
     from app.models.assets import Asset
+    from app.models.grc import Control
     from app.models.identity import User
     from app.models.organization import Organization
 
@@ -49,6 +51,10 @@ class Risk(UUIDMixin, TimestampMixin, Base):
     assessments: Mapped[list[RiskAssessment]] = relationship(back_populates="risk")
     treatments: Mapped[list[RiskTreatment]] = relationship(back_populates="risk")
     reviews: Mapped[list[RiskReview]] = relationship(back_populates="risk")
+    control_links: Mapped[list[RiskControlMapping]] = relationship(
+        back_populates="risk",
+        order_by="RiskControlMapping.created_at",
+    )
 
 
 class RiskAssessment(UUIDMixin, TimestampMixin, Base):
@@ -131,3 +137,19 @@ class RiskReview(UUIDMixin, TimestampMixin, Base):
 
     risk: Mapped[Risk] = relationship(back_populates="reviews")
     reviewer: Mapped[User | None] = relationship()
+
+
+class RiskControlMapping(UUIDMixin, TimestampMixin, Base):
+    """Relationship-only link between a risk and a mitigating control.
+
+    Linking does not change likelihood, impact, score, treatment, or control status.
+    """
+
+    __tablename__ = "risk_control_mappings"
+    __table_args__ = (UniqueConstraint("risk_id", "control_id", name="risk_control"),)
+
+    risk_id: Mapped[UUID] = mapped_column(ForeignKey("risks.id"), nullable=False, index=True)
+    control_id: Mapped[UUID] = mapped_column(ForeignKey("controls.id"), nullable=False, index=True)
+
+    risk: Mapped[Risk] = relationship(back_populates="control_links")
+    control: Mapped[Control] = relationship(back_populates="risk_links")
