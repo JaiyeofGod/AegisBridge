@@ -278,9 +278,42 @@ export type IncidentTimelineEvent = {
 };
 
 export type IncidentTaskItem = {
+  id: string;
   title: string;
   status: string;
   assignee: PersonRef | null;
+};
+
+export type IncidentTaskStatusValue =
+  "open" | "in_progress" | "blocked" | "completed" | "cancelled";
+
+/** Full response-task record from the task collection. Internal UUIDs are not part of this contract. */
+export type IncidentTaskRecord = {
+  id: string;
+  incident_id: string;
+  title: string;
+  status: string;
+  assignee: PersonRef | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type IncidentTaskCreate = {
+  title: string;
+  status?: IncidentTaskStatusValue;
+};
+
+export type IncidentTaskUpdate = {
+  title?: string;
+  status?: IncidentTaskStatusValue;
+  expected_updated_at?: string;
+};
+
+export type IncidentTaskQuery = {
+  status?: IncidentTaskStatusValue;
+  page?: number;
+  pageSize?: number;
 };
 
 export type IncidentIndicatorItem = {

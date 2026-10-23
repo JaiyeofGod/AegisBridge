@@ -1,8 +1,12 @@
-import { apiGet, apiPatch } from "@/services/api-client";
+import { apiGet, apiPatch, apiPostCsrf } from "@/services/api-client";
 import type {
   IncidentDetailResponse,
   IncidentListItem,
   IncidentQuery,
+  IncidentTaskCreate,
+  IncidentTaskQuery,
+  IncidentTaskRecord,
+  IncidentTaskUpdate,
   IncidentUpdate,
   PageResponse,
 } from "@/services/api-types";
@@ -26,6 +30,30 @@ export function fetchIncident(incidentId: string) {
 export function updateIncident(incidentId: string, patch: IncidentUpdate) {
   return apiPatch<IncidentDetailResponse>(
     `/api/v1/incidents/${encodeURIComponent(incidentId)}`,
+    patch,
+  );
+}
+
+export function fetchIncidentTasks(incidentId: string, query: IncidentTaskQuery = {}) {
+  const params = new URLSearchParams();
+  params.set("page", String(query.page ?? 1));
+  params.set("page_size", String(query.pageSize ?? 25));
+  if (query.status) params.set("status", query.status);
+  return apiGet<PageResponse<IncidentTaskRecord>>(
+    `/api/v1/incidents/${encodeURIComponent(incidentId)}/tasks?${params.toString()}`,
+  );
+}
+
+export function createIncidentTask(incidentId: string, body: IncidentTaskCreate) {
+  return apiPostCsrf<IncidentTaskRecord>(
+    `/api/v1/incidents/${encodeURIComponent(incidentId)}/tasks`,
+    body,
+  );
+}
+
+export function updateIncidentTask(incidentId: string, taskId: string, patch: IncidentTaskUpdate) {
+  return apiPatch<IncidentTaskRecord>(
+    `/api/v1/incidents/${encodeURIComponent(incidentId)}/tasks/${encodeURIComponent(taskId)}`,
     patch,
   );
 }

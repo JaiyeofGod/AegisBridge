@@ -131,7 +131,9 @@ describe("Incident response", () => {
     expect(await within(page).findByText("INC-0001")).toBeInTheDocument();
     expect(within(page).getAllByText("No related alerts are stored.").length).toBeGreaterThan(0);
     expect(within(page).getAllByText("No affected assets are stored.").length).toBeGreaterThan(0);
-    expect(within(page).getByTestId("incident-context")).toHaveTextContent("No tasks are stored.");
+    expect(within(page).getByTestId("incident-context")).toHaveTextContent(
+      "No response tasks have been created for this incident.",
+    );
 
     await user.click(within(page).getByRole("tab", { name: "Timeline" }));
     expect(within(page).getByTestId("incident-timeline")).toHaveTextContent(
@@ -139,7 +141,9 @@ describe("Incident response", () => {
     );
 
     await user.click(within(page).getByRole("tab", { name: "Tasks" }));
-    expect(within(page).getByTestId("incident-tasks")).toHaveTextContent("No tasks are stored.");
+    expect(await within(page).findByTestId("incident-tasks")).toHaveTextContent(
+      "No response tasks have been created for this incident.",
+    );
     expect(within(page).queryByText("Overdue")).not.toBeInTheDocument();
     expect(within(page).queryByText("On schedule")).not.toBeInTheDocument();
 
@@ -169,7 +173,9 @@ describe("Incident response", () => {
     expect(within(page).getByTestId("incident-context")).toHaveTextContent(
       "No timeline events are stored.",
     );
-    expect(within(page).getByTestId("incident-context")).toHaveTextContent("No tasks are stored.");
+    expect(within(page).getByTestId("incident-context")).toHaveTextContent(
+      "No response tasks have been created for this incident.",
+    );
     expect(within(page).getByTestId("incident-context")).toHaveTextContent(
       "No evidence is stored.",
     );

@@ -5,7 +5,6 @@ import type {
   IncidentIndicator,
   IncidentRecord,
   IncidentSnapshot,
-  IncidentTask,
   TimelineEvent,
 } from "@/types/incident";
 import type { OverviewMetric } from "@/types/overview";
@@ -46,20 +45,6 @@ export function timelineFrom(detail: IncidentDetailResponse): TimelineEvent[] {
   }));
 }
 
-export function tasksFrom(detail: IncidentDetailResponse): IncidentTask[] {
-  return detail.tasks.map((task, index) => ({
-    id: `${detail.id}-task-${index}`,
-    taskId: "Not stored",
-    incidentId: detail.id,
-    title: task.title,
-    owner: task.assignee?.display_name ?? "Unassigned",
-    dueLabel: "Not stored",
-    status: titleCase(task.status),
-    priority: "Not stored",
-    overdue: false,
-  }));
-}
-
 export function indicatorsFrom(detail: IncidentDetailResponse): IncidentIndicator[] {
   return detail.indicators.map((indicator, index) => ({
     id: `${detail.id}-indicator-${index}`,
@@ -92,9 +77,6 @@ export function applyIncidentDetail(detail: IncidentDetailResponse): IncidentRec
     })),
     relatedAlerts: detail.related_alerts.map((alert) => alert.id),
     evidenceCount: detail.evidence.length,
-    openTaskCount: detail.tasks.filter(
-      (task) => !["closed", "resolved", "done"].includes(task.status.toLowerCase()),
-    ).length,
   };
 }
 
@@ -135,7 +117,8 @@ export function incidentMetrics(items: IncidentListItem[]): OverviewMetric[] {
       secondaryValue: String(items.reduce((sum, item) => sum + item.open_task_count, 0)),
       tone: "accent",
       freshness: "fresh",
-      semantics: "Open task counts returned with the incident list. Due dates are not stored.",
+      semantics:
+        "Counts of open, in-progress, and blocked tasks returned with the incident list. Completed and cancelled tasks are excluded. Due dates are not stored.",
     },
     {
       id: "validation",

@@ -2639,6 +2639,33 @@ export function installApiFetch(
       }
       return jsonResponse(assetPage(alertItems));
     }
+    if (/\/api\/v1\/incidents\/[^/?]+\/tasks/.test(url)) {
+      const params = new URL(url, "http://localhost").searchParams;
+      if (init?.method === "POST" || init?.method === "PATCH") {
+        const provided = headerValue(init, "X-CSRF-Token");
+        if (!provided) {
+          return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+        }
+        const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+        const status = typeof body.status === "string" ? body.status : "open";
+        return jsonResponse({
+          id: "TASK-0099",
+          incident_id: "INC-0001",
+          title: typeof body.title === "string" ? body.title : "Response task",
+          status,
+          assignee: null,
+          completed_at: status === "completed" ? "2026-10-22T18:00:00+00:00" : null,
+          created_at: "2026-10-22T18:00:00+00:00",
+          updated_at: "2026-10-22T18:05:00+00:00",
+        });
+      }
+      return jsonResponse({
+        page: Number(params.get("page") ?? 1),
+        page_size: Number(params.get("page_size") ?? 25),
+        total: 0,
+        items: [],
+      });
+    }
     if (/\/api\/v1\/incidents\/[^/?]+/.test(url) && init?.method === "PATCH") {
       const provided = headerValue(init, "X-CSRF-Token");
       if (!provided) {

@@ -18,15 +18,15 @@ import {
   type IncidentFilterOption,
   type IncidentTableFilters,
 } from "@/features/incidents/IncidentTable";
+import { IncidentEditor } from "@/features/incidents/IncidentEditor";
+import { IncidentTasksPanel } from "@/features/incidents/IncidentTasksPanel";
 import {
   applyIncidentDetail,
   evidenceFrom,
   indicatorsFrom,
   mapIncidentInventory,
-  tasksFrom,
   timelineFrom,
 } from "@/features/incidents/mapIncident";
-import { IncidentEditor } from "@/features/incidents/IncidentEditor";
 import {
   useIncidentCatalog,
   useIncidentDetail,
@@ -80,7 +80,6 @@ export function IncidentPage() {
       : selectedRow;
   const visible = listed.map((item) => (item.id === selected?.id && selected ? selected : item));
   const timeline = detail.data ? timelineFrom(detail.data) : [];
-  const tasks = detail.data ? tasksFrom(detail.data) : [];
   const indicators = detail.data ? indicatorsFrom(detail.data) : [];
   const evidence = detail.data ? evidenceFrom(detail.data) : [];
   const ownerOptions = uniqueOptions(
@@ -229,7 +228,6 @@ export function IncidentPage() {
                         incident={selected}
                         detail={detail.data ?? null}
                         timeline={timeline}
-                        openTasks={tasks.filter((item) => item.status.toLowerCase() !== "done")}
                         evidenceIds={evidence.map((item) => item.evidenceId)}
                       />
                     ) : (
@@ -266,74 +264,21 @@ export function IncidentPage() {
 
             {section === "tasks" ? (
               <Panel
-                title="Tasks"
-                description="Tasks returned with the selected incident. Due date and priority are not stored."
+                title="Response tasks"
+                description="TASK-NNNN records for the selected incident. Priority, due date, and description are not stored."
                 action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
               >
-                <div className="hidden overflow-x-auto md:block" data-testid="incident-tasks">
-                  <table className="min-w-full border-collapse text-left text-sm">
-                    <caption className="sr-only">
-                      Incident tasks with owner, due date, status, priority, and overdue state
-                    </caption>
-                    <thead className="text-[var(--muted)]">
-                      <tr>
-                        {["Task", "Incident", "Owner", "Due", "Status", "Priority", "Schedule"].map(
-                          (heading) => (
-                            <th key={heading} scope="col" className="px-3 py-3 font-medium">
-                              {heading}
-                            </th>
-                          ),
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tasks.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="px-3 py-8 text-[var(--muted)]">
-                            No tasks are stored.
-                          </td>
-                        </tr>
-                      ) : null}
-                      {tasks.map((item) => (
-                        <tr key={item.id} className="border-t border-[var(--border)]">
-                          <td className="px-3 py-3 text-[var(--text)]">
-                            {item.taskId}
-                            <span className="mt-1 block text-xs text-[var(--muted)]">
-                              {item.title}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3 text-[var(--muted)]">{item.incidentId}</td>
-                          <td className="px-3 py-3 text-[var(--muted)]">{item.owner}</td>
-                          <td className="px-3 py-3 text-[var(--muted)]">{item.dueLabel}</td>
-                          <td className="px-3 py-3 text-[var(--text)]">{item.status}</td>
-                          <td className="px-3 py-3 text-[var(--text)]">{item.priority}</td>
-                          <td className="px-3 py-3 text-[var(--muted)]">
-                            {item.overdue ? "Overdue" : "Not stored"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <ul className="space-y-3 md:hidden">
-                  {tasks.length === 0 ? (
-                    <li className="text-sm text-[var(--muted)]">No tasks are stored.</li>
-                  ) : null}
-                  {tasks.map((item) => (
-                    <li
-                      key={item.id}
-                      className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3"
-                    >
-                      <p className="font-medium text-[var(--text)]">
-                        {item.taskId} · {item.title}
-                      </p>
-                      <p className="mt-1 text-sm text-[var(--muted)]">
-                        {item.owner} · Due {item.dueLabel} · {item.status} · {item.priority} ·{" "}
-                        {item.overdue ? "Overdue" : "Not stored"}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
+                {selected ? (
+                  <IncidentTasksPanel
+                    incidentId={selected.incidentId}
+                    incidentStatus={selected.status}
+                    openTaskCount={selected.openTaskCount}
+                  />
+                ) : (
+                  <p className="text-sm text-[var(--muted)]">
+                    No incident is stored for the current request.
+                  </p>
+                )}
               </Panel>
             ) : null}
 
@@ -457,13 +402,11 @@ function IncidentContext({
   incident,
   detail,
   timeline,
-  openTasks,
   evidenceIds,
 }: {
   incident: IncidentRecord;
   detail: IncidentDetailResponse | null;
   timeline: TimelineEvent[];
-  openTasks: { taskId: string; title: string }[];
   evidenceIds: string[];
 }) {
   const auth = useAuthStatus();
@@ -553,11 +496,14 @@ function IncidentContext({
         <p className="mt-1 text-[var(--text)]">{incident.containment}</p>
       </div>
       <div>
-        <p className="text-[var(--muted)]">Open tasks</p>
+        <p className="text-[var(--muted)]">Response tasks</p>
         <p className="mt-1 text-[var(--text)]">
-          {openTasks.length > 0
-            ? openTasks.map((task) => `${task.taskId} ${task.title}`).join(" · ")
-            : "No tasks are stored."}
+          {incident.openTaskCount === 0 && (detail?.tasks.length ?? 0) === 0
+            ? "No response tasks have been created for this incident."
+            : `${incident.openTaskCount} active`}
+        </p>
+        <p className="mt-1 text-xs text-[var(--muted)]">
+          Task status does not automatically change the incident status.
         </p>
       </div>
       <div>
