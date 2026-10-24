@@ -3,8 +3,11 @@
 from fastapi import APIRouter, Depends
 
 from app.api.deps import DbSession, PageQuery, RequireCsrf, require_permissions
+from app.core.config import get_settings
+from app.integrations.vulnerability.http import open_transport
 from app.schemas.common import ErrorBody, Page
 from app.schemas.vulnerabilities import (
+    IntelligenceRefreshResult,
     VulnerabilityDetail,
     VulnerabilityListItem,
     VulnerabilityRemediationUpdate,
@@ -14,6 +17,7 @@ from app.services.vulnerabilities import (
     list_vulnerabilities,
     update_vulnerability_remediation,
 )
+from app.services.vulnerability_intelligence import refresh_vulnerability_intelligence
 
 router = APIRouter(
     prefix="/vulnerabilities",
@@ -76,3 +80,32 @@ def patch_vulnerability_remediation(
 ) -> VulnerabilityDetail:
     """Update remediation task fields only. CVSS/EPSS/KEV/SSVC stay immutable. CSRF required."""
     return update_vulnerability_remediation(session, principal, vulnerability_id, body)
+
+
+@router.post(
+    "/{vulnerability_id}/intelligence/refresh",
+    response_model=IntelligenceRefreshResult,
+    responses={401: {"model": ErrorBody}, 403: {"model": ErrorBody}, 404: {"model": ErrorBody}},
+    dependencies=[Depends(require_permissions("vulnerability.manage"))],
+)
+def refresh_vulnerability_intelligence_route(
+    vulnerability_id: str,
+    session: DbSession,
+    principal: RequireCsrf,
+) -> IntelligenceRefreshResult:
+    """Refresh NVD, CISA KEV, and FIRST EPSS for one CVE.
+
+    Organization workflow fields are not changed. Feed URLs come from server
+    configuration. `vulnerability.manage` and CSRF are required. There is no
+    refresh-all route.
+    """
+    transport = open_transport(get_settings())
+    try:
+        return refresh_vulnerability_intelligence(
+            session,
+            principal,
+            vulnerability_id,
+            transport,
+        )
+    finally:
+        transport.close()

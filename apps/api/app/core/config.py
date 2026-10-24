@@ -65,6 +65,25 @@ class Settings(BaseSettings):
         alias="EVIDENCE_MAX_UPLOAD_BYTES",
     )
 
+    # Optional. Missing key uses NVD's unauthenticated CVE API and must not block startup.
+    nvd_api_key: str | None = Field(default=None, alias="NVD_API_KEY")
+    nvd_cve_url: str = Field(
+        default="https://services.nvd.nist.gov/rest/json/cves/2.0",
+        alias="NVD_CVE_URL",
+    )
+    cisa_kev_url: str = Field(
+        default="https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
+        alias="CISA_KEV_URL",
+    )
+    first_epss_url: str = Field(
+        default="https://api.first.org/data/v1/epss",
+        alias="FIRST_EPSS_URL",
+    )
+    vulnerability_intelligence_timeout_seconds: float = Field(
+        default=10.0,
+        alias="VULNERABILITY_INTELLIGENCE_TIMEOUT_SECONDS",
+    )
+
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 

@@ -55,6 +55,8 @@ Render Postgres  Render Key Value  Cloudflare R2
 
 ATT&CK updates are version-aware/manual — do not silently schedule to `latest`.
 
+The current NVD, CISA KEV, and FIRST EPSS refresh is an on-demand API request (`POST /api/v1/vulnerabilities/{id}/intelligence/refresh`). It runs in the API process with a short timeout and a few retries. It is not the `aegis-sync-*` cron jobs and it does not download the NVD catalog. Those workers remain future work.
+
 Describe deployable resources in `render.yaml` (stub allowed in Phase 1; live deploy Phase 10+).
 
 ---

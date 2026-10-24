@@ -77,3 +77,20 @@ class VulnerabilityRemediationUpdate(BaseModel):
         ),
     )
     expected_updated_at: datetime | None = None
+
+
+class IntelligenceSourceResult(BaseModel):
+    """One external source outcome. Raw feed bodies are not included."""
+
+    source: str
+    status: str
+    detail: str | None = None
+
+
+class IntelligenceRefreshResult(BaseModel):
+    """On-demand CVE refresh. Remediation and action_decision are not part of this result."""
+
+    vulnerability_id: str
+    cve: str
+    fetched_at: datetime
+    sources: list[IntelligenceSourceResult]

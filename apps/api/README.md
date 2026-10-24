@@ -99,6 +99,7 @@ See `docs/security/AUTHENTICATION_AND_RBAC.md`. Never commit a real password. Pr
 - `PATCH /api/v1/incidents/{incident_id}` (`incident.manage` + CSRF; `incident.close` to resolve/close)
 - `GET|POST /api/v1/incidents/{incident_id}/tasks` and `GET|PATCH /api/v1/incidents/{incident_id}/tasks/{task_id}` (`incident.read` to view, `incident.manage` + CSRF to create/update). Public ids are `TASK-NNNN`. Completing a task does not close the incident. Cancel keeps the row; hard delete is not implemented.
 - `PATCH /api/v1/vulnerabilities/{vulnerability_id}/remediation` (`vulnerability.manage` + CSRF)
+- `POST /api/v1/vulnerabilities/{vulnerability_id}/intelligence/refresh` (`vulnerability.manage` + CSRF). Looks up one CVE at NVD, matches it against one CISA KEV catalog fetch, and reads FIRST EPSS. CVSS, EPSS, and KEV stay separate fields. Remediation state and `action_decision` are not updated. There is no bulk refresh.
 - `PATCH /api/v1/administration/access-reviews/{review_id}` (`administration.manage` + CSRF)
 - `PATCH /api/v1/administration/users/{user_id}` (`administration.manage` + CSRF; status only)
 - `PUT /api/v1/administration/users/{user_id}/roles` (`administration.manage` + `user.role.manage` + CSRF)

@@ -39,6 +39,7 @@ Frontend        <->  API (REST/JSON)
 API             <->  PostgreSQL
 API / worker    <->  Object storage (SeaweedFS S3 local / R2 hosted)
 Worker          <->  External intelligence APIs
+API (on demand) <->  NVD CVE 2.0, CISA KEV JSON, FIRST EPSS
 Lab bridge      <->  Hosted API (/api/v1/lab-sync)
 Lab bridge      <->  Local Wazuh API
 ```
@@ -103,7 +104,11 @@ Lab bridge      <->  Local Wazuh API
 
 ---
 
-## 8. Open Threat-Model Work
+## 8. External vulnerability feeds
+
+NVD, CISA KEV, and FIRST EPSS are untrusted inputs. The API calls only the configured URLs. A failed catalog fetch must not clear KEV membership. A high EPSS value does not change `action_decision`. Audit metadata for `VULNERABILITY_INTELLIGENCE_REFRESH` records the CVE and source status only: no API key, no response body, and no request headers.
+
+## 9. Open Threat-Model Work
 
 - Deep-dive data-flow diagrams for evidence download and lab-sync (Phase 2 / Phase 15)
 - Formal abuse cases per role after RBAC lands

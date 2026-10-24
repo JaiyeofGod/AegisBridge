@@ -103,6 +103,8 @@ Administrator, CISO, GRC Analyst, SOC Analyst, Security Engineer, Auditor, Read 
 
 **Never commit:** database passwords, NVD API keys, Wazuh credentials, session secrets, R2 keys, GitHub tokens, lab-bridge credentials, SSH private keys.
 
+`NVD_API_KEY` is optional. When it is unset, NVD calls stay unauthenticated. The key is sent only as the NVD `apiKey` header. It is not written to audit events, API responses, or logs. Callers cannot supply NVD, CISA KEV, or FIRST EPSS URLs; those endpoints come from server settings.
+
 Local: `.env` (gitignored) + committed `.env.example`  
 Hosted: Render env groups / secrets; separate per environment
 
