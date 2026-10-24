@@ -2623,6 +2623,32 @@ export function installApiFetch(
       };
       return jsonResponse(vulnDetailState);
     }
+    if (
+      /\/api\/v1\/vulnerabilities\/[^/?]+\/intelligence\/refresh/.test(url) &&
+      init?.method === "POST"
+    ) {
+      const provided = headerValue(init, "X-CSRF-Token");
+      if (!provided) {
+        return jsonResponse({ code: "csrf_failed", message: "CSRF validation failed." }, 403);
+      }
+      vulnDetailState = {
+        ...vulnDetailState,
+        epss: 0.47231,
+        epss_percentile: 0.963,
+        epss_observed_on: "2026-10-23",
+      };
+      const vulnerabilityId = url.split("/vulnerabilities/")[1]?.split("/")[0] ?? "";
+      return jsonResponse({
+        vulnerability_id: decodeURIComponent(vulnerabilityId),
+        cve: vulnDetailState.cve_id,
+        fetched_at: "2026-10-24T05:00:00+00:00",
+        sources: [
+          { source: "NVD", status: "updated", detail: null },
+          { source: "CISA_KEV", status: "updated", detail: null },
+          { source: "FIRST_EPSS", status: "updated", detail: null },
+        ],
+      });
+    }
     if (/\/api\/v1\/vulnerabilities\/[^?]+/.test(url)) return jsonResponse(vulnDetailState);
     if (url.includes("/api/v1/vulnerabilities")) {
       if (url.includes("severity=critical")) return jsonResponse(assetPage([vulnCritical]));

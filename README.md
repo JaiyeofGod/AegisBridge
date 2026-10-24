@@ -139,7 +139,9 @@ Domain read routes, including threat intelligence, administration, reports, data
 
 On-demand vulnerability intelligence refresh (`POST /api/v1/vulnerabilities/{id}/intelligence/refresh`) reads NVD CVE metadata, the CISA Known Exploited Vulnerabilities catalog, and FIRST EPSS for one CVE. Those three stay separate. AegisBridge does not combine them into one score, and the refresh does not change remediation or `action_decision`.
 
-**Not yet created:** Policy rich-text/PDF/e-sign/email, integration/report/cyber-range writes, SSO/MFA, password reset, rate limiting, scheduled NVD/KEV/EPSS sync, frontend refresh controls, malware scanning for evidence, background jobs, Celery worker, CI workflows.
+The vulnerability detail page shows NVD, CISA KEV, and FIRST EPSS separately. A user with `vulnerability.manage` can refresh one CVE. That refresh does not change remediation or `action_decision`. A vulnerability without a CVE stays valid and is not sent to those sources. Scheduled refresh is still future work.
+
+**Not yet created:** Policy rich-text/PDF/e-sign/email, integration/report/cyber-range writes, SSO/MFA, password reset, rate limiting, scheduled NVD/KEV/EPSS sync, malware scanning for evidence, background jobs, Celery worker, CI workflows.
 
 Local login: set `AEGIS_DEV_ADMIN_PASSWORD` in the repo-root `.env` (no default password). From `apps/api`, run `python -m app.db.seed` so `USR-0001` (`amara.okonkwo@aegisbridge.example`) matches that value. Re-run the seed after changing it. Production does not sync this credential. Backend tests write only to `TEST_DATABASE_URL` and leave the development credential unchanged.
 

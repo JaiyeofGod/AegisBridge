@@ -1,7 +1,8 @@
-import { apiGet, apiPatch } from "@/services/api-client";
+import { apiGet, apiPatch, apiPostCsrf } from "@/services/api-client";
 import type {
   PageResponse,
   VulnerabilityDetailResponse,
+  VulnerabilityIntelligenceRefreshResult,
   VulnerabilityListItem,
   VulnerabilityQuery,
   VulnerabilityRemediationUpdate,
@@ -35,5 +36,11 @@ export function updateVulnerabilityRemediation(
   return apiPatch<VulnerabilityDetailResponse>(
     `/api/v1/vulnerabilities/${encodeURIComponent(vulnerabilityId)}/remediation`,
     patch,
+  );
+}
+
+export function refreshVulnerabilityIntelligence(vulnerabilityId: string) {
+  return apiPostCsrf<VulnerabilityIntelligenceRefreshResult>(
+    `/api/v1/vulnerabilities/${encodeURIComponent(vulnerabilityId)}/intelligence/refresh`,
   );
 }

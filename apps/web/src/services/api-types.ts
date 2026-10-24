@@ -209,6 +209,23 @@ export type VulnerabilityDetailResponse = VulnerabilityListItem & {
   cve_summary: string | null;
 };
 
+export type VulnerabilityIntelligenceSourceStatus = "updated" | "unavailable" | "no_data";
+
+export type VulnerabilityIntelligenceSourceName = "NVD" | "CISA_KEV" | "FIRST_EPSS";
+
+export type VulnerabilityIntelligenceSourceResult = {
+  source: VulnerabilityIntelligenceSourceName;
+  status: VulnerabilityIntelligenceSourceStatus;
+  detail: string | null;
+};
+
+export type VulnerabilityIntelligenceRefreshResult = {
+  vulnerability_id: string;
+  cve: string;
+  fetched_at: string;
+  sources: VulnerabilityIntelligenceSourceResult[];
+};
+
 export type VulnerabilityQuery = {
   search?: string;
   severity?: string;
