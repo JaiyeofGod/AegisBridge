@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/buttons/Button";
 import { useAuthActions } from "@/features/auth/useAuthSession";
-import { formatTimestamp } from "@/lib/format";
+import { formatCalendarDate, formatTimestamp } from "@/lib/format";
 import { ApiError } from "@/services/api-client";
 import { refreshVulnerabilityIntelligence } from "@/services/vulnerabilities";
 import type {
@@ -107,6 +107,20 @@ function Fact({ label, value }: { label: string; value: string }) {
       <dd className="mt-1 text-[var(--text)]">{value}</dd>
     </div>
   );
+}
+
+function WhenPresent({
+  label,
+  value,
+  kind,
+}: {
+  label: string;
+  value: string | null | undefined;
+  kind: "timestamp" | "date";
+}) {
+  if (!value) return null;
+  const text = kind === "date" ? formatCalendarDate(value) : formatTimestamp(value);
+  return <Fact label={label} value={text} />;
 }
 
 export function ExternalIntelligence({ finding, canManage }: Props) {
@@ -240,6 +254,21 @@ function NvdCard({ finding }: { finding: VulnerabilityFinding }) {
           <Fact label="CVSS severity" value={finding.severity} />
           {finding.cvssVector ? <Fact label="Vector" value={finding.cvssVector} /> : null}
           {finding.cveSummary ? <Fact label="Summary" value={finding.cveSummary} /> : null}
+          <WhenPresent
+            label="Published"
+            value={finding.intelligence?.nvd?.publishedAt}
+            kind="timestamp"
+          />
+          <WhenPresent
+            label="Last modified by source"
+            value={finding.intelligence?.nvd?.sourceModifiedAt}
+            kind="timestamp"
+          />
+          <WhenPresent
+            label="Last fetched by AegisBridge"
+            value={finding.intelligence?.nvd?.fetchedAt}
+            kind="timestamp"
+          />
         </dl>
       ) : (
         <p className="mt-3 text-sm text-[var(--text)]">Not available · No CVE</p>
@@ -264,13 +293,33 @@ function KevCard({ finding }: { finding: VulnerabilityFinding }) {
       {finding.cve ? (
         <dl className="mt-3 space-y-2 text-sm">
           <Fact label="KEV" value={finding.kev === "KEV listed" ? "Listed" : "Not listed"} />
-          {finding.kevDateAdded ? <Fact label="Date added" value={finding.kevDateAdded} /> : null}
+          <WhenPresent label="Date added" value={finding.kevDateAdded} kind="date" />
           {finding.knownRansomwareUse ? (
             <Fact
               label="Known ransomware campaign use"
               value={finding.knownRansomwareUse.replaceAll("_", " ")}
             />
           ) : null}
+          {finding.intelligence?.kev?.vendorProject ? (
+            <Fact label="Vendor / Project" value={finding.intelligence.kev.vendorProject} />
+          ) : null}
+          {finding.intelligence?.kev?.product ? (
+            <Fact label="Product" value={finding.intelligence.kev.product} />
+          ) : null}
+          {finding.intelligence?.kev?.requiredAction ? (
+            <div>
+              <dt className="text-[var(--muted)]">Required action</dt>
+              <dd className="mt-1 max-w-prose whitespace-pre-wrap text-[var(--text)]">
+                {finding.intelligence.kev.requiredAction}
+              </dd>
+            </div>
+          ) : null}
+          <WhenPresent label="CISA due date" value={finding.intelligence?.kev?.dueOn} kind="date" />
+          <WhenPresent
+            label="Last checked by AegisBridge"
+            value={finding.intelligence?.kev?.checkedAt}
+            kind="timestamp"
+          />
         </dl>
       ) : (
         <p className="mt-3 text-sm text-[var(--text)]">Not available · No CVE</p>
@@ -307,9 +356,16 @@ function EpssCard({ finding }: { finding: VulnerabilityFinding }) {
                 : formatEpssPercentile(finding.epssPercentile)
             }
           />
-          {finding.epssObservedOn ? (
-            <Fact label="Observation date" value={finding.epssObservedOn} />
-          ) : null}
+          <WhenPresent
+            label="Observation date"
+            value={finding.epssObservedOn ?? finding.intelligence?.epss?.observedOn}
+            kind="date"
+          />
+          <WhenPresent
+            label="Last fetched by AegisBridge"
+            value={finding.intelligence?.epss?.fetchedAt}
+            kind="timestamp"
+          />
         </dl>
       ) : (
         <p className="mt-3 text-sm text-[var(--text)]">Not available · No CVE</p>

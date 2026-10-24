@@ -205,8 +205,35 @@ export type VulnerabilityListItem = {
   assets: VulnerabilityAssetContext[];
 };
 
+export type VulnerabilityNvdIntelligence = {
+  published_at: string | null;
+  source_modified_at: string | null;
+  fetched_at: string | null;
+};
+
+export type VulnerabilityKevIntelligence = {
+  checked_at: string | null;
+  due_on: string | null;
+  required_action: string | null;
+  vendor_project: string | null;
+  product: string | null;
+};
+
+export type VulnerabilityEpssIntelligence = {
+  observed_on: string | null;
+  fetched_at: string | null;
+};
+
+/** Detail-only provenance. Nested objects are present; individual timestamps may be null. */
+export type VulnerabilityIntelligenceRead = {
+  nvd: VulnerabilityNvdIntelligence | null;
+  kev: VulnerabilityKevIntelligence | null;
+  epss: VulnerabilityEpssIntelligence | null;
+};
+
 export type VulnerabilityDetailResponse = VulnerabilityListItem & {
   cve_summary: string | null;
+  intelligence: VulnerabilityIntelligenceRead;
 };
 
 export type VulnerabilityIntelligenceSourceStatus = "updated" | "unavailable" | "no_data";

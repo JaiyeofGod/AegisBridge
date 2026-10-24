@@ -602,6 +602,25 @@ export const vulnItems = [vulnCritical, vulnMedium];
 export const vulnDetail: VulnerabilityDetailResponse = {
   ...vulnCritical,
   cve_summary: "Stored catalog summary. Not a live NVD fetch.",
+  intelligence: {
+    nvd: {
+      published_at: "2024-01-12T17:15:10.017000Z",
+      source_modified_at: "2026-08-04T16:16:30.193000Z",
+      fetched_at: "2026-10-24T16:33:49.581286Z",
+    },
+    kev: {
+      checked_at: "2026-10-24T16:33:49.581286Z",
+      due_on: "2024-01-22",
+      required_action:
+        "Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.",
+      vendor_project: "Ivanti",
+      product: "Connect Secure and Policy Secure",
+    },
+    epss: {
+      observed_on: "2026-10-19",
+      fetched_at: "2026-10-24T16:33:49.581286Z",
+    },
+  },
 };
 
 export const alertHigh: AlertListItem = {
