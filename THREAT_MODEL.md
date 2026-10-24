@@ -72,6 +72,7 @@ Lab bridge      <->  Local Wazuh API
 | API/worker ↔ R2 | Stolen keys | Object overwrite | Weak object audit | Public bucket misconfig | Large uploads | Presign misuse |
 | Worker ↔ intel | Fake sources | Poisoned CVE/IOC data | — | Key leakage in logs | Rate-limit exhaustion | — |
 | Worker ↔ Wazuh indexer | Stolen basic auth | Poisoned alert text | — | Credential in logs or rows | Oversized search responses | Indexer URL redirected by a caller |
+| API ↔ Hugging Face datasets | Stolen `HF_TOKEN` | Poisoned Parquet or labels | — | Token or raw rows in the API | Oversized dataset download | Caller-supplied download URL |
 | Lab bridge ↔ API | Replay / stolen token | Mutated sync payloads | Weak sync audit | Raw log leakage | Sync floods | Over-privileged sync |
 | Lab bridge ↔ Wazuh | Stolen Wazuh JWT | Rule/config abuse | — | Full event exfil | API abuse | Admin API exposure |
 

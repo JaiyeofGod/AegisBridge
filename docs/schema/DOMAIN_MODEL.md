@@ -4,6 +4,8 @@ Phase 2 relational foundation. SQLAlchemy models live in `apps/api/app/models/`.
 
 Internal primary keys are UUIDs. Operational records also have a unique `human_id`. Closed value sets are strings with check constraints. There is no combined vulnerability score.
 
+`20261024_0019` adds provenance columns on `dataset_versions` for a pinned research-dataset revision. `dataset_files.storage_uri` remains the private object key and is not an API field. `dataset_experiments.dataset_version_id` already points at a version, so a future experiment can name an ingested revision without a new table. Seeded experiments are unchanged.
+
 ## Ownership
 
 | Boundary | Owns | Does not own |

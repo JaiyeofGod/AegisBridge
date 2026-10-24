@@ -64,6 +64,8 @@ MITRE ATT&CK Enterprise is loaded from a pinned STIX 2.1 bundle for release 20.0
 
 Wazuh remains the SIEM. When `WAZUH_ENABLED` is set, Celery polls the Wazuh indexer every five minutes for a 15-minute lookback and stores selected alert metadata on the existing `alert_references` table. The manager API, raw events, agents, and active response are not part of this path. Credentials stay in server settings. The integration does nothing until that configuration is present. The Lenovo single-node stack is specified in `docs/lab/LENOVO_WAZUH_SETUP.md` and is not deployed. A future Lenovo lab bridge is outbound-only; the hosted API does not open a path into the lab.
 
+Research datasets are versioned artifacts, not live feeds. The first approved source is the public Hugging Face dataset `phreshphish/phreshphish` (`DS-0006`). A manual command resolves that catalog id, pins the source commit, checks the declared size, and refuses the download when it exceeds `DATASET_MAX_DOWNLOAD_BYTES` (default 512 MiB). A download that fits the cap is hashed, validated as Parquet, profiled with a row cap, and stored through the private object-storage interface. PostgreSQL keeps the revision, SHA-256, and profile. It does not keep raw rows. There is no training job and no Beat schedule. Callers cannot supply a download URL.
+
 ---
 
 ## 4. Critical Separations
@@ -72,8 +74,8 @@ Wazuh remains the SIEM. When `WAZUH_ENABLED` is set, Celery polls the Wazuh inde
 |---|---|---|
 | PostgreSQL | Assets, risks, controls, evidence metadata, vulns, detections, incidents, audit, integration snapshots, selected Wazuh alert metadata | Massive raw SIEM telemetry |
 | Wazuh | Raw security events / telemetry authority | AegisBridge business workflows |
-| Cloudflare R2 (hosted) / SeaweedFS S3 (local) | Evidence files, reports, screenshots, selected artifacts | Primary relational state |
-| Local disk / lab | Raw datasets, PCAPs, VM disks | Public demo content |
+| Cloudflare R2 (hosted) / SeaweedFS S3 (local) | Evidence files, reports, screenshots, ingested research-dataset artifacts | Primary relational state, dataset credentials |
+| Local disk / lab | Temporary dataset downloads, PCAPs, VM disks | Permanent dataset copies, public demo content |
 
 ---
 
@@ -82,7 +84,7 @@ Wazuh remains the SIEM. When `WAZUH_ENABLED` is set, Celery polls the Wazuh inde
 | Layer | Choice |
 |---|---|
 | Frontend | React 19.3, TypeScript, Vite 8, React Router, TanStack Query/Table, Tailwind, shadcn/ui, Recharts, Zod |
-| Backend | Python 3.14.x, FastAPI, Pydantic 2, SQLAlchemy 2, Alembic, HTTPX, Celery, psycopg |
+| Backend | Python 3.14.x, FastAPI, Pydantic 2, SQLAlchemy 2, Alembic, HTTPX, Celery, psycopg, PyArrow |
 | Database | PostgreSQL 18 |
 | Queue/cache | Redis-compatible (Render Key Value / Valkey hosted; Compose locally) |
 | Object storage | R2 hosted; SeaweedFS `weed mini` S3 locally (ADR-021) |

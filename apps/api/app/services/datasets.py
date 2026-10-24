@@ -22,6 +22,10 @@ DATASET_STATUSES = frozenset(
         "candidate",
         "registry_only",
         "not_downloaded",
+        "downloading",
+        "validating",
+        "ready",
+        "failed",
         "reviewed",
         "approved",
         "rejected",
@@ -125,6 +129,15 @@ def get_dataset(session: Session, dataset_id: str) -> DatasetDetail:
             file_count=len(version.files),
             experiment_count=len(version.experiments),
             created_at=version.created_at,
+            source_revision=version.source_revision,
+            ingestion_status=version.ingestion_status,
+            validation_status=version.validation_status,
+            ingested_at=version.ingested_at,
+            row_count=version.row_count,
+            column_count=version.column_count,
+            byte_size=version.byte_size,
+            sha256=version.artifact_sha256,
+            label_counts=_label_counts(version.profile),
         )
         for version in sorted(row.versions, key=lambda item: item.version_label)
     ]
@@ -194,6 +207,19 @@ def get_experiment(session: Session, experiment_id: str) -> ExperimentDetail:
         **base.model_dump(),
         dataset_version_label=row.dataset_version.version_label,
     )
+
+
+def _label_counts(profile: dict[str, object] | None) -> dict[str, int] | None:
+    if not profile or profile.get("label_count_scope") != "full":
+        return None
+    counts = profile.get("label_counts")
+    if not isinstance(counts, dict):
+        return None
+    parsed: dict[str, int] = {}
+    for key, value in counts.items():
+        if isinstance(key, str) and isinstance(value, int) and not isinstance(value, bool):
+            parsed[key] = value
+    return parsed or None
 
 
 def _dataset(row: Dataset) -> DatasetListItem:

@@ -102,13 +102,15 @@ Administrator, CISO, GRC Analyst, SOC Analyst, Security Engineer, Auditor, Read 
 
 ## 9. Secrets Management
 
-**Never commit:** database passwords, NVD API keys, abuse.ch Auth-Keys, Wazuh credentials, session secrets, R2 keys, GitHub tokens, lab-bridge credentials, SSH private keys.
+**Never commit:** database passwords, NVD API keys, abuse.ch Auth-Keys, Wazuh credentials, Hugging Face tokens, session secrets, R2 keys, GitHub tokens, lab-bridge credentials, SSH private keys, research dataset files.
 
 `NVD_API_KEY` is optional. When it is unset, NVD calls stay unauthenticated. The key is sent only as the NVD `apiKey` header. It is not written to audit events, API responses, logs, Celery task arguments, or broker messages. The scheduled task takes no arguments. Callers cannot supply NVD, CISA KEV, FIRST EPSS, or ATT&CK source URLs; those endpoints come from server settings. The ATT&CK bundle is public STIX. Its SHA-256 is calculated at ingestion and is not an upstream signature check. Celery accepts JSON only. Pickle is disabled. Synchronization status is a PostgreSQL run row, not a Celery result and not a human audit actor.
 
 `ABUSECH_AUTH_KEY` is optional and is the community key from auth.abuse.ch. It is sent only as the `Auth-Key` header to the two allowlisted HTTPS endpoints. It is not placed in a URL, a task argument, a log line, or an API response. If it is unset, both IOC sources fail closed and no unofficial mirror is used. ThreatFox and URLhaus bodies are untrusted: values are length-bounded, types are a closed set, tags are capped, and one malformed item does not fail the rest of that source. Callers cannot choose the feed URL.
 
 The Lenovo Wazuh stack, when it is installed, listens on loopback and keeps certificates under `~/aegis-lab/wazuh/`. Those lab files must not be committed. `WAZUH_PASSWORD` is optional and is sent only as HTTP Basic authentication to the server-configured indexer URL. It is not stored in PostgreSQL, task arguments, logs, or API responses. Callers cannot choose the indexer URL. TLS verification defaults to on. Setting `WAZUH_VERIFY_TLS=false` disables verification only when `APP_ENV` is not production; that opt-in accepts a machine-in-the-middle risk on a local indexer and must not be used for a reachable network. Wazuh alert text is untrusted: strings are length-bounded, control characters are stripped, and the text is stored as text. Event paths are not opened and event strings are not executed. A failed poll leaves previously stored alerts in place.
+
+Research dataset bytes are untrusted. The ingest command accepts a catalog id, not a URL. The PhreshPhish adapter calls only `huggingface.co` and the official Hugging Face content hosts, and it rechecks the host on each redirect. Parquet is read with PyArrow. Pickle, embedded code, and HTML rendering are not used. `HF_TOKEN`, when set, stays in the server environment and is not written to logs, rows, or API responses. The SHA-256 recorded at ingest is an AegisBridge integrity hash, not a publisher signature. Profiles omit raw text. Object keys and storage credentials are not returned by the dataset API. Temporary downloads are deleted. A failed ingest does not replace a ready artifact.
 
 Local: `.env` (gitignored) + committed `.env.example`  
 Hosted: Render env groups / secrets; separate per environment

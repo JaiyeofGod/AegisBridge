@@ -43,6 +43,15 @@ class DatasetVersionItem(BaseModel):
     file_count: int
     experiment_count: int
     created_at: datetime
+    source_revision: str | None = None
+    ingestion_status: str | None = None
+    validation_status: str | None = None
+    ingested_at: datetime | None = None
+    row_count: int | None = None
+    column_count: int | None = None
+    byte_size: int | None = None
+    sha256: str | None = None
+    label_counts: dict[str, int] | None = None
 
 
 class DatasetExperimentRef(BaseModel):

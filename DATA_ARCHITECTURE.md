@@ -152,6 +152,18 @@ Do not serve uploads from arbitrary local web paths. Prefer presigned object URL
 
 Wazuh stays the authoritative SIEM. AegisBridge polls the indexer (`wazuh-alerts*/_search`) for a bounded recent window and writes selected fields onto `alert_references`. It does not copy the indexer, store `full_log`, or store Windows event XML. Deduplication is `organization_id` plus the Wazuh alert id. Seeded demo alerts stay `data_origin=simulated` with a null Wazuh id. Ingested rows use `data_origin=wazuh`, status `new`, and severity `not_assigned`. The Wazuh rule level is stored separately and is not a CVSS, EPSS, or incident severity. Source ATT&CK ids are kept as text, including ids the Enterprise 20.0 catalog does not contain. Poll history is `integration_sync_runs`, not `intelligence_sync_runs`. The password is not a column.
 
+## 8b. Research dataset versions
+
+`dataset_versions` already identified a catalog revision. `20261024_0019` adds nullable provenance on that table: source type, pinned revision, public source reference, ingestion and validation status, ingest time, row and column counts, byte size, artifact SHA-256, a JSON profile, and a short error. `dataset_files` still stores one private object key per file in `storage_uri`. Raw rows stay out of PostgreSQL. The seed `registry` version is unchanged and has null provenance.
+
+Ingestion status is `downloading`, `validating`, `ready`, or `failed`. Catalog status may also become `ready` or `failed` after an ingest. Seed rows stay `not_downloaded`. A failed newer revision does not remove an older `ready` version. The same source revision that is already `ready` is not downloaded again.
+
+The artifact SHA-256 is calculated by AegisBridge at ingestion over the stored files. It is not a publisher signature. The profile records column names, types, null counts, split-independent row totals, and label counts only when every row was scanned. It does not store sample text, URLs, or HTML.
+
+`dataset_experiments` already references `dataset_version_id`. A future experiment can point at the ingested revision. Seeded `RSCH-*` rows are not rewritten. An earlier adapted PhreshPhish CPU baseline (1,000 training rows, 200 balanced test rows, 79% accuracy) is not a product of this pipeline and is not stored as an ingestion result.
+
+Supported file format for this slice: Parquet. Archives, pickle, and HTML rendering are not used. There is no daily download.
+
 ## 9. Local vs Hosted Storage Mapping
 
 | Concern | Local | Hosted |
@@ -159,7 +171,7 @@ Wazuh stays the authoritative SIEM. AegisBridge polls the indexer (`wazuh-alerts
 | Relational | Compose PostgreSQL 18, database from `DATABASE_URL` (default `aegis`) | Render Postgres 18 |
 | Backend tests | Same Compose PostgreSQL server, separate database from `TEST_DATABASE_URL` (default `aegis_test`). Not used when `APP_ENV` is local or production | Not used |
 | Queue/cache | Compose Redis/Valkey | Render Key Value |
-| Objects | SeaweedFS S3 bucket `aegis-dev-evidence` (`localhost:8333`) | R2 `aegis-stage-evidence` / `aegis-prod-evidence` |
+| Objects | SeaweedFS S3 bucket `aegis-dev-evidence` (`localhost:8333`), including private dataset artifacts | R2 `aegis-stage-evidence` / `aegis-prod-evidence`, including private dataset artifacts |
 | Raw telemetry | Lenovo / Wazuh | Not mirrored wholesale to cloud |
 
 Application code uses an S3-compatible storage abstraction so SeaweedFS (local) and R2 (hosted) share one interface pattern.

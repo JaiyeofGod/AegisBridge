@@ -152,6 +152,14 @@ class Settings(BaseSettings):
     wazuh_http_timeout_seconds: float = Field(default=20.0, alias="WAZUH_HTTP_TIMEOUT_SECONDS")
     wazuh_max_bytes: int = Field(default=8_000_000, alias="WAZUH_MAX_BYTES")
     wazuh_sync_lock_ttl_seconds: int = Field(default=240, alias="WAZUH_SYNC_LOCK_TTL_SECONDS")
+    # Research datasets are manual and versioned. 512 MiB refuses the full PhreshPhish pull.
+    dataset_max_download_bytes: int = Field(
+        default=512 * 1024 * 1024,
+        alias="DATASET_MAX_DOWNLOAD_BYTES",
+    )
+    dataset_max_profile_rows: int = Field(default=50_000, alias="DATASET_MAX_PROFILE_ROWS")
+    dataset_temp_dir: str | None = Field(default=None, alias="DATASET_TEMP_DIR")
+    huggingface_token: str | None = Field(default=None, alias="HF_TOKEN")
 
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

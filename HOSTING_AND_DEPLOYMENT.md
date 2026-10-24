@@ -61,7 +61,9 @@ ATT&CK Enterprise 20.0 is imported manually from pinned STIX 2.1. A weekly or ve
 
 Wazuh alert metadata is polled every five minutes on the `integrations` queue (`soc.sync_wazuh_alerts`) when `WAZUH_ENABLED=true`. The task exits without a network call while that flag is false. The indexer URL and basic-auth credentials come from server settings. `WAZUH_VERIFY_TLS` defaults to true, and production ignores a false value. A local worker must listen on `intelligence,integrations`. This poll does not install Wazuh, open port 55000, or require inbound access to the Lenovo lab.
 
-The `aegis-sync-*` cron names, worker autoscaling, a source-health dashboard, refresh history in the UI, notification rules, user-editable schedules, scheduled MITRE ATT&CK refresh, dataset download workers, and a production managed queue are not implemented. IOC expiry, asset correlation, and automated blocking are also not implemented.
+Research datasets are not on the Beat schedule. `python -m app.datasets ingest DS-0006` is a manual command. It uses the same private S3 bucket as evidence (SeaweedFS locally, R2 when hosted). `DATASET_MAX_DOWNLOAD_BYTES` defaults to 512 MiB and `DATASET_TEMP_DIR` may point at a scratch directory outside the repository. Temporary files are removed when the command finishes. Dataset files are not committed.
+
+The `aegis-sync-*` cron names, worker autoscaling, a source-health dashboard, refresh history in the UI, notification rules, user-editable schedules, scheduled MITRE ATT&CK refresh, dataset revision checks, background dataset downloads, and a production managed queue are not implemented. IOC expiry, asset correlation, and automated blocking are also not implemented.
 
 Describe deployable resources in `render.yaml` (stub allowed in Phase 1; live deploy Phase 10+).
 

@@ -16,6 +16,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin, human_id_column
@@ -52,11 +53,40 @@ class Dataset(UUIDMixin, TimestampMixin, Base):
 
 
 class DatasetVersion(UUIDMixin, TimestampMixin, Base):
+    """One catalog or ingested revision. Raw rows are not stored."""
+
     __tablename__ = "dataset_versions"
-    __table_args__ = (UniqueConstraint("dataset_id", "version_label", name="dataset_version"),)
+    __table_args__ = (
+        UniqueConstraint("dataset_id", "version_label", name="dataset_version"),
+        CheckConstraint(
+            "ingestion_status IS NULL OR ingestion_status IN "
+            "('downloading', 'validating', 'ready', 'failed')",
+            name="ingestion_status",
+        ),
+        CheckConstraint(
+            "validation_status IS NULL OR validation_status IN ('passed', 'failed')",
+            name="validation_status",
+        ),
+        CheckConstraint(
+            "artifact_sha256 IS NULL OR artifact_sha256 ~ '^[0-9a-f]{64}$'",
+            name="artifact_sha256_hex",
+        ),
+    )
 
     dataset_id: Mapped[UUID] = mapped_column(ForeignKey("datasets.id"), nullable=False, index=True)
     version_label: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_type: Mapped[str | None] = mapped_column(String(32))
+    source_revision: Mapped[str | None] = mapped_column(String(64))
+    source_reference: Mapped[str | None] = mapped_column(String(500))
+    ingestion_status: Mapped[str | None] = mapped_column(String(32))
+    validation_status: Mapped[str | None] = mapped_column(String(32))
+    ingested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    row_count: Mapped[int | None] = mapped_column(BigInteger)
+    column_count: Mapped[int | None] = mapped_column(Integer)
+    byte_size: Mapped[int | None] = mapped_column(BigInteger)
+    artifact_sha256: Mapped[str | None] = mapped_column(String(64))
+    profile: Mapped[dict[str, object] | None] = mapped_column(JSONB)
+    error_summary: Mapped[str | None] = mapped_column(String(500))
 
     dataset: Mapped[Dataset] = relationship(back_populates="versions")
     files: Mapped[list[DatasetFile]] = relationship(back_populates="dataset_version")
