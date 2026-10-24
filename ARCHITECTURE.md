@@ -62,13 +62,15 @@ API readiness does not require the worker or Beat. Redis/Valkey stays an optiona
 
 MITRE ATT&CK Enterprise is loaded from a pinned STIX 2.1 bundle for release 20.0. Ingestion is a manual command, not a daily Beat job. The catalog stores tactics, techniques, sub-techniques, and tactic membership. Read APIs use `threat_intel.read`. Existing detection and indicator rows keep their string technique ids.
 
+Wazuh remains the SIEM. When `WAZUH_ENABLED` is set, Celery polls the Wazuh indexer every five minutes for a 15-minute lookback and stores selected alert metadata on the existing `alert_references` table. The manager API, raw events, agents, and active response are not part of this path. Credentials stay in server settings. The integration does nothing until that configuration is present. A future Lenovo lab bridge is outbound-only; the hosted API does not open a path into the lab.
+
 ---
 
 ## 4. Critical Separations
 
 | Store | Holds | Does not hold |
 |---|---|---|
-| PostgreSQL | Assets, risks, controls, evidence metadata, vulns, detections, incidents, audit, integration snapshots | Massive raw SIEM telemetry |
+| PostgreSQL | Assets, risks, controls, evidence metadata, vulns, detections, incidents, audit, integration snapshots, selected Wazuh alert metadata | Massive raw SIEM telemetry |
 | Wazuh | Raw security events / telemetry authority | AegisBridge business workflows |
 | Cloudflare R2 (hosted) / SeaweedFS S3 (local) | Evidence files, reports, screenshots, selected artifacts | Primary relational state |
 | Local disk / lab | Raw datasets, PCAPs, VM disks | Public demo content |

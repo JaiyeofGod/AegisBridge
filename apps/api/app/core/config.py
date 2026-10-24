@@ -139,6 +139,19 @@ class Settings(BaseSettings):
         alias="THREAT_INTEL_HTTP_TIMEOUT_SECONDS",
     )
     threat_intel_max_bytes: int = Field(default=20_000_000, alias="THREAT_INTEL_MAX_BYTES")
+    # Wazuh indexer (OpenSearch) alert search. Disabled until a deployment sets the URL
+    # and credentials. The manager API on port 55000 is not used for alert retrieval.
+    wazuh_enabled: bool = Field(default=False, alias="WAZUH_ENABLED")
+    wazuh_indexer_url: str | None = Field(default=None, alias="WAZUH_INDEXER_URL")
+    wazuh_username: str | None = Field(default=None, alias="WAZUH_USERNAME")
+    wazuh_password: str | None = Field(default=None, alias="WAZUH_PASSWORD")
+    wazuh_verify_tls: bool = Field(default=True, alias="WAZUH_VERIFY_TLS")
+    wazuh_alert_index: str = Field(default="wazuh-alerts*", alias="WAZUH_ALERT_INDEX")
+    wazuh_lookback_minutes: int = Field(default=15, alias="WAZUH_LOOKBACK_MINUTES")
+    wazuh_alert_limit: int = Field(default=500, alias="WAZUH_ALERT_LIMIT")
+    wazuh_http_timeout_seconds: float = Field(default=20.0, alias="WAZUH_HTTP_TIMEOUT_SECONDS")
+    wazuh_max_bytes: int = Field(default=8_000_000, alias="WAZUH_MAX_BYTES")
+    wazuh_sync_lock_ttl_seconds: int = Field(default=240, alias="WAZUH_SYNC_LOCK_TTL_SECONDS")
 
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
@@ -146,6 +159,18 @@ class Settings(BaseSettings):
     def celery_broker(self) -> str:
         configured = (self.celery_broker_url or "").strip()
         return configured or self.redis_url
+
+    def wazuh_tls_verify(self) -> bool:
+        """Production always verifies TLS. A false setting is a local opt-in only."""
+        if self.app_env.lower() == "production":
+            return True
+        return self.wazuh_verify_tls
+
+    def wazuh_alert_cap(self) -> int:
+        return min(max(self.wazuh_alert_limit, 1), 1000)
+
+    def wazuh_lookback(self) -> int:
+        return min(max(self.wazuh_lookback_minutes, 1), 1440)
 
 
 @lru_cache

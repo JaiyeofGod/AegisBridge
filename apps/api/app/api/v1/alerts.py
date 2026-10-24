@@ -21,6 +21,7 @@ def read_alerts(
     status: str | None = None,
     asset: str | None = None,
     attack_technique: str | None = None,
+    data_origin: str | None = None,
 ) -> Page[AlertListItem]:
     return list_alerts(
         session,
@@ -30,6 +31,7 @@ def read_alerts(
         status=status,
         asset=asset,
         attack_technique=attack_technique,
+        data_origin=data_origin,
     )
 
 

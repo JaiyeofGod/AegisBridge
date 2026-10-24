@@ -59,7 +59,9 @@ Local and current application behavior is two Celery Beat schedules, not the thr
 
 ATT&CK Enterprise 20.0 is imported manually from pinned STIX 2.1. A weekly or version-based refresh is future work and is not on the Beat schedule.
 
-The `aegis-sync-*` cron names, worker autoscaling, a source-health dashboard, refresh history in the UI, notification rules, user-editable schedules, scheduled MITRE ATT&CK refresh, Wazuh ingestion, dataset download workers, and a production managed queue are not implemented. IOC expiry, asset correlation, and automated blocking are also not implemented.
+Wazuh alert metadata is polled every five minutes on the `integrations` queue (`soc.sync_wazuh_alerts`) when `WAZUH_ENABLED=true`. The task exits without a network call while that flag is false. The indexer URL and basic-auth credentials come from server settings. `WAZUH_VERIFY_TLS` defaults to true, and production ignores a false value. A local worker must listen on `intelligence,integrations`. This poll does not install Wazuh, open port 55000, or require inbound access to the Lenovo lab.
+
+The `aegis-sync-*` cron names, worker autoscaling, a source-health dashboard, refresh history in the UI, notification rules, user-editable schedules, scheduled MITRE ATT&CK refresh, dataset download workers, and a production managed queue are not implemented. IOC expiry, asset correlation, and automated blocking are also not implemented.
 
 Describe deployable resources in `render.yaml` (stub allowed in Phase 1; live deploy Phase 10+).
 
@@ -142,13 +144,13 @@ Private administrator interface remains authenticated.
 
 Do **not** expose Wazuh 55000, dashboards, RDP, SSH, or lab subnets to the public internet.
 
-`aegis-lab-bridge` on Lenovo:
+`aegis-lab-bridge` on Lenovo is future work and is not implemented:
 
 ```text
-Local Wazuh API --> Lab Bridge --> outbound HTTPS --> Hosted /api/v1/lab-sync
+Lenovo cyber range --> Wazuh --> outbound-only Lab Bridge --> AegisBridge
 ```
 
-Bridge: normalize/sanitize, authenticate/sign requests, retry, record last success, queue when offline if practical. Hosted app must work when lab is offline.
+Local development may later point `WAZUH_INDEXER_URL` at a LAN indexer. The public deployment must not accept inbound connections from the internet into the lab, and it must not require the lab to accept inbound connections from the cloud. The bridge, when it exists, will push sanitized metadata outbound. The hosted app must keep working when the lab is offline. Direct indexer polling is the first slice and does not replace that future bridge.
 
 ---
 

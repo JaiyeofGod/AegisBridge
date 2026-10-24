@@ -108,6 +108,8 @@ Administrator, CISO, GRC Analyst, SOC Analyst, Security Engineer, Auditor, Read 
 
 `ABUSECH_AUTH_KEY` is optional and is the community key from auth.abuse.ch. It is sent only as the `Auth-Key` header to the two allowlisted HTTPS endpoints. It is not placed in a URL, a task argument, a log line, or an API response. If it is unset, both IOC sources fail closed and no unofficial mirror is used. ThreatFox and URLhaus bodies are untrusted: values are length-bounded, types are a closed set, tags are capped, and one malformed item does not fail the rest of that source. Callers cannot choose the feed URL.
 
+`WAZUH_PASSWORD` is optional and is sent only as HTTP Basic authentication to the server-configured indexer URL. It is not stored in PostgreSQL, task arguments, logs, or API responses. Callers cannot choose the indexer URL. TLS verification defaults to on. Setting `WAZUH_VERIFY_TLS=false` disables verification only when `APP_ENV` is not production; that opt-in accepts a machine-in-the-middle risk on a local indexer and must not be used for a reachable network. Wazuh alert text is untrusted: strings are length-bounded, control characters are stripped, and the text is stored as text. Event paths are not opened and event strings are not executed. A failed poll leaves previously stored alerts in place.
+
 Local: `.env` (gitignored) + committed `.env.example`  
 Hosted: Render env groups / secrets; separate per environment
 

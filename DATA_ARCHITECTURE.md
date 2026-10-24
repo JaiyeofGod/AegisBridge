@@ -24,7 +24,7 @@
 |---|---|---|
 | A. Operational application data | Assets, risks, controls, incidents, users | PostgreSQL |
 | B. Live intelligence | NVD, KEV, EPSS, ATT&CK, OSV snapshots | PostgreSQL (+ provenance) |
-| C. Cyber-range telemetry | Sysmon, Windows Security, Suricata, Wazuh events | Wazuh / lab; summaries in Aegis |
+| C. Cyber-range telemetry | Sysmon, Windows Security, Suricata, Wazuh events | Wazuh / lab. Aegis stores selected alert metadata only |
 | D. Research datasets | Smishing IMC25, CIC subsets | Local/registry; manifests in Git |
 
 ---
@@ -147,6 +147,10 @@ Do not serve uploads from arbitrary local web paths. Prefer presigned object URL
 - Entity relationships: `docs/schema/DOMAIN_MODEL.md`
 
 ---
+
+## 8a. Wazuh alert metadata
+
+Wazuh stays the authoritative SIEM. AegisBridge polls the indexer (`wazuh-alerts*/_search`) for a bounded recent window and writes selected fields onto `alert_references`. It does not copy the indexer, store `full_log`, or store Windows event XML. Deduplication is `organization_id` plus the Wazuh alert id. Seeded demo alerts stay `data_origin=simulated` with a null Wazuh id. Ingested rows use `data_origin=wazuh`, status `new`, and severity `not_assigned`. The Wazuh rule level is stored separately and is not a CVSS, EPSS, or incident severity. Source ATT&CK ids are kept as text, including ids the Enterprise 20.0 catalog does not contain. Poll history is `integration_sync_runs`, not `intelligence_sync_runs`. The password is not a column.
 
 ## 9. Local vs Hosted Storage Mapping
 

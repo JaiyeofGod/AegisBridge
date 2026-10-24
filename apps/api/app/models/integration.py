@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -58,3 +58,26 @@ class SyncState(UUIDMixin, TimestampMixin, Base):
     last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     integration: Mapped[Integration] = relationship(back_populates="sync_state")
+
+
+class IntegrationSyncRun(UUIDMixin, TimestampMixin, Base):
+    """One connector poll. Counts and a short summary only; no raw payloads or secrets."""
+
+    __tablename__ = "integration_sync_runs"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('skipped', 'completed', 'partial', 'failed')",
+            name="ck_integration_sync_runs_status",
+        ),
+    )
+
+    integration: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    received_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    inserted_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    duplicate_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    skipped_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    malformed_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    summary: Mapped[str | None] = mapped_column(String(500))

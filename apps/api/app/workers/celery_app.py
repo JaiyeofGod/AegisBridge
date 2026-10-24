@@ -43,6 +43,13 @@ celery_app.conf.update(
             "schedule": crontab(hour="*/6", minute=15),
             "options": {"queue": "intelligence"},
         },
+        # Alerts are time-sensitive. Five minutes stays above the one-minute floor
+        # and overlaps the 15-minute lookback so a delayed poll still deduplicates.
+        "wazuh-alert-sync": {
+            "task": "soc.sync_wazuh_alerts",
+            "schedule": crontab(minute="*/5"),
+            "options": {"queue": "integrations"},
+        },
     },
 )
 

@@ -9,8 +9,9 @@ from redis import Redis
 from app.core.config import get_settings
 from app.services.threat_intel_sync import ThreatIocSyncResult, sync_threat_intelligence_iocs
 from app.services.vulnerability_sync import SyncResult, sync_tracked_vulnerability_intelligence
+from app.services.wazuh_sync import WazuhSyncResult, sync_wazuh_alerts
 from app.workers.celery_app import celery_app
-from app.workers.lock import THREAT_IOC_LOCK_KEY, RedisSyncLock
+from app.workers.lock import THREAT_IOC_LOCK_KEY, WAZUH_ALERT_LOCK_KEY, RedisSyncLock, SyncLock
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,50 @@ def sync_threat_intelligence_iocs_task() -> ThreatIocSyncResult:
             "ioc_updated_count": 0,
             "ioc_skipped_count": 0,
             "failed_source_count": 0,
+        }
+    finally:
+        client.close()
+
+
+class _UnusedLock:
+    """Disabled Wazuh polling must not touch Valkey or the indexer."""
+
+    def acquire(self) -> str | None:
+        raise RuntimeError("disabled wazuh sync must not take the lock")
+
+    def release(self, token: str) -> None:
+        return None
+
+
+@celery_app.task(  # type: ignore[untyped-decorator]
+    name="soc.sync_wazuh_alerts",
+    max_retries=0,
+    queue="integrations",
+)
+def sync_wazuh_alerts_task() -> WazuhSyncResult:
+    """Periodic Wazuh alert poll. The message carries no arguments or credentials."""
+    settings = get_settings()
+    if not settings.wazuh_enabled:
+        return sync_wazuh_alerts(settings=settings, lock=_UnusedLock())
+    client = Redis.from_url(settings.celery_broker(), socket_connect_timeout=2.0)
+    lock: SyncLock = RedisSyncLock(
+        client,
+        settings.wazuh_sync_lock_ttl_seconds,
+        key=WAZUH_ALERT_LOCK_KEY,
+    )
+    try:
+        return sync_wazuh_alerts(settings=settings, lock=lock)
+    except Exception:
+        logger.error("wazuh alert synchronization failed")
+        return {
+            "status": "failed",
+            "reason": "orchestration_error",
+            "run_id": None,
+            "received_count": 0,
+            "inserted_count": 0,
+            "duplicate_count": 0,
+            "skipped_count": 0,
+            "malformed_count": 0,
         }
     finally:
         client.close()

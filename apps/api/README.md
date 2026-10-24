@@ -19,7 +19,7 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 # Host-run worker and scheduler. Valkey must be listening on REDIS_URL.
 # Upgrade the development database before the first worker start (`alembic upgrade head`).
-uv run celery -A app.workers.celery_app:celery_app worker --loglevel=info -Q intelligence --pool=solo
+uv run celery -A app.workers.celery_app:celery_app worker --loglevel=info -Q intelligence,integrations --pool=solo
 uv run celery -A app.workers.celery_app:celery_app beat --loglevel=info
 ```
 
@@ -35,7 +35,7 @@ uv run --project apps/api python -m app.db.seed
 uv run --project apps/api python -m app.db.seed --reset
 ```
 
-The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. Threat-intelligence tables and `integrations.human_id` are `20261020_0003`. Report definitions and dataset registry metadata are `20261020_0004`. Cyber-range catalog tables and detection metadata columns are `20261020_0005`. Local credentials and sessions are `20261020_0006`. CSRF digests and `user_preferences` are `20261020_0007`. Control-test public ids (`control_tests.human_id`) are `20261020_0008`. Evidence object metadata (`evidence_objects`) is `20261020_0009`. Policy version lifecycle (`policy_versions.status`, `change_summary`, policy status check) is `20261020_0010`. Policy↔control relationship table (`policy_control_mappings`) is `20261020_0011`. Risk↔control relationship table (`risk_control_mappings`) is `20261020_0012`. Incident task public ids and completion time (`incident_tasks.human_id`, `completed_at`) are `20261020_0013`. Vulnerability intelligence provenance is `20261024_0014`. Synchronization run records (`intelligence_sync_runs`) are `20261024_0015`. The pinned ATT&CK Enterprise catalog is `20261024_0016`. ThreatFox and URLhaus indicator columns are `20261024_0017`. Seed data is not in the migration. Re-running the seed ensures contract rows when the organization already exists.
+The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. Threat-intelligence tables and `integrations.human_id` are `20261020_0003`. Report definitions and dataset registry metadata are `20261020_0004`. Cyber-range catalog tables and detection metadata columns are `20261020_0005`. Local credentials and sessions are `20261020_0006`. CSRF digests and `user_preferences` are `20261020_0007`. Control-test public ids (`control_tests.human_id`) are `20261020_0008`. Evidence object metadata (`evidence_objects`) is `20261020_0009`. Policy version lifecycle (`policy_versions.status`, `change_summary`, policy status check) is `20261020_0010`. Policy↔control relationship table (`policy_control_mappings`) is `20261020_0011`. Risk↔control relationship table (`risk_control_mappings`) is `20261020_0012`. Incident task public ids and completion time (`incident_tasks.human_id`, `completed_at`) are `20261020_0013`. Vulnerability intelligence provenance is `20261024_0014`. Synchronization run records (`intelligence_sync_runs`) are `20261024_0015`. The pinned ATT&CK Enterprise catalog is `20261024_0016`. ThreatFox and URLhaus indicator columns are `20261024_0017`. Wazuh alert provenance and `integration_sync_runs` are `20261024_0018`. Seed data is not in the migration. Re-running the seed ensures contract rows when the organization already exists.
 
 ### Vulnerability intelligence sync
 
@@ -43,7 +43,15 @@ Daily at 06:00 UTC, Celery Beat enqueues `intelligence.sync_vulnerability_intell
 
 Worker health is separate from API readiness. `GET /api/v1/health/ready` still requires only PostgreSQL. Redis/Valkey is optional.
 
-Not in this phase: scheduler UI, source-health dashboard, refresh-history UI, notification rules, worker autoscaling, scheduled ATT&CK refresh, Wazuh ingestion, dataset download workers, and a production managed queue.
+Not in this phase: scheduler UI, source-health dashboard, refresh-history UI, notification rules, worker autoscaling, scheduled ATT&CK refresh, dataset download workers, and a production managed queue.
+
+### Wazuh alert metadata
+
+Beat enqueues `soc.sync_wazuh_alerts` every five minutes on the `integrations` queue. The task has no arguments. `WAZUH_ENABLED` defaults to false, and a disabled run returns before Valkey or the indexer is contacted. A configured run searches the Wazuh indexer index `wazuh-alerts*` for the last 15 minutes, at most 500 hits (hard maximum 1000). Selected fields are written to `alert_references`. Repeated polls deduplicate on the Wazuh alert id. Rule level is stored as `source_rule_level` and is not converted into severity; ingested rows use severity `not_assigned` and status `new`. No incident is created. ATT&CK ids present on `rule.mitre.id` are stored as text. Unknown ids do not fail the batch. `full_log` and Windows event XML are not stored. The lock key is `aegis:lock:wazuh_alert_sync`. Poll counts go to `integration_sync_runs`. A successful read sets the Wazuh catalog row to `configured` and freshness `healthy`. Authentication failure or a timeout leaves existing alerts unchanged.
+
+The indexer URL is `WAZUH_INDEXER_URL`. This is not the manager API on port 55000. TLS verification defaults to on. `WAZUH_VERIFY_TLS=false` applies only outside production. The password stays in the environment.
+
+Future only: Lenovo Wazuh deployment, Windows Sysmon and Linux agents, Suricata, file integrity monitoring, agent inventory, acknowledgement sync, rule management, detection correlation, IOC enrichment, Wazuh vulnerability data, SOC frontend provenance, an outbound lab bridge, and a push or webhook path.
 
 ### ThreatFox and URLhaus
 
@@ -63,7 +71,7 @@ The command downloads the server-configured bundle, checks the release version, 
 
 `GET /api/v1/attack/tactics`, `GET /api/v1/attack/techniques`, and `GET /api/v1/attack/techniques/{technique_id}` require `threat_intel.read`. Lists omit revoked and deprecated objects unless `include_deprecated=true`. Detail by ATT&CK id still returns those flags. Responses use ATT&CK ids, not database UUIDs. Detection, lab, and indicator rows continue to store technique ids on `attack_techniques`.
 
-Future only: explorer UI, detection foreign keys, incident mapping UI, Sigma, Navigator export, coverage views, version diff, weekly sync, and Wazuh technique mapping.
+Future only: explorer UI, detection foreign keys, incident mapping UI, Sigma, Navigator export, coverage views, version diff, and weekly sync. Wazuh may supply technique ids on an ingested alert; those ids are not inferred and are not foreign keys.
 
 ### Policy ↔ control mappings
 
