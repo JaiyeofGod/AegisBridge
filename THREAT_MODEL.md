@@ -111,6 +111,10 @@ Lab bridge      <->  Local Wazuh API
 
 NVD, CISA KEV, and FIRST EPSS are untrusted inputs. The API calls only the configured URLs. A failed catalog fetch must not clear KEV membership. A high EPSS value does not change `action_decision`. Audit metadata for `VULNERABILITY_INTELLIGENCE_REFRESH` records the CVE and source status only: no API key, no response body, and no request headers.
 
+ThreatFox and URLhaus are also untrusted inputs. The worker calls only `https://threatfox-api.abuse.ch/api/v1/` and `https://urlhaus-api.abuse.ch/v1/urls/recent/`. A feed record can contain script-like text, odd URL queries, or malformed values. Invalid indicators are skipped. Stored text is not executable content. Presence in either feed does not mean an asset is compromised, a vulnerability was exploited, or a control fired. There is no automatic block, firewall change, incident, or IOC score. A source failure leaves the previous rows in place. The Auth-Key is not logged. The IOC lock is separate from the vulnerability-intelligence lock.
+
+Future work, not this slice: indicator provenance in the UI, a source-health dashboard, an expiry policy, correlation with assets or alerts, Wazuh enrichment, Sigma relationships, VirusTotal, MISP/TAXII, analyst allowlists and blocklists, notification rules, and automated containment.
+
 ## 9. Open Threat-Model Work
 
 - Deep-dive data-flow diagrams for evidence download and lab-sync (Phase 2 / Phase 15)

@@ -32,7 +32,7 @@ class IndicatorListItem(BaseModel):
     id: str
     indicator_type: str
     value: str
-    confidence: str
+    confidence: str | None
     severity: str | None
     source: SourceRef
     first_seen: datetime
@@ -48,6 +48,14 @@ class IndicatorDetail(IndicatorListItem):
     attack: AttackRef | None
     matched_asset: RelatedRecord | None
     data_origin: str
+    indicator_subtype: str | None = None
+    threat_type: str | None = None
+    malware_family: str | None = None
+    tags: list[str] = []
+    source_status: str | None = None
+    source_confidence: int | None = None
+    reference_url: str | None = None
+    fetched_at: datetime | None = None
 
 
 class AdvisoryListItem(BaseModel):

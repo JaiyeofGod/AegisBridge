@@ -1,4 +1,4 @@
-"""System records for scheduled vulnerability-intelligence synchronization."""
+"""System records for scheduled intelligence synchronization."""
 
 from datetime import datetime
 
@@ -32,4 +32,9 @@ class IntelligenceSyncRun(UUIDMixin, TimestampMixin, Base):
     kev_updated_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     epss_updated_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     failed_source_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    threatfox_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    urlhaus_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    ioc_inserted_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    ioc_updated_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    ioc_skipped_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     summary: Mapped[str | None] = mapped_column(String(500))

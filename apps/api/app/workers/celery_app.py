@@ -36,7 +36,13 @@ celery_app.conf.update(
             "task": "intelligence.sync_vulnerability_intelligence",
             "schedule": crontab(hour=settings.vulnerability_sync_hour_utc, minute=0),
             "options": {"queue": "intelligence"},
-        }
+        },
+        # 00:15, 06:15, 12:15, and 18:15 UTC. Offset from the 06:00 vulnerability sync.
+        "threat-intelligence-iocs": {
+            "task": "intelligence.sync_threat_intelligence_iocs",
+            "schedule": crontab(hour="*/6", minute=15),
+            "options": {"queue": "intelligence"},
+        },
     },
 )
 

@@ -25,7 +25,7 @@
 | Object storage | S3-compatible abstraction; SeaweedFS locally; Cloudflare R2 for hosted; optional health check |
 | Package installs | API via uv; web via pnpm (`apps/web`) |
 | Cyber range | Not started |
-| Background sync | Celery worker and Beat on the host. Valkey is the broker. Daily 06:00 UTC refresh of tracked CVEs: NVD per CVE, CISA KEV once, FIRST EPSS in batches of 100. Run status is stored in PostgreSQL. Manual refresh remains. Remediation and `action_decision` are unchanged. ATT&CK Enterprise 20.0 is a manual STIX import, not a Beat job |
+| Background sync | Celery worker and Beat on the host. Valkey is the broker. Daily 06:00 UTC refresh of tracked CVEs: NVD per CVE, CISA KEV once, FIRST EPSS in batches of 100. ThreatFox and URLhaus recent indicators run at 00:15, 06:15, 12:15, and 18:15 UTC, at most 500 records per source. Run status is stored in PostgreSQL. Manual vulnerability refresh remains. Remediation and `action_decision` are unchanged. ATT&CK Enterprise 20.0 is a manual STIX import, not a Beat job |
 | ATT&CK catalog | Pinned Enterprise STIX 2.1 release 20.0. Tactics, techniques, and sub-techniques. Read APIs under `/api/v1/attack` use `threat_intel.read`. The Threat Intelligence page shows that catalog when the session has `threat_intel.read`. Detection string ids stay on `attack_techniques` |
 | Hosting | Not started |
 
@@ -64,7 +64,7 @@
 - Complete Phase 0 before Phase 1 (**Option A**)
 - Tooling: **pnpm**, **uv**, **Pyright**, **Prettier**
 - Early dev: Compose for Postgres/Redis/Valkey/SeaweedFS; **host-run** React + FastAPI
-- Celery: Phase 0 started from a minimal foundation. Current code schedules one daily vulnerability-intelligence job. UI schedules, autoscaling, and a production managed queue remain future work
+- Celery: Phase 0 started from a minimal foundation. Current code schedules the daily vulnerability-intelligence job and a 6-hour ThreatFox/URLhaus IOC job. UI schedules, autoscaling, and a production managed queue remain future work
 - Routes: `/signin`, `/account/workspace`
 - Post-bootstrap UI: real Figma Sign-in + Overview
 - Figma access available

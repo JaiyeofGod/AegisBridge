@@ -35,7 +35,7 @@ uv run --project apps/api python -m app.db.seed
 uv run --project apps/api python -m app.db.seed --reset
 ```
 
-The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. Threat-intelligence tables and `integrations.human_id` are `20261020_0003`. Report definitions and dataset registry metadata are `20261020_0004`. Cyber-range catalog tables and detection metadata columns are `20261020_0005`. Local credentials and sessions are `20261020_0006`. CSRF digests and `user_preferences` are `20261020_0007`. Control-test public ids (`control_tests.human_id`) are `20261020_0008`. Evidence object metadata (`evidence_objects`) is `20261020_0009`. Policy version lifecycle (`policy_versions.status`, `change_summary`, policy status check) is `20261020_0010`. Policy↔control relationship table (`policy_control_mappings`) is `20261020_0011`. Risk↔control relationship table (`risk_control_mappings`) is `20261020_0012`. Incident task public ids and completion time (`incident_tasks.human_id`, `completed_at`) are `20261020_0013`. Vulnerability intelligence provenance is `20261024_0014`. Synchronization run records (`intelligence_sync_runs`) are `20261024_0015`. The pinned ATT&CK Enterprise catalog is `20261024_0016`. Seed data is not in the migration. Re-running the seed ensures contract rows when the organization already exists.
+The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. Threat-intelligence tables and `integrations.human_id` are `20261020_0003`. Report definitions and dataset registry metadata are `20261020_0004`. Cyber-range catalog tables and detection metadata columns are `20261020_0005`. Local credentials and sessions are `20261020_0006`. CSRF digests and `user_preferences` are `20261020_0007`. Control-test public ids (`control_tests.human_id`) are `20261020_0008`. Evidence object metadata (`evidence_objects`) is `20261020_0009`. Policy version lifecycle (`policy_versions.status`, `change_summary`, policy status check) is `20261020_0010`. Policy↔control relationship table (`policy_control_mappings`) is `20261020_0011`. Risk↔control relationship table (`risk_control_mappings`) is `20261020_0012`. Incident task public ids and completion time (`incident_tasks.human_id`, `completed_at`) are `20261020_0013`. Vulnerability intelligence provenance is `20261024_0014`. Synchronization run records (`intelligence_sync_runs`) are `20261024_0015`. The pinned ATT&CK Enterprise catalog is `20261024_0016`. ThreatFox and URLhaus indicator columns are `20261024_0017`. Seed data is not in the migration. Re-running the seed ensures contract rows when the organization already exists.
 
 ### Vulnerability intelligence sync
 
@@ -43,7 +43,13 @@ Daily at 06:00 UTC, Celery Beat enqueues `intelligence.sync_vulnerability_intell
 
 Worker health is separate from API readiness. `GET /api/v1/health/ready` still requires only PostgreSQL. Redis/Valkey is optional.
 
-Not in this phase: scheduler UI, source-health dashboard, refresh-history UI, notification rules, worker autoscaling, scheduled ATT&CK refresh, ThreatFox, URLhaus, Wazuh ingestion, dataset download workers, and a production managed queue.
+Not in this phase: scheduler UI, source-health dashboard, refresh-history UI, notification rules, worker autoscaling, scheduled ATT&CK refresh, Wazuh ingestion, dataset download workers, and a production managed queue.
+
+### ThreatFox and URLhaus
+
+Beat enqueues `intelligence.sync_threat_intelligence_iocs` at 00:15, 06:15, 12:15, and 18:15 UTC on the `intelligence` queue. The task has no arguments. It reads recent ThreatFox indicators (`days` defaults to 1, maximum 7) and the URLhaus recent URL list. Each source persists at most 500 rows per run. Set `ABUSECH_AUTH_KEY` to the community key from auth.abuse.ch. The key is an `Auth-Key` header, never a URL path. Without the key the run is `failed` and existing indicators stay. If one source fails, the other source is still stored and the run is `partial`. The lock key is `aegis:lock:threat_intelligence_iocs`. Feed content is untrusted text. A stored URL or indicator is not a compromise, an infection, or a block. There is no IOC score and no automatic deletion of older rows. The daily vulnerability sync is unchanged.
+
+Future work: indicator provenance in the UI, source-health dashboard, expiry policy, asset and alert correlation, Wazuh enrichment, Sigma relationships, VirusTotal, MISP/TAXII, analyst allowlists and blocklists, notification rules, and automated containment.
 
 ### MITRE ATT&CK Enterprise
 

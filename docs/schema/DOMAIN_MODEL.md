@@ -22,7 +22,7 @@ Internal primary keys are UUIDs. Operational records also have a unique `human_i
 | SOC | Selected alert metadata and investigations | A copy of the Wazuh database |
 | Incident | Events, tasks, indicators, evidence links | Confirmed compromise as a stored fact |
 | Vendor / policy / dataset / integration | Their own records and versions | Secrets and live connector state |
-| Threat intelligence | Source catalog, simulated indicators, advisory metadata | A live external feed |
+| Threat intelligence | Source catalog, simulated indicators, ThreatFox/URLhaus observations, advisory metadata | Compromise claims, IOC scores, automated blocking |
 | Reports | Report definition catalog | Generated PDF/CSV files and a running scheduler |
 | Audit | Actor, action, object, result, source, environment, timestamp | Updates, secrets |
 
@@ -44,7 +44,7 @@ Internal primary keys are UUIDs. Operational records also have a unique `human_i
 - Vendors have services, assessments, and findings. Policies have versions and acknowledgements. Policy lifecycle status is closed-set on `policies.status`. Version content is plain text in `body_summary`; `status` is `draft` / `published` / `superseded`; `is_current` marks the sole published current version. Acknowledgements reference a policy version and a user. `policy_control_mappings` stores relationship-only links to controls (`policy_id`, `control_id`, unique pair); no control or licensed framework text is copied. Datasets have registry metadata, versions, optional file metadata, and experiments. Dataset `status` is a download/registry label such as `not_downloaded`. `verification_status` is a separate review label.
 - Report definitions belong to an organization and may name an owner. `schedule_defined` stores a cadence label. Generated files and execution rows are not part of this table.
 - An integration has an optional human ID, sync jobs, and one current `sync_states` row. No credential column is stored. `auth_state` is a label such as `No credentials stored`.
-- A threat-intelligence source has `connection_status` of `configured`, `reference_only`, `not_connected`, `delayed`, or `healthy`. Indicators belong to one source and may point at one asset and one ATT&CK technique. Advisories store metadata only. Incident indicators remain a separate table.
+- A threat-intelligence source has `connection_status` of `configured`, `reference_only`, `not_connected`, `delayed`, or `healthy`. Indicators belong to one source and may point at one asset and one local ATT&CK technique. Feed ingestion does not invent that technique link. The public type stays `ip`, `domain`, `url`, or `file_hash`. `indicator_subtype` is `ipv4`, `ipv6`, `domain`, `hostname`, `url`, `md5`, `sha1`, or `sha256`. `value` is the source-observed text and `normalized_value` is the conservative comparison key. The same normalized value from ThreatFox and URLhaus is two rows (`20261024_0017`). Advisories store metadata only. Incident indicators remain a separate table.
 - Audit events reference an optional user and have no `updated_at`.
 
 ## Deferred tables

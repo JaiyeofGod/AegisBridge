@@ -21,8 +21,9 @@ INDICATOR_TYPES = frozenset({"ip", "domain", "url", "file_hash"})
 INDICATOR_STATUSES = frozenset({"active", "expired", "retracted"})
 DATA_ORIGIN = "simulated"
 SUMMARY_SEMANTICS = (
-    "Counts are stored development records. "
-    "reference_only and not_connected mean the named feed is not connected. "
+    "Counts include stored development records and any ingested feed rows. "
+    "reference_only and not_connected mean that catalog row is not connected. "
+    "A feed indicator means the source listed that value. It is not a confirmed compromise. "
     "Reserved example addresses are simulated indicators, not live threat intelligence."
 )
 
@@ -49,12 +50,21 @@ def get_summary(session: Session) -> ThreatIntelSummary:
     health: dict[str, int] = {}
     for status in statuses:
         health[status] = health.get(status, 0) + 1
+    external = int(
+        session.scalar(
+            select(func.count())
+            .select_from(ThreatIndicator)
+            .join(ThreatIntelSource)
+            .where(ThreatIntelSource.provider != "internal")
+        )
+        or 0
+    )
     return ThreatIntelSummary(
         active_indicator_count=active,
         internal_match_count=matches,
         advisory_count=advisories,
         source_health=health,
-        data_origin=DATA_ORIGIN,
+        data_origin=DATA_ORIGIN if external == 0 else "mixed",
         semantics=SUMMARY_SEMANTICS,
     )
 
@@ -85,6 +95,7 @@ def list_indicators(
         statement = statement.where(
             or_(
                 ThreatIndicator.value.ilike(term, escape="\\"),
+                ThreatIndicator.normalized_value.ilike(term, escape="\\"),
                 ThreatIndicator.human_id.ilike(term, escape="\\"),
                 ThreatIndicator.summary.ilike(term, escape="\\"),
             )
@@ -142,7 +153,15 @@ def get_indicator(session: Session, indicator_id: str) -> IndicatorDetail:
         summary=row.summary,
         attack=attack,
         matched_asset=matched,
-        data_origin=DATA_ORIGIN,
+        data_origin=_data_origin(row.source),
+        indicator_subtype=row.indicator_subtype,
+        threat_type=row.threat_type,
+        malware_family=row.malware_family,
+        tags=list(row.tags or []),
+        source_status=row.source_status,
+        source_confidence=row.source_confidence,
+        reference_url=row.reference_url,
+        fetched_at=row.fetched_at,
     )
 
 
@@ -209,6 +228,12 @@ def _indicator(row: ThreatIndicator) -> IndicatorListItem:
         ),
         matched_asset_id=None if row.matched_asset is None else row.matched_asset.human_id,
     )
+
+
+def _data_origin(source: ThreatIntelSource) -> str:
+    if source.provider == "internal":
+        return DATA_ORIGIN
+    return "external_feed"
 
 
 def _source_ref(source: ThreatIntelSource) -> SourceRef:

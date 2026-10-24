@@ -1,4 +1,8 @@
-"""Simulated threat-intelligence references. External feeds are not connected."""
+"""Threat-intelligence sources and indicators.
+
+Seeded rows are simulated. ThreatFox and URLhaus rows are untrusted feed
+observations, not compromise claims.
+"""
 
 from __future__ import annotations
 
@@ -6,7 +10,17 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, String, Text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin, human_id_column
@@ -45,7 +59,12 @@ class ThreatIntelSource(UUIDMixin, TimestampMixin, Base):
 
 
 class ThreatIndicator(UUIDMixin, TimestampMixin, Base):
-    """Development indicator. A reserved address is not live threat intelligence."""
+    """One indicator observation from one source.
+
+    The same normalized value from ThreatFox and URLhaus stays as two rows.
+    ``confidence`` is only the seeded high/medium/low label. Feed confidence,
+    when a source actually provides one, is ``source_confidence``.
+    """
 
     __tablename__ = "threat_indicators"
     __table_args__ = (
@@ -54,12 +73,27 @@ class ThreatIndicator(UUIDMixin, TimestampMixin, Base):
             name="indicator_type",
         ),
         CheckConstraint(
+            "indicator_subtype IN "
+            "('ipv4', 'ipv6', 'domain', 'hostname', 'url', 'md5', 'sha1', 'sha256')",
+            name="subtype",
+        ),
+        CheckConstraint(
             "status IN ('active', 'expired', 'retracted')",
             name="status",
         ),
         CheckConstraint(
             "confidence IN ('high', 'medium', 'low')",
             name="confidence",
+        ),
+        CheckConstraint(
+            "source_confidence IS NULL OR (source_confidence >= 0 AND source_confidence <= 100)",
+            name="source_confidence",
+        ),
+        UniqueConstraint(
+            "source_id",
+            "indicator_subtype",
+            "normalized_value",
+            name="source_indicator",
         ),
     )
 
@@ -75,14 +109,29 @@ class ThreatIndicator(UUIDMixin, TimestampMixin, Base):
     )
     human_id: Mapped[str] = human_id_column()
     indicator_type: Mapped[str] = mapped_column(String(32), nullable=False)
-    value: Mapped[str] = mapped_column(String(500), nullable=False)
-    confidence: Mapped[str] = mapped_column(String(32), nullable=False)
+    indicator_subtype: Mapped[str] = mapped_column(String(16), nullable=False)
+    value: Mapped[str] = mapped_column(String(2048), nullable=False)
+    normalized_value: Mapped[str] = mapped_column(String(2048), nullable=False)
+    confidence: Mapped[str | None] = mapped_column(String(32))
     severity: Mapped[str | None] = mapped_column(String(32))
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     internal_match: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
+    source_record_id: Mapped[str | None] = mapped_column(String(64))
+    threat_type: Mapped[str | None] = mapped_column(String(64))
+    malware_family: Mapped[str | None] = mapped_column(String(120))
+    tags: Mapped[list[str]] = mapped_column(
+        ARRAY(String(64)),
+        nullable=False,
+        default=list,
+        server_default="{}",
+    )
+    source_confidence: Mapped[int | None] = mapped_column(Integer)
+    source_status: Mapped[str | None] = mapped_column(String(32))
+    reference_url: Mapped[str | None] = mapped_column(String(500))
+    fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     organization: Mapped[Organization] = relationship()
     source: Mapped[ThreatIntelSource] = relationship(back_populates="indicators")

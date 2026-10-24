@@ -72,6 +72,7 @@ Administrator, CISO, GRC Analyst, SOC Analyst, Security Engineer, Auditor, Read 
 ## 6. Input Validation and API Security
 
 - Validate and sanitize inputs at API boundary (Pydantic)
+- Treat threat-feed fields as untrusted text. Do not render them as HTML. Reject indicators that are not a valid IP, domain, hostname, URL, or exact-length hash
 - Parameterized queries via SQLAlchemy
 - Consistent error handling without leaking secrets
 - Rate limiting on auth and sensitive endpoints
@@ -101,9 +102,11 @@ Administrator, CISO, GRC Analyst, SOC Analyst, Security Engineer, Auditor, Read 
 
 ## 9. Secrets Management
 
-**Never commit:** database passwords, NVD API keys, Wazuh credentials, session secrets, R2 keys, GitHub tokens, lab-bridge credentials, SSH private keys.
+**Never commit:** database passwords, NVD API keys, abuse.ch Auth-Keys, Wazuh credentials, session secrets, R2 keys, GitHub tokens, lab-bridge credentials, SSH private keys.
 
 `NVD_API_KEY` is optional. When it is unset, NVD calls stay unauthenticated. The key is sent only as the NVD `apiKey` header. It is not written to audit events, API responses, logs, Celery task arguments, or broker messages. The scheduled task takes no arguments. Callers cannot supply NVD, CISA KEV, FIRST EPSS, or ATT&CK source URLs; those endpoints come from server settings. The ATT&CK bundle is public STIX. Its SHA-256 is calculated at ingestion and is not an upstream signature check. Celery accepts JSON only. Pickle is disabled. Synchronization status is a PostgreSQL run row, not a Celery result and not a human audit actor.
+
+`ABUSECH_AUTH_KEY` is optional and is the community key from auth.abuse.ch. It is sent only as the `Auth-Key` header to the two allowlisted HTTPS endpoints. It is not placed in a URL, a task argument, a log line, or an API response. If it is unset, both IOC sources fail closed and no unofficial mirror is used. ThreatFox and URLhaus bodies are untrusted: values are length-bounded, types are a closed set, tags are capped, and one malformed item does not fail the rest of that source. Callers cannot choose the feed URL.
 
 Local: `.env` (gitignored) + committed `.env.example`  
 Hosted: Render env groups / secrets; separate per environment

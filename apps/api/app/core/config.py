@@ -117,6 +117,28 @@ class Settings(BaseSettings):
     )
     attack_stix_timeout_seconds: float = Field(default=120.0, alias="ATTACK_STIX_TIMEOUT_SECONDS")
     attack_stix_max_bytes: int = Field(default=80_000_000, alias="ATTACK_STIX_MAX_BYTES")
+    # Community Auth-Key from https://auth.abuse.ch/. Sent only as a request header.
+    abusech_auth_key: str | None = Field(default=None, alias="ABUSECH_AUTH_KEY")
+    threatfox_api_url: str = Field(
+        default="https://threatfox-api.abuse.ch/api/v1/",
+        alias="THREATFOX_API_URL",
+    )
+    threatfox_days: int = Field(default=1, alias="THREATFOX_DAYS")
+    urlhaus_recent_url: str = Field(
+        default="https://urlhaus-api.abuse.ch/v1/urls/recent/",
+        alias="URLHAUS_RECENT_URL",
+    )
+    threat_intel_ioc_limit: int = Field(default=500, alias="THREAT_INTEL_IOC_LIMIT")
+    threat_intel_sync_enabled: bool = Field(default=True, alias="THREAT_INTEL_SYNC_ENABLED")
+    threat_intel_sync_lock_ttl_seconds: int = Field(
+        default=1800,
+        alias="THREAT_INTEL_SYNC_LOCK_TTL_SECONDS",
+    )
+    threat_intel_http_timeout_seconds: float = Field(
+        default=30.0,
+        alias="THREAT_INTEL_HTTP_TIMEOUT_SECONDS",
+    )
+    threat_intel_max_bytes: int = Field(default=20_000_000, alias="THREAT_INTEL_MAX_BYTES")
 
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

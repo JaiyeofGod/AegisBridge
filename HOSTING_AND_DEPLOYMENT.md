@@ -55,11 +55,11 @@ Render Postgres  Render Key Value  Cloudflare R2
 
 ATT&CK updates are version-aware/manual — do not silently schedule to `latest`.
 
-Local and current application behavior is one Celery Beat schedule, not the three `aegis-sync-*` cron services. Every day at 06:00 UTC the worker refreshes CVEs already tracked by AegisBridge: NVD once per CVE, the CISA KEV catalog once, and FIRST EPSS in batches of at most 100. It does not download the full NVD database. Manual refresh (`POST /api/v1/vulnerabilities/{id}/intelligence/refresh`) remains. The job does not change remediation, asset context, or `action_decision`.
+Local and current application behavior is two Celery Beat schedules, not the three `aegis-sync-*` cron services. Every day at 06:00 UTC the worker refreshes CVEs already tracked by AegisBridge: NVD once per CVE, the CISA KEV catalog once, and FIRST EPSS in batches of at most 100. It does not download the full NVD database. Manual refresh (`POST /api/v1/vulnerabilities/{id}/intelligence/refresh`) remains. The job does not change remediation, asset context, or `action_decision`. Every 6 hours, at minute 15, the same worker ingests recent ThreatFox and URLhaus indicators. That job uses its own Valkey lock and does not change the vulnerability schedule.
 
 ATT&CK Enterprise 20.0 is imported manually from pinned STIX 2.1. A weekly or version-based refresh is future work and is not on the Beat schedule.
 
-The `aegis-sync-*` cron names, worker autoscaling, a source-health dashboard, refresh history in the UI, notification rules, user-editable schedules, scheduled MITRE ATT&CK refresh, ThreatFox, URLhaus, Wazuh ingestion, dataset download workers, and a production managed queue are not implemented.
+The `aegis-sync-*` cron names, worker autoscaling, a source-health dashboard, refresh history in the UI, notification rules, user-editable schedules, scheduled MITRE ATT&CK refresh, Wazuh ingestion, dataset download workers, and a production managed queue are not implemented. IOC expiry, asset correlation, and automated blocking are also not implemented.
 
 Describe deployable resources in `render.yaml` (stub allowed in Phase 1; live deploy Phase 10+).
 
@@ -89,7 +89,7 @@ The API uses an S3-compatible storage abstraction (`app/storage`). Switching hos
 | SeaweedFS (S3 `weed mini`) | Docker Compose |
 | FastAPI | Mac host (hot reload); container-ready |
 | React (Vite) | Mac host (hot reload); container-ready |
-| Celery worker and Beat | Host-run against Compose Valkey. One daily vulnerability-intelligence task on the solo pool. No API image in Compose |
+| Celery worker and Beat | Host-run against Compose Valkey. Daily vulnerability intelligence at 06:00 UTC and ThreatFox/URLhaus indicators every 6 hours, both on the solo pool. No API image in Compose |
 | Backend tests | Same Compose PostgreSQL container. Development database `aegis`. Test database `aegis_test` via `TEST_DATABASE_URL`. No extra host port |
 
 Local pytest does not use the development database. `python -m app.db.test_db ensure` creates the test database on an existing volume. Init scripts do not re-run after the first data directory is created. Production startup reads `DATABASE_URL` only.

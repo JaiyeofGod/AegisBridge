@@ -8,6 +8,7 @@ from uuid import uuid4
 from redis import Redis
 
 LOCK_KEY = "aegis:lock:vulnerability_intelligence_sync"
+THREAT_IOC_LOCK_KEY = "aegis:lock:threat_intelligence_iocs"
 _RELEASE = """
 if redis.call("get", KEYS[1]) == ARGV[1] then
     return redis.call("del", KEYS[1])
