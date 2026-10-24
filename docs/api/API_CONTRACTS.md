@@ -65,7 +65,7 @@ All domain rows require a valid session (`401` otherwise) and the permission lis
 | GET | `/risks` | Filters: `search`, `risk_level`, `treatment_status`, `owner` |
 | GET | `/risks/{risk_id}` | Likelihood, impact, and score stay separate. `control_mappings` lists related controls (human id, code, title, framework metadata, implementation status, `licensed_text_included=false`) without nested tests or evidence. |
 | GET | `/vulnerabilities` | Filters: `search`, `severity`, `kev`, `action_decision`, `remediation_status`, `asset_criticality` |
-| GET | `/vulnerabilities/{vulnerability_id}` | CVSS, EPSS, KEV, exposure, criticality, and SSVC stay separate; asset contexts may include `remediation_updated_at` |
+| GET | `/vulnerabilities/{vulnerability_id}` | Same flat CVSS, EPSS, and KEV fields as the list, plus `cve_summary` and `intelligence`. `intelligence.nvd` is `published_at`, `source_modified_at`, and `fetched_at` (last successful NVD fetch). `intelligence.kev` is `checked_at` (last successful catalog check), `due_on`, `required_action`, `vendor_project`, and `product`. `intelligence.epss` is the selected snapshot's `observed_on` and `fetched_at`. Null means the value is not stored. These timestamps are not `updated_at` or remediation times. KEV listing is catalog membership only. |
 | GET | `/alerts` | Filters: `search`, `severity`, `status`, `asset`, `attack_technique` |
 | GET | `/alerts/{alert_id}` | Selected Wazuh reference metadata |
 | GET | `/incidents` | Filters: `search`, `severity`, `status`, `owner`, `containment_state` |

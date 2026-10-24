@@ -28,7 +28,11 @@ from app.schemas.common import Page, RelatedRecord
 from app.schemas.vulnerabilities import (
     VulnerabilityAssetContext,
     VulnerabilityDetail,
+    VulnerabilityEpssRead,
+    VulnerabilityIntelligenceRead,
+    VulnerabilityKevRead,
     VulnerabilityListItem,
+    VulnerabilityNvdRead,
     VulnerabilityRemediationUpdate,
 )
 from app.security.rbac import AuthenticatedPrincipal
@@ -127,11 +131,11 @@ def get_vulnerability(session: Session, vulnerability_id: str) -> VulnerabilityD
     )
     if finding is None:
         raise not_found("Vulnerability", vulnerability_id)
-    item = _item(session, finding)
-    cve = finding.cve_record
+    item, intelligence, summary = _compose(session, finding)
     return VulnerabilityDetail(
         **item.model_dump(),
-        cve_summary=None if cve is None else cve.summary,
+        cve_summary=summary,
+        intelligence=intelligence,
     )
 
 
@@ -230,6 +234,13 @@ def update_vulnerability_remediation(
 
 
 def _item(session: Session, finding: Vulnerability) -> VulnerabilityListItem:
+    item, _intelligence, _summary = _compose(session, finding)
+    return item
+
+
+def _compose(
+    session: Session, finding: Vulnerability
+) -> tuple[VulnerabilityListItem, VulnerabilityIntelligenceRead, str | None]:
     cve = finding.cve_record if finding.cve_record_id is not None else None
     if cve is None and finding.cve_record_id is not None:
         cve = session.get(CveRecord, finding.cve_record_id)
@@ -249,21 +260,52 @@ def _item(session: Session, finding: Vulnerability) -> VulnerabilityListItem:
             .order_by(AssetVulnerability.asset_id)
         ).all()
     ]
-    return VulnerabilityListItem(
-        id=finding.human_id,
-        title=finding.title,
-        cve_id=None if cve is None else cve.cve_id,
-        cvss_version=None if cve is None else cve.cvss_version,
-        cvss_base_score=score,
-        cvss_vector=None if cve is None else cve.cvss_vector,
-        cvss_severity=cvss_severity(score),
-        epss=None if epss is None else float(epss.epss),
-        epss_percentile=None if epss is None or epss.percentile is None else float(epss.percentile),
-        epss_observed_on=None if epss is None else epss.observed_on,
-        kev_listed=kev is not None,
-        kev_date_added=None if kev is None else kev.date_added,
-        known_ransomware_use=None if kev is None else kev.known_ransomware_use,
-        assets=contexts,
+    return (
+        VulnerabilityListItem(
+            id=finding.human_id,
+            title=finding.title,
+            cve_id=None if cve is None else cve.cve_id,
+            cvss_version=None if cve is None else cve.cvss_version,
+            cvss_base_score=score,
+            cvss_vector=None if cve is None else cve.cvss_vector,
+            cvss_severity=cvss_severity(score),
+            epss=None if epss is None else float(epss.epss),
+            epss_percentile=None
+            if epss is None or epss.percentile is None
+            else float(epss.percentile),
+            epss_observed_on=None if epss is None else epss.observed_on,
+            kev_listed=kev is not None,
+            kev_date_added=None if kev is None else kev.date_added,
+            known_ransomware_use=None if kev is None else kev.known_ransomware_use,
+            assets=contexts,
+        ),
+        _intelligence(cve, epss, kev),
+        None if cve is None else cve.summary,
+    )
+
+
+def _intelligence(
+    cve: CveRecord | None,
+    epss: EpssSnapshot | None,
+    kev: KevRecord | None,
+) -> VulnerabilityIntelligenceRead:
+    return VulnerabilityIntelligenceRead(
+        nvd=VulnerabilityNvdRead(
+            published_at=None if cve is None else cve.published_at,
+            source_modified_at=None if cve is None else cve.source_modified_at,
+            fetched_at=None if cve is None else cve.nvd_fetched_at,
+        ),
+        kev=VulnerabilityKevRead(
+            checked_at=None if cve is None else cve.kev_checked_at,
+            due_on=None if kev is None else kev.due_on,
+            required_action=None if kev is None else kev.required_action,
+            vendor_project=None if kev is None else kev.vendor_project,
+            product=None if kev is None else kev.product,
+        ),
+        epss=VulnerabilityEpssRead(
+            observed_on=None if epss is None else epss.observed_on,
+            fetched_at=None if epss is None else epss.fetched_at,
+        ),
     )
 
 

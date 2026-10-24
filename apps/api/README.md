@@ -111,7 +111,7 @@ Requires the domain migration, development seed, and a valid session cookie. Con
 - `GET /api/v1/overview` — authenticated; sections filtered by effective permissions
 - `GET /api/v1/assets*` — `asset.read`
 - `GET /api/v1/risks*` — `risk.read`
-- `GET /api/v1/vulnerabilities*` — `vulnerability.read`
+- `GET /api/v1/vulnerabilities*` — `vulnerability.read`. Detail adds `intelligence` for stored NVD, CISA KEV, and FIRST EPSS provenance. The list shape is unchanged. Null fields stay null. This does not refresh external sources.
 - `GET /api/v1/alerts*` — `alert.read`
 - `GET /api/v1/incidents*` — `incident.read`
 - `GET /api/v1/governance/*` — `control.read`

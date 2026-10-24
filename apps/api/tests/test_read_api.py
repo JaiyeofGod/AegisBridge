@@ -1,16 +1,18 @@
 """Read-only API contracts against the development seed."""
 
 import re
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.core.db import SessionLocal
 from app.db.seed import seed_development
 from app.main import create_app
+from app.models.vulnerability import CveRecord, EpssSnapshot, KevRecord
 
 UUID_RE = re.compile(
     r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b",
@@ -188,6 +190,86 @@ def test_vulnerability_factors_stay_separate(client: TestClient) -> None:
     detail = client.get("/api/v1/vulnerabilities/VULN-0041").json()
     assert detail["cve_summary"]
     assert "score" not in detail
+    assert "intelligence" not in item
+    assert detail["intelligence"]["nvd"]["fetched_at"] is None
+    assert detail["intelligence"]["kev"]["due_on"] is None
+    assert detail["intelligence"]["epss"]["observed_on"] == "2026-10-19"
+    assert detail["intelligence"]["epss"]["fetched_at"] is None
+    assert_safe(detail)
+
+
+def test_vulnerability_detail_exposes_stored_provenance(client: TestClient) -> None:
+    published = datetime(2024, 1, 16, 12, 0, tzinfo=UTC)
+    modified = datetime(2026, 2, 1, 8, 30, tzinfo=UTC)
+    nvd_fetched = datetime(2026, 10, 24, 5, 0, tzinfo=UTC)
+    kev_checked = datetime(2026, 10, 24, 5, 1, tzinfo=UTC)
+    older_fetched = datetime(2020, 1, 2, tzinfo=UTC)
+    selected_fetched = datetime(2026, 10, 23, 6, 0, tzinfo=UTC)
+    with SessionLocal() as session:
+        cve = session.scalar(select(CveRecord).where(CveRecord.cve_id == "CVE-2024-21887"))
+        assert cve is not None
+        cve.published_at = published
+        cve.source_modified_at = modified
+        cve.nvd_fetched_at = nvd_fetched
+        cve.kev_checked_at = kev_checked
+        kev = session.scalar(select(KevRecord).where(KevRecord.cve_record_id == cve.id))
+        assert kev is not None
+        kev.due_on = date(2024, 1, 31)
+        kev.required_action = "Apply the vendor update."
+        kev.vendor_project = "Ivanti"
+        kev.product = "Connect Secure"
+        current = session.scalar(
+            select(EpssSnapshot).where(
+                EpssSnapshot.cve_record_id == cve.id,
+                EpssSnapshot.observed_on == date(2026, 10, 19),
+            )
+        )
+        assert current is not None
+        current.fetched_at = selected_fetched
+        session.add(
+            EpssSnapshot(
+                cve_record_id=cve.id,
+                epss=0.1,
+                percentile=0.2,
+                observed_on=date(2020, 1, 1),
+                fetched_at=older_fetched,
+            )
+        )
+        session.commit()
+
+    detail = client.get("/api/v1/vulnerabilities/VULN-0041").json()
+    listed = client.get("/api/v1/vulnerabilities", params={"search": "21887"}).json()["items"][0]
+    assert "intelligence" not in listed
+    assert listed["cvss_base_score"] == 9.8
+    assert listed["epss"] == pytest.approx(0.94)
+    assert listed["kev_listed"] is True
+    assert listed["kev_date_added"] == "2024-01-12"
+    assert listed["known_ransomware_use"] == "unknown"
+    assert detail["cvss_base_score"] == 9.8
+    assert detail["epss"] == pytest.approx(0.94)
+    assert detail["epss_percentile"] == pytest.approx(0.99)
+    assert detail["epss_observed_on"] == "2026-10-19"
+    assert detail["kev_listed"] is True
+    assert detail["assets"][0]["action_decision"] == "act"
+    assert detail["assets"][0]["remediation_status"] == "open"
+    assert detail["assets"][0]["due_on"] == "2026-10-20"
+    nvd = detail["intelligence"]["nvd"]
+    assert nvd["published_at"].startswith("2024-01-16T12:00:00")
+    assert nvd["source_modified_at"].startswith("2026-02-01T08:30:00")
+    assert nvd["fetched_at"].startswith("2026-10-24T05:00:00")
+    kev_body = detail["intelligence"]["kev"]
+    assert kev_body["checked_at"].startswith("2026-10-24T05:01:00")
+    assert kev_body["due_on"] == "2024-01-31"
+    assert kev_body["required_action"] == "Apply the vendor update."
+    assert kev_body["vendor_project"] == "Ivanti"
+    assert kev_body["product"] == "Connect Secure"
+    assert detail["intelligence"]["epss"]["observed_on"] == "2026-10-19"
+    assert detail["intelligence"]["epss"]["fetched_at"].startswith("2026-10-23T06:00:00")
+    encoded = str(detail).lower()
+    assert "api_key" not in encoded
+    assert "services.nvd.nist.gov" not in encoded
+    assert "cisa.gov" not in encoded
+    assert "api.first.org" not in encoded
     assert_safe(detail)
 
 
@@ -740,6 +822,12 @@ def test_openapi_lists_read_routes(client: TestClient) -> None:
     assert "score" not in vulnerability
     assert "cvss_base_score" in vulnerability
     assert "epss" in vulnerability
+    assert "intelligence" in vulnerability
+    assert "intelligence" not in schemas["VulnerabilityListItem"]["properties"]
+    intelligence = schemas["VulnerabilityIntelligenceRead"]["properties"]
+    assert set(intelligence) == {"nvd", "kev", "epss"}
+    assert "api_key" not in str(schemas["VulnerabilityIntelligenceRead"])
+    assert "http://" not in str(schemas["VulnerabilityNvdRead"])
 
 
 def assert_safe(payload: object) -> None:

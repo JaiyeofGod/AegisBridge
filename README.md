@@ -139,7 +139,7 @@ Domain read routes, including threat intelligence, administration, reports, data
 
 On-demand vulnerability intelligence refresh (`POST /api/v1/vulnerabilities/{id}/intelligence/refresh`) reads NVD CVE metadata, the CISA Known Exploited Vulnerabilities catalog, and FIRST EPSS for one CVE. Those three stay separate. AegisBridge does not combine them into one score, and the refresh does not change remediation or `action_decision`.
 
-The vulnerability detail page shows NVD, CISA KEV, and FIRST EPSS separately. A user with `vulnerability.manage` can refresh one CVE. That refresh does not change remediation or `action_decision`. A vulnerability without a CVE stays valid and is not sent to those sources. Scheduled refresh is still future work.
+`GET /api/v1/vulnerabilities/{id}` includes stored `intelligence` provenance for NVD, CISA KEV, and FIRST EPSS. The list response does not. The vulnerability detail page shows NVD, CISA KEV, and FIRST EPSS separately. A user with `vulnerability.manage` can refresh one CVE. That refresh does not change remediation or `action_decision`. A vulnerability without a CVE stays valid and is not sent to those sources. Scheduled refresh is still future work.
 
 **Not yet created:** Policy rich-text/PDF/e-sign/email, integration/report/cyber-range writes, SSO/MFA, password reset, rate limiting, scheduled NVD/KEV/EPSS sync, malware scanning for evidence, background jobs, Celery worker, CI workflows.
 

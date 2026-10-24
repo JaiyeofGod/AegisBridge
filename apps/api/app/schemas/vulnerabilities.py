@@ -51,8 +51,48 @@ class VulnerabilityListItem(BaseModel):
     assets: list[VulnerabilityAssetContext]
 
 
+class VulnerabilityNvdRead(BaseModel):
+    """NVD timestamps already stored for this CVE. Null means the value is absent."""
+
+    published_at: datetime | None = Field(description="NVD published time. Not a fetch time.")
+    source_modified_at: datetime | None = Field(description="NVD last-modified time for the CVE.")
+    fetched_at: datetime | None = Field(
+        description="When AegisBridge last successfully fetched this CVE from NVD."
+    )
+
+
+class VulnerabilityKevRead(BaseModel):
+    """Stored CISA KEV catalog metadata. Listing is not a compromise finding."""
+
+    checked_at: datetime | None = Field(
+        description="When AegisBridge last successfully checked KEV membership."
+    )
+    due_on: date | None
+    required_action: str | None
+    vendor_project: str | None
+    product: str | None
+
+
+class VulnerabilityEpssRead(BaseModel):
+    """The same latest EPSS snapshot already selected for epss and epss_percentile."""
+
+    observed_on: date | None
+    fetched_at: datetime | None = Field(
+        description="When AegisBridge fetched the selected EPSS observation."
+    )
+
+
+class VulnerabilityIntelligenceRead(BaseModel):
+    """Persisted source provenance. Not a score and not remediation state."""
+
+    nvd: VulnerabilityNvdRead
+    kev: VulnerabilityKevRead
+    epss: VulnerabilityEpssRead
+
+
 class VulnerabilityDetail(VulnerabilityListItem):
     cve_summary: str | None
+    intelligence: VulnerabilityIntelligenceRead
 
 
 class VulnerabilityRemediationUpdate(BaseModel):
