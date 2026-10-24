@@ -12,7 +12,9 @@ import { PageContainer } from "@/components/navigation/PageContainer";
 import { PageHeader } from "@/components/navigation/PageHeader";
 import { StatusBadge } from "@/components/status/StatusBadge";
 import { StaleDataIndicator } from "@/components/status/StaleDataIndicator";
+import { useAuthStatus } from "@/features/auth/useAuthSession";
 import { SEEDED_DATA_LABEL, SEEDED_DATA_NOTE } from "@/features/data-origin";
+import { AttackExplorer } from "@/features/threat-intel/AttackExplorer";
 import {
   mapAdvisory,
   mapIndicator,
@@ -39,7 +41,7 @@ import { formatTimestamp } from "@/lib/format";
 import type { IndicatorQuery } from "@/services/api-types";
 import type { IntelSectionId } from "@/types/threat-intel";
 
-const sections: { id: IntelSectionId; label: string }[] = [
+const baseSections: { id: IntelSectionId; label: string }[] = [
   { id: "indicators", label: "Indicators" },
   { id: "advisories", label: "Advisories" },
   { id: "enrichment", label: "Enrichment" },
@@ -55,6 +57,11 @@ const emptyFilters: IndicatorTableFilters = {
 };
 
 export function ThreatIntelPage() {
+  const auth = useAuthStatus();
+  const canReadAttack = auth.user?.permissions.includes("threat_intel.read") === true;
+  const sections = canReadAttack
+    ? [...baseSections, { id: "attack" as const, label: "MITRE ATT&CK" }]
+    : baseSections;
   const summary = useThreatIntelSummary();
   const catalog = useIndicatorCatalog();
   const advisories = useAdvisories();
@@ -107,7 +114,7 @@ export function ThreatIntelPage() {
               >
                 Add indicator
               </Button>
-              <SimulatedDataBanner message={SEEDED_DATA_NOTE} />
+              {section === "attack" ? null : <SimulatedDataBanner message={SEEDED_DATA_NOTE} />}
               {summary.dataUpdatedAt ? (
                 <p className="text-xs text-[var(--muted)]" data-testid="last-successful-fetch">
                   Last successful update: {formatTimestamp(generatedAt)}
@@ -144,8 +151,12 @@ export function ThreatIntelPage() {
           })}
         </div>
 
-        {summary.isPending ? <LoadingState label="Updating" rows={4} /> : null}
-        {summary.isError ? (
+        {section === "attack" && canReadAttack ? <AttackExplorer /> : null}
+
+        {section !== "attack" && summary.isPending ? (
+          <LoadingState label="Updating" rows={4} />
+        ) : null}
+        {section !== "attack" && summary.isError ? (
           <ErrorState
             title="Threat intelligence data unavailable"
             description="The development threat-intelligence API did not respond. Retry to load the seeded summary. Fixture rows are not substituted."
@@ -153,28 +164,28 @@ export function ThreatIntelPage() {
             onRetry={() => void summary.refetch()}
           />
         ) : null}
-        {catalog.isError ? (
+        {section !== "attack" && catalog.isError ? (
           <ErrorState
             title="Indicator list unavailable"
             description="The indicator request failed. Fixture indicators are not substituted."
             onRetry={() => void catalog.refetch()}
           />
         ) : null}
-        {filtered.isError ? (
+        {section !== "attack" && filtered.isError ? (
           <ErrorState
             title="Filtered indicators unavailable"
             description="The indicator filter request failed. Fixture rows are not added."
             onRetry={() => void filtered.refetch()}
           />
         ) : null}
-        {detail.isError ? (
+        {section !== "attack" && detail.isError ? (
           <ErrorState
             title="Indicator record unavailable"
             description="The indicator detail request failed. Related records are not invented."
             onRetry={() => void detail.refetch()}
           />
         ) : null}
-        {summary.isSuccess && refreshing ? (
+        {section !== "attack" && summary.isSuccess && refreshing ? (
           <div className="mb-6">
             <StaleDataIndicator
               message="Refreshing development threat intelligence"
@@ -183,7 +194,7 @@ export function ThreatIntelPage() {
           </div>
         ) : null}
 
-        {summary.isSuccess && metrics ? (
+        {section !== "attack" && summary.isSuccess && metrics ? (
           <div className="space-y-8">
             {section === "indicators" && catalog.isPending ? (
               <LoadingState label="Updating" rows={3} />

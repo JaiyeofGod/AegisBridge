@@ -6,7 +6,7 @@ export type IntelConfidence = "High" | "Medium" | "Low";
 
 export type IntelFreshness = "Current" | "Expiring" | "Stale";
 
-export type IntelSectionId = "indicators" | "advisories" | "enrichment" | "sources";
+export type IntelSectionId = "indicators" | "advisories" | "enrichment" | "sources" | "attack";
 
 export type SourceConnection = "Simulated snapshot" | "Pinned reference" | "Planned";
 

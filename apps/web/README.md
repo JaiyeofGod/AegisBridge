@@ -62,6 +62,18 @@ Requires Node.js 24 LTS. Dev server: `http://127.0.0.1:5173` (proxies `/api` to 
 | Update incident task               | `PATCH /api/v1/incidents/{id}/tasks/{task_id}`           | Requires `incident.manage` + CSRF. `title` / `status` / changed `assignee` plus `expected_updated_at`. `assignee: null` clears it. Complete, reopen, and cancel use this route. No delete.                                                                                                                                                                             |
 | Operational directory              | `GET /api/v1/directory/users`                            | Requires `directory.read`. Active same-organization users for the assignee picker. `page` / `page_size` (20) and optional `q`. No CSRF. Not the Administration users API.                                                                                                                                                                                              |
 
+### MITRE ATT&CK explorer
+
+The Threat Intelligence page keeps Indicators, Advisories, Enrichment, and Sources. A session with `threat_intel.read` also gets a MITRE ATT&CK tab. That tab reads:
+
+| Action           | Endpoint                                       | Notes                                                                                                                                                             |
+| ---------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| List tactics     | `GET /api/v1/attack/tactics`                   | Names, short names, and ids come from the API. No hard-coded tactic list.                                                                                         |
+| List techniques  | `GET /api/v1/attack/techniques`                | `page` / `page_size` (25), optional `q` (ATT&CK id or name), `tactic` (short name), `include_subtechniques` (default true), `include_deprecated` (default false). |
+| Technique detail | `GET /api/v1/attack/techniques/{technique_id}` | Public ATT&CK id. Description is plain text. Parent, tactics, platforms, revoked, deprecated, modified time, and pinned release are shown when returned.          |
+
+The header states the pinned Enterprise release returned by the API (20.0 in the loaded catalog). Revoked and deprecated techniques stay out of the default list. Opening one shows a text status, not color alone. The catalog is read-only. There is no Navigator, coverage heatmap, Sigma import, detection write, or scheduled refresh on this screen. GET requests do not send a CSRF header.
+
 Backend remains the authorization boundary. Evidence files are stored outside PostgreSQL (local SeaweedFS / future R2) via the API only. SHA-256 is calculated server-side at ingestion; `integrity_verified` remains false; malware scanning is not implemented. Policy UI preserves version history and Policy → Control → Test → Evidence traceability; licensed CIS safeguard prose is never surfaced. E-sign, email, and rich docs remain unsupported. Integration credential writes, reports, and Cyber Range control stay disabled in the UI.
 
 ### Incident → Response Tasks

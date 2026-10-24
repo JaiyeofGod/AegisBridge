@@ -1262,6 +1262,50 @@ export type AccountPreferencesUpdate = {
   reduced_motion?: boolean;
 };
 
+export type AttackTacticItem = {
+  id: string;
+  name: string;
+  short_name: string;
+  release: string;
+};
+
+export type AttackTechniqueListItem = {
+  id: string;
+  name: string;
+  is_subtechnique: boolean;
+  parent_technique_id: string | null;
+  tactics: string[];
+  release: string;
+};
+
+export type AttackTechniqueParent = {
+  id: string;
+  name: string;
+};
+
+export type AttackTechniqueDetail = {
+  id: string;
+  name: string;
+  description: string | null;
+  tactics: AttackTacticItem[];
+  platforms: string[];
+  is_subtechnique: boolean;
+  parent: AttackTechniqueParent | null;
+  revoked: boolean;
+  deprecated: boolean;
+  release: string;
+  modified_at: string | null;
+};
+
+export type AttackTechniqueQuery = {
+  page?: number;
+  pageSize?: number;
+  q?: string;
+  tactic?: string;
+  includeSubtechniques?: boolean;
+  includeDeprecated?: boolean;
+};
+
 export type AccountWorkspaceResponse = {
   organization: string;
   department: string | null;
