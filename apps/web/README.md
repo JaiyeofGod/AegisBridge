@@ -74,6 +74,12 @@ The Threat Intelligence page keeps Indicators, Advisories, Enrichment, and Sourc
 
 The header states the pinned Enterprise release returned by the API (20.0 in the loaded catalog). Revoked and deprecated techniques stay out of the default list. Opening one shows a text status, not color alone. The catalog is read-only. There is no Navigator, coverage heatmap, Sigma import, detection write, or scheduled refresh on this screen. GET requests do not send a CSRF header.
 
+### Indicator provenance
+
+`GET /api/v1/threat-intelligence/indicators` stays the compact list: public id, coarse type, value, source name, last seen, status, and the existing filters (`search`, `indicator_type`, `source`, `status`, `internal_match`) with `page` / `page_size` 25. The UI does not download the whole feed. Source options come from `GET /api/v1/threat-intelligence/sources`.
+
+`GET /api/v1/threat-intelligence/indicators/{id}` supplies the selected row: subtype, `data_origin` (`external_feed` or `simulated`), threat type, malware family, tags, source status, integer source confidence, fetch time, and a source reference when present. `normalized_value` is not in the response and is not shown. A null AegisBridge confidence is labeled "Not assigned". The integer source confidence is shown as that integer. A URL value is text, never an anchor. The source reference opens in a new tab with `rel="noopener noreferrer"`. Online or offline source status is the feed's label, not a compromise finding. Healthy on the Sources tab means the most recent feed read succeeded. There is no automatic blocking.
+
 Backend remains the authorization boundary. Evidence files are stored outside PostgreSQL (local SeaweedFS / future R2) via the API only. SHA-256 is calculated server-side at ingestion; `integrity_verified` remains false; malware scanning is not implemented. Policy UI preserves version history and Policy → Control → Test → Evidence traceability; licensed CIS safeguard prose is never surfaced. E-sign, email, and rich docs remain unsupported. Integration credential writes, reports, and Cyber Range control stay disabled in the UI.
 
 ### Incident → Response Tasks

@@ -785,7 +785,7 @@ export type IndicatorListItem = {
   id: string;
   indicator_type: string;
   value: string;
-  confidence: string;
+  confidence: string | null;
   severity: string | null;
   source: ThreatSourceRef;
   first_seen: string;
@@ -801,6 +801,14 @@ export type IndicatorDetailResponse = IndicatorListItem & {
   attack: AttackRef | null;
   matched_asset: RelatedRecord | null;
   data_origin: string;
+  indicator_subtype?: string | null;
+  threat_type?: string | null;
+  malware_family?: string | null;
+  tags?: string[];
+  source_status?: string | null;
+  source_confidence?: number | null;
+  reference_url?: string | null;
+  fetched_at?: string | null;
 };
 
 export type IndicatorQuery = {

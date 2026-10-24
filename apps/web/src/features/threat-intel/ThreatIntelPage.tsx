@@ -25,12 +25,13 @@ import {
   type IndicatorView,
 } from "@/features/threat-intel/mapThreatIntel";
 import {
+  IndicatorValue,
   ThreatIndicatorTable,
   type IndicatorTableFilters,
 } from "@/features/threat-intel/ThreatIndicatorTable";
 import {
+  INDICATOR_PAGE_SIZE,
   useAdvisories,
-  useIndicatorCatalog,
   useIndicatorDetail,
   useIndicatorList,
   useThreatIntelSummary,
@@ -63,24 +64,27 @@ export function ThreatIntelPage() {
     ? [...baseSections, { id: "attack" as const, label: "MITRE ATT&CK" }]
     : baseSections;
   const summary = useThreatIntelSummary();
-  const catalog = useIndicatorCatalog();
   const advisories = useAdvisories();
   const sources = useThreatSources();
   const [section, setSection] = useState<IntelSectionId>("indicators");
   const [selectedId, setSelectedId] = useState("");
+  const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<IndicatorTableFilters>(emptyFilters);
   const deferredSearch = useDeferredValue(filters.search.trim());
-  const query = useMemo(
+  const filterQuery = useMemo(
     () => toIndicatorQuery({ ...filters, search: deferredSearch }),
     [filters, deferredSearch],
   );
-  const hasServerFilters = Object.keys(query).length > 0;
-  const filtered = useIndicatorList(query, hasServerFilters);
+  const hasFilters = Object.keys(filterQuery).length > 0;
+  const query = useMemo(
+    () => ({ ...filterQuery, page, pageSize: INDICATOR_PAGE_SIZE }),
+    [filterQuery, page],
+  );
+  const indicators = useIndicatorList(query);
   const generatedAt = summary.dataUpdatedAt
     ? new Date(summary.dataUpdatedAt).toISOString()
     : new Date().toISOString();
-  const sourceItems = hasServerFilters ? (filtered.data?.items ?? []) : (catalog.data?.items ?? []);
-  const listed = sourceItems.map(mapIndicator);
+  const listed = (indicators.data?.items ?? []).map(mapIndicator);
   const selectedRow = listed.find((item) => item.id === selectedId) ?? listed[0];
   const detail = useIndicatorDetail(selectedRow?.id ?? "");
   const selected =
@@ -92,11 +96,12 @@ export function ThreatIntelPage() {
   const sourceViews = sources.data?.items.map(mapThreatSource) ?? [];
   const refreshing =
     summary.isFetching ||
-    catalog.isFetching ||
-    filtered.isFetching ||
+    indicators.isFetching ||
     detail.isFetching ||
     advisories.isFetching ||
     sources.isFetching;
+  const originNote =
+    section === "indicators" ? indicatorOriginNote(summary.data?.data_origin) : SEEDED_DATA_NOTE;
 
   return (
     <AppShell environmentLabel="Development · Seeded">
@@ -114,7 +119,7 @@ export function ThreatIntelPage() {
               >
                 Add indicator
               </Button>
-              {section === "attack" ? null : <SimulatedDataBanner message={SEEDED_DATA_NOTE} />}
+              {section === "attack" ? null : <SimulatedDataBanner message={originNote} />}
               {summary.dataUpdatedAt ? (
                 <p className="text-xs text-[var(--muted)]" data-testid="last-successful-fetch">
                   Last successful update: {formatTimestamp(generatedAt)}
@@ -164,18 +169,11 @@ export function ThreatIntelPage() {
             onRetry={() => void summary.refetch()}
           />
         ) : null}
-        {section !== "attack" && catalog.isError ? (
+        {section !== "attack" && indicators.isError ? (
           <ErrorState
             title="Indicator list unavailable"
             description="The indicator request failed. Fixture indicators are not substituted."
-            onRetry={() => void catalog.refetch()}
-          />
-        ) : null}
-        {section !== "attack" && filtered.isError ? (
-          <ErrorState
-            title="Filtered indicators unavailable"
-            description="The indicator filter request failed. Fixture rows are not added."
-            onRetry={() => void filtered.refetch()}
+            onRetry={() => void indicators.refetch()}
           />
         ) : null}
         {section !== "attack" && detail.isError ? (
@@ -196,10 +194,10 @@ export function ThreatIntelPage() {
 
         {section !== "attack" && summary.isSuccess && metrics ? (
           <div className="space-y-8">
-            {section === "indicators" && catalog.isPending ? (
+            {section === "indicators" && indicators.isPending ? (
               <LoadingState label="Updating" rows={3} />
             ) : null}
-            {section === "indicators" && catalog.isSuccess ? (
+            {section === "indicators" && indicators.isSuccess ? (
               <>
                 <section aria-labelledby="intel-summary-heading">
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -209,7 +207,10 @@ export function ThreatIntelPage() {
                     >
                       Intelligence snapshot
                     </h2>
-                    <StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />
+                    <StatusBadge
+                      label={snapshotOriginLabel(summary.data.data_origin)}
+                      tone={summary.data.data_origin === "simulated" ? "warning" : "neutral"}
+                    />
                   </div>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                     {metrics.metrics.map((metric) => (
@@ -224,28 +225,30 @@ export function ThreatIntelPage() {
 
                 <Panel
                   title="Indicator workspace"
-                  description="Development indicators stored in PostgreSQL. Reserved example addresses and domains."
+                  description="Stored indicators. Open a row for source context. A listed value is not a compromise or a block."
                 >
                   <ThreatIndicatorTable
                     indicators={listed}
-                    total={
-                      hasServerFilters
-                        ? (filtered.data?.total ?? listed.length)
-                        : catalog.data.total
-                    }
+                    total={indicators.data?.total ?? listed.length}
+                    page={indicators.data?.page ?? page}
+                    pageSize={indicators.data?.page_size ?? INDICATOR_PAGE_SIZE}
+                    onPageChange={setPage}
                     selectedId={selected?.id ?? ""}
                     onSelect={setSelectedId}
                     filters={filters}
-                    onFiltersChange={setFilters}
+                    onFiltersChange={(next) => {
+                      setFilters(next);
+                      setPage(1);
+                    }}
                     sourceOptions={sourceViews.map((item) => ({
                       value: item.id,
-                      label: `${item.name} (${item.id})`,
+                      label: item.name,
                     }))}
                     emptyLabel={
-                      hasServerFilters && filtered.isPending
+                      hasFilters && indicators.isPending
                         ? "Updating indicator filters."
-                        : hasServerFilters
-                          ? "No indicators match the current filters."
+                        : hasFilters
+                          ? "No indicators match these filters."
                           : "No indicators are stored."
                     }
                   />
@@ -333,7 +336,7 @@ export function ThreatIntelPage() {
             {section === "sources" ? (
               <Panel
                 title="Sources"
-                description="Stored source catalog. connection_status says whether a feed is connected."
+                description="Stored source catalog. Healthy means the most recent feed read succeeded."
                 action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
               >
                 {sources.isPending ? <LoadingState label="Updating" rows={2} /> : null}
@@ -365,6 +368,12 @@ export function ThreatIntelPage() {
                         <p className="mt-1 text-sm text-[var(--text)]">
                           {item.connectionLabel} · {item.connectionStatus}
                         </p>
+                        {item.connectionStatus === "healthy" ? (
+                          <p className="mt-1 text-sm text-[var(--muted)]">
+                            Healthy means the most recent feed read succeeded. It is not guaranteed
+                            uptime, real-time streaming, or proof that each indicator is correct.
+                          </p>
+                        ) : null}
                         <p className="mt-1 text-sm text-[var(--muted)]">{item.notes}</p>
                       </li>
                     ))}
@@ -382,46 +391,122 @@ export function ThreatIntelPage() {
 function IndicatorContext({ indicator }: { indicator: IndicatorView | IndicatorDetailView }) {
   const detail = "summary" in indicator ? indicator : null;
   return (
-    <div className="space-y-4 text-sm" data-testid="intel-context">
-      <div>
-        <p className="text-[var(--muted)]">Identity</p>
-        <p className="mt-1 text-[var(--text)]">
-          {indicator.id} · {indicator.indicatorType} · {indicator.value}
-        </p>
-      </div>
-      <div>
-        <p className="text-[var(--muted)]">Data handling</p>
-        <p className="mt-1 text-[var(--text)]">
-          {detail?.exampleNote ??
-            "Reserved example addresses, example domains, and synthetic hashes are simulated."}
-        </p>
-      </div>
-      <div>
-        <p className="text-[var(--muted)]">Source and confidence</p>
-        <p className="mt-1 text-[var(--text)]">
-          {indicator.sourceName} · {indicator.sourceId} · {indicator.sourceStatus} ·{" "}
-          {indicator.confidence} confidence
-          {indicator.severity ? ` · ${indicator.severity} severity` : " · Severity not stored"}
-        </p>
-      </div>
-      <div>
-        <p className="text-[var(--muted)]">Validity</p>
-        <p className="mt-1 text-[var(--text)]">
-          First seen {indicator.firstSeen}. Last seen {indicator.lastSeen}. Status{" "}
-          {indicator.status}.
-        </p>
-      </div>
-      <div>
-        <p className="text-[var(--muted)]">Internal match</p>
-        <p className="mt-1 text-[var(--text)]">
-          {indicator.internalMatch
-            ? "Stored internal match. Not a live correlation and not a confirmed compromise."
-            : "No internal match is stored."}
-        </p>
-      </div>
-      <div>
-        <p className="text-[var(--muted)]">Relationships</p>
-        <p className="mt-1 text-[var(--text)]">
+    <div className="space-y-5 text-sm" data-testid="intel-context">
+      <section aria-labelledby="indicator-identity-heading" className="space-y-2">
+        <h3 id="indicator-identity-heading" className="font-semibold text-[var(--text)]">
+          Indicator
+        </h3>
+        <dl className="space-y-2">
+          <DetailRow label="Public id" value={indicator.id} />
+          <div>
+            <dt className="text-[var(--muted)]">Value</dt>
+            <dd className="mt-1">
+              <IndicatorValue value={indicator.value} />
+            </dd>
+          </div>
+          <DetailRow label="Type" value={indicator.indicatorTypeLabel} />
+          {detail?.indicatorSubtypeLabel ? (
+            <DetailRow label="Subtype" value={detail.indicatorSubtypeLabel} />
+          ) : null}
+          <DetailRow label="Status" value={indicator.status} />
+          <div>
+            <dt className="text-[var(--muted)]">Data origin</dt>
+            <dd className="mt-1">
+              <StatusBadge
+                label={detail?.dataOriginLabel ?? "Detail loading"}
+                tone={detail?.dataOrigin === "external_feed" ? "accent" : "neutral"}
+              />
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <section aria-labelledby="indicator-source-heading" className="space-y-2">
+        <h3 id="indicator-source-heading" className="font-semibold text-[var(--text)]">
+          Source context
+        </h3>
+        <dl className="space-y-2">
+          <DetailRow label="Source" value={`${indicator.sourceName} · ${indicator.sourceId}`} />
+          <DetailRow
+            label="Source connection"
+            value={`${indicator.sourceConnectionLabel} · ${indicator.sourceStatus}`}
+          />
+          {detail?.threatType ? <DetailRow label="Threat type" value={detail.threatType} /> : null}
+          {detail?.malwareFamily ? (
+            <DetailRow label="Malware family" value={detail.malwareFamily} />
+          ) : null}
+          {detail?.feedStatus ? (
+            <DetailRow label="Source status" value={detail.feedStatus} />
+          ) : null}
+          {detail && detail.sourceConfidence !== null ? (
+            <DetailRow label="Source confidence" value={String(detail.sourceConfidence)} />
+          ) : null}
+          {detail ? (
+            <div>
+              <dt className="text-[var(--muted)]">Tags</dt>
+              <dd className="mt-1">
+                <TagList tags={detail.tags} />
+              </dd>
+            </div>
+          ) : null}
+          {detail?.referenceUrl ? (
+            <div>
+              <dt className="text-[var(--muted)]">Source reference</dt>
+              <dd className="mt-1">
+                <a
+                  href={detail.referenceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-11 items-center font-semibold break-all text-[var(--accent)]"
+                >
+                  Source reference
+                </a>
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+        {detail?.feedStatus ? (
+          <p className="text-xs text-[var(--muted)]">
+            Source status is the feed&apos;s own label. Online or offline is not a compromise
+            finding and does not mean an AegisBridge asset contacted this indicator.
+          </p>
+        ) : null}
+      </section>
+
+      <section aria-labelledby="indicator-timing-heading" className="space-y-2">
+        <h3 id="indicator-timing-heading" className="font-semibold text-[var(--text)]">
+          Timing
+        </h3>
+        <dl className="space-y-2">
+          <DetailRow label="First seen" value={indicator.firstSeen} />
+          <DetailRow label="Last seen" value={indicator.lastSeen} />
+          {detail?.fetchedAt ? (
+            <DetailRow label="Fetched by AegisBridge" value={detail.fetchedAt} />
+          ) : null}
+        </dl>
+      </section>
+
+      <section aria-labelledby="indicator-aegis-heading" className="space-y-2">
+        <h3 id="indicator-aegis-heading" className="font-semibold text-[var(--text)]">
+          AegisBridge context
+        </h3>
+        <dl className="space-y-2">
+          <DetailRow label="AegisBridge confidence" value={indicator.confidenceLabel} />
+          <DetailRow label="Severity" value={indicator.severity ?? "Not stored"} />
+          <DetailRow
+            label="Internal match"
+            value={
+              indicator.internalMatch
+                ? "Stored internal match. Not a live correlation and not a confirmed compromise."
+                : "No internal match is stored."
+            }
+          />
+          <DetailRow
+            label="Summary"
+            value={detail?.summary ?? "Indicator detail is still loading."}
+          />
+        </dl>
+        <p className="text-[var(--text)]">
           {indicator.matchedAssetId ?? "No asset"}
           {detail?.matchedAssetTitle ? ` · ${detail.matchedAssetTitle}` : ""}
           {indicator.matchedAssetId ? (
@@ -441,21 +526,65 @@ function IndicatorContext({ indicator }: { indicator: IndicatorView | IndicatorD
             ? `${indicator.attackTechniqueId}${detail?.attackName ? ` · ${detail.attackName}` : ""}${detail?.attackTactic ? ` · ${detail.attackTactic}` : ""}`
             : "No ATT&CK mapping stored"}
         </p>
-      </div>
-      <div>
-        <p className="text-[var(--muted)]">Stored summary</p>
-        <p className="mt-1 text-[var(--text)]">
-          {detail?.summary ?? "Indicator detail is still loading."}
-        </p>
-      </div>
-      {detail ? (
-        <div>
-          <p className="text-[var(--muted)]">Data origin</p>
-          <p className="mt-1 text-[var(--text)]">{detail.dataOrigin}</p>
-        </div>
+      </section>
+    </div>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-[var(--muted)]">{label}</dt>
+      <dd className="mt-1 break-words text-[var(--text)]">{value}</dd>
+    </div>
+  );
+}
+
+function TagList({ tags }: { tags: string[] }) {
+  const [expanded, setExpanded] = useState(false);
+  if (tags.length === 0) {
+    return <p className="text-[var(--muted)]">No tags stored.</p>;
+  }
+  const visible = expanded ? tags : tags.slice(0, 8);
+  const hidden = tags.length - visible.length;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {visible.map((tag, index) => (
+        <span
+          key={`${tag}-${index}`}
+          className="inline-flex max-w-full items-center rounded-full bg-[var(--raised)] px-2.5 py-1 text-xs break-all text-[var(--text)]"
+        >
+          {tag}
+        </span>
+      ))}
+      {hidden > 0 ? (
+        <button
+          type="button"
+          className="inline-flex min-h-8 items-center rounded-full px-2.5 text-xs font-semibold text-[var(--accent)]"
+          onClick={() => setExpanded(true)}
+        >
+          +{hidden} more
+        </button>
       ) : null}
     </div>
   );
+}
+
+function indicatorOriginNote(origin: string | undefined) {
+  if (origin === "mixed") {
+    return "Indicator records include external feeds and simulated rows. A feed listing is not a compromise or a block.";
+  }
+  if (origin === "external_feed") {
+    return "Indicator records on this page come from external feeds. A feed listing is not a compromise or a block.";
+  }
+  return SEEDED_DATA_NOTE;
+}
+
+function snapshotOriginLabel(origin: string) {
+  if (origin === "mixed") return "MIXED ORIGIN";
+  if (origin === "external_feed") return "EXTERNAL FEED";
+  if (origin === "simulated") return SEEDED_DATA_LABEL;
+  return origin;
 }
 
 function toIndicatorQuery(filters: IndicatorTableFilters): IndicatorQuery {

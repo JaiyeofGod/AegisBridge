@@ -979,7 +979,9 @@ export function filteredIndicators(url: string) {
   }
   if (match === "true") items = items.filter((item) => item.internal_match);
   if (match === "false") items = items.filter((item) => !item.internal_match);
-  return assetPage(items);
+  const page = Number(params.get("page") ?? "1") || 1;
+  const pageSize = Number(params.get("page_size") ?? "100") || 100;
+  return assetPage(items, page, pageSize);
 }
 
 export const advisoryItems: AdvisoryListItem[] = [

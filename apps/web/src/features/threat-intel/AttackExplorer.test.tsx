@@ -212,7 +212,7 @@ describe("MITRE ATT&CK explorer", () => {
   it("hides the catalog tab without threat_intel.read and keeps indicators", async () => {
     const api = installApiFetch();
     await renderWithProviders(<AppRouter />, { initialEntries: ["/threat-intelligence"] });
-    expect(await screen.findByText("IOC-0002")).toBeInTheDocument();
+    expect((await screen.findAllByText("IOC-0002")).length).toBeGreaterThan(0);
     expect(screen.queryByRole("tab", { name: "MITRE ATT&CK" })).not.toBeInTheDocument();
     expect(api.calls.some((url) => url.includes("/api/v1/attack"))).toBe(false);
   });
@@ -393,7 +393,7 @@ describe("MITRE ATT&CK explorer", () => {
     const { user } = await openAttack();
     expect(screen.getByTestId("attack-explorer")).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Indicators" }));
-    expect(await screen.findByText("IOC-0002")).toBeInTheDocument();
+    expect((await screen.findAllByText("IOC-0002")).length).toBeGreaterThan(0);
     await user.click(screen.getByRole("tab", { name: "Advisories" }));
     expect(await screen.findByTestId("intel-advisories")).toHaveTextContent("ADV-0001");
     await user.click(screen.getByRole("tab", { name: "Sources" }));

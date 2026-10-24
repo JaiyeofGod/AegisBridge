@@ -1,4 +1,4 @@
-import { StatusBadge } from "@/components/status/StatusBadge";
+import { CatalogPager } from "@/components/navigation/CatalogPager";
 import type { IndicatorView } from "@/features/threat-intel/mapThreatIntel";
 
 export type IndicatorTableFilters = {
@@ -32,16 +32,12 @@ const matches: IndicatorFilterOption[] = [
   { value: "false", label: "No internal match" },
 ];
 
-function confidenceTone(confidence: string): "warning" | "accent" | "neutral" {
-  const value = confidence.toLowerCase();
-  if (value === "high") return "warning";
-  if (value === "medium") return "accent";
-  return "neutral";
-}
-
 export function ThreatIndicatorTable({
   indicators,
   total,
+  page,
+  pageSize,
+  onPageChange,
   selectedId,
   onSelect,
   filters,
@@ -51,6 +47,9 @@ export function ThreatIndicatorTable({
 }: {
   indicators: IndicatorView[];
   total: number;
+  page: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
   selectedId: string;
   onSelect: (id: string) => void;
   filters: IndicatorTableFilters;
@@ -114,25 +113,12 @@ export function ThreatIndicatorTable({
           <div className="hidden overflow-x-auto rounded-[var(--radius-control)] border border-[var(--border)] md:block">
             <table className="min-w-full border-collapse text-left text-sm">
               <caption className="sr-only">
-                Development indicator records with type, value, confidence, source, status, internal
-                match, and ATT&CK mapping kept separate
+                Indicator records with value, type, source, last seen, and status. Indicator values
+                are plain text.
               </caption>
               <thead className="bg-[var(--raised)] text-[var(--muted)]">
                 <tr>
-                  {[
-                    "Indicator",
-                    "Value",
-                    "Type",
-                    "Confidence",
-                    "Severity",
-                    "Source",
-                    "First seen",
-                    "Last seen",
-                    "Status",
-                    "Internal match",
-                    "ATT&CK",
-                    "Asset",
-                  ].map((heading) => (
+                  {["Indicator", "Type", "Source", "Last seen", "Status"].map((heading) => (
                     <th
                       key={heading}
                       scope="col"
@@ -144,79 +130,93 @@ export function ThreatIndicatorTable({
                 </tr>
               </thead>
               <tbody>
-                {indicators.map((item) => (
-                  <tr key={item.id} className="border-t border-[var(--border)]">
-                    <td className="px-3 py-3">
-                      <button
-                        type="button"
-                        onClick={() => onSelect(item.id)}
-                        aria-pressed={selectedId === item.id}
-                        className="inline-flex min-h-11 items-center font-medium text-[var(--text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-                      >
-                        {item.id}
-                      </button>
-                    </td>
-                    <td className="px-3 py-3 text-[var(--text)]">{item.value}</td>
-                    <td className="px-3 py-3 text-[var(--muted)]">{item.indicatorTypeLabel}</td>
-                    <td className="px-3 py-3">
-                      <StatusBadge label={item.confidence} tone={confidenceTone(item.confidence)} />
-                    </td>
-                    <td className="px-3 py-3 text-[var(--muted)]">
-                      {item.severity ?? "Not stored"}
-                    </td>
-                    <td className="px-3 py-3 text-[var(--muted)]">
-                      {item.sourceName}
-                      <span className="mt-1 block text-xs">{item.sourceStatus}</span>
-                    </td>
-                    <td className="px-3 py-3 whitespace-nowrap text-[var(--muted)]">
-                      {item.firstSeen}
-                    </td>
-                    <td className="px-3 py-3 whitespace-nowrap text-[var(--muted)]">
-                      {item.lastSeen}
-                    </td>
-                    <td className="px-3 py-3 text-[var(--text)]">{item.status}</td>
-                    <td className="px-3 py-3 text-[var(--text)]">
-                      {item.internalMatch ? "Internal match" : "No internal match"}
-                    </td>
-                    <td className="px-3 py-3 text-[var(--muted)]">
-                      {item.attackTechniqueId ?? "Not stored"}
-                    </td>
-                    <td className="px-3 py-3 text-[var(--muted)]">
-                      {item.matchedAssetId ?? "Not stored"}
-                    </td>
-                  </tr>
-                ))}
+                {indicators.map((item) => {
+                  const selected = selectedId === item.id;
+                  return (
+                    <tr
+                      key={item.id}
+                      className={
+                        selected
+                          ? "border-t border-[var(--border)] bg-[var(--raised)]"
+                          : "border-t border-[var(--border)]"
+                      }
+                      data-selected={selected ? "true" : "false"}
+                    >
+                      <td className="px-3 py-3">
+                        <button
+                          type="button"
+                          onClick={() => onSelect(item.id)}
+                          aria-pressed={selected}
+                          className="inline-flex min-h-11 items-center font-medium text-[var(--text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                        >
+                          {item.id}
+                        </button>
+                        <IndicatorValue value={item.value} />
+                      </td>
+                      <td className="px-3 py-3 text-[var(--text)]">{item.indicatorTypeLabel}</td>
+                      <td className="px-3 py-3 text-[var(--text)]">
+                        {item.sourceName}
+                        <span className="mt-1 block text-xs text-[var(--muted)]">
+                          {item.sourceConnectionLabel}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-[var(--muted)]">
+                        {item.lastSeen}
+                      </td>
+                      <td className="px-3 py-3 text-[var(--text)]">{item.status}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           <ul className="space-y-3 md:hidden">
-            {indicators.map((item) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  onClick={() => onSelect(item.id)}
-                  aria-pressed={selectedId === item.id}
-                  className="flex min-h-11 w-full flex-col gap-1 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-                >
-                  <span className="font-medium text-[var(--text)]">
-                    {item.id} · {item.value}
-                  </span>
-                  <span className="text-xs text-[var(--muted)]">
-                    {item.confidence} confidence · {item.status} ·{" "}
-                    {item.internalMatch ? "Internal match" : "No internal match"}
-                  </span>
-                </button>
-              </li>
-            ))}
+            {indicators.map((item) => {
+              const selected = selectedId === item.id;
+              return (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => onSelect(item.id)}
+                    aria-pressed={selected}
+                    className="flex min-h-11 w-full flex-col gap-1 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                  >
+                    <span className="font-medium text-[var(--text)]">{item.id}</span>
+                    <IndicatorValue value={item.value} />
+                    <span className="text-xs text-[var(--muted)]">
+                      {item.indicatorTypeLabel} · {item.sourceName} · {item.status}
+                    </span>
+                    <span className="text-xs text-[var(--muted)]">Last seen {item.lastSeen}</span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </>
       )}
 
-      <p className="text-xs text-[var(--muted)]">
-        Showing {indicators.length} of {total} stored records · Row selection opens record details
-      </p>
+      <CatalogPager
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={onPageChange}
+        label="indicators"
+        testIdPrefix="indicator-pager"
+      />
     </div>
+  );
+}
+
+export function IndicatorValue({ value }: { value: string }) {
+  return (
+    <span
+      className="block max-w-md truncate text-xs text-[var(--muted)]"
+      title={value}
+      data-testid="indicator-value"
+    >
+      {value}
+    </span>
   );
 }
 

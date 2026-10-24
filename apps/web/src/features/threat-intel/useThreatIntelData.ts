@@ -11,6 +11,8 @@ import {
 
 const indicatorsKey = ["threat-intel", "indicators"] as const;
 
+export const INDICATOR_PAGE_SIZE = 25;
+
 export function useThreatIntelSummary() {
   return useQuery({
     queryKey: ["threat-intel", "summary"],
@@ -20,20 +22,15 @@ export function useThreatIntelSummary() {
   });
 }
 
-export function useIndicatorCatalog() {
-  return useQuery({
-    queryKey: [...indicatorsKey, "catalog"],
-    queryFn: () => fetchIndicators({ pageSize: 100 }),
-    retry: false,
-    staleTime: 30_000,
-  });
-}
-
-export function useIndicatorList(query: IndicatorQuery, enabled: boolean) {
+export function useIndicatorList(query: IndicatorQuery) {
   return useQuery({
     queryKey: [...indicatorsKey, query],
-    queryFn: () => fetchIndicators({ ...query, pageSize: 100 }),
-    enabled,
+    queryFn: () =>
+      fetchIndicators({
+        ...query,
+        page: query.page ?? 1,
+        pageSize: query.pageSize ?? INDICATOR_PAGE_SIZE,
+      }),
     retry: false,
     staleTime: 30_000,
     placeholderData: keepPreviousData,

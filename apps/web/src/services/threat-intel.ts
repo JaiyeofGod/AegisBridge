@@ -23,7 +23,7 @@ export function fetchIndicators(query: IndicatorQuery = {}) {
     params.set("internal_match", query.internalMatch ? "true" : "false");
   }
   params.set("page", String(query.page ?? 1));
-  params.set("page_size", String(query.pageSize ?? 100));
+  params.set("page_size", String(query.pageSize ?? 25));
   return apiGet<PageResponse<IndicatorListItem>>(
     `/api/v1/threat-intelligence/indicators?${params.toString()}`,
   );
