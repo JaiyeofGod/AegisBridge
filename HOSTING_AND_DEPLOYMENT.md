@@ -152,6 +152,8 @@ Lenovo cyber range --> Wazuh --> outbound-only Lab Bridge --> AegisBridge
 
 Local development may later point `WAZUH_INDEXER_URL` at a LAN indexer. The public deployment must not accept inbound connections from the internet into the lab, and it must not require the lab to accept inbound connections from the cloud. The bridge, when it exists, will push sanitized metadata outbound. The hosted app must keep working when the lab is offline. Direct indexer polling is the first slice and does not replace that future bridge.
 
+The Lenovo procedure is `docs/lab/LENOVO_WAZUH_SETUP.md`. It pins official single-node containers at Wazuh 4.14.9, binds ports to loopback, starts manually, and enrolls one host agent. That stack has not been installed. The Mac connector stays disabled. Lab certificates and passwords stay in `~/aegis-lab/wazuh/` and are not committed.
+
 ---
 
 ## 10. Deployment Gates

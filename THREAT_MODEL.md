@@ -102,7 +102,7 @@ Lab bridge      <->  Local Wazuh API
 ## 7. Assumptions
 
 - Mac developer machine is trusted relative to production
-- Lenovo lab network is private
+- Lenovo lab network is private. The specified Wazuh stack binds to loopback and is not installed yet. No inbound path from the hosted app into the lab exists
 - Render and Cloudflare provide baseline platform controls
 - Public demo uses only synthetic data
 

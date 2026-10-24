@@ -46,7 +46,7 @@ Patch versions may move after testing. Major architectural changes require an AD
 | Uvicorn | **0.54.0** | |
 | Redis client | **8.1.0** | Optional readiness probe |
 | Celery | Deferred | Worker foundation not in this slice |
-| Wazuh | 4.14.9 planning baseline | Lab phases |
+| Wazuh | **4.14.9** (`wazuh-docker` tag `v4.14.9`) | Specified, not installed. Do not use the repository `main` branch |
 | Suricata | 8.0.7 | Lab phases |
 
 ---
