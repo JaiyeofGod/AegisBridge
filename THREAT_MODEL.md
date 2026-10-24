@@ -40,6 +40,8 @@ API             <->  PostgreSQL
 API / worker    <->  Object storage (SeaweedFS S3 local / R2 hosted)
 Worker          <->  External intelligence APIs
 API (on demand) <->  NVD CVE 2.0, CISA KEV JSON, FIRST EPSS
+Worker (daily)  <->  Valkey broker. JSON task name only; no credentials or source URLs
+Worker (daily)  <->  NVD per tracked CVE, one CISA KEV catalog, batched FIRST EPSS
 Lab bridge      <->  Hosted API (/api/v1/lab-sync)
 Lab bridge      <->  Local Wazuh API
 ```

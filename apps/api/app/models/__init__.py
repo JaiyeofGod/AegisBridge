@@ -54,6 +54,7 @@ from app.models.incident import (
     IncidentTask,
 )
 from app.models.integration import Integration, SyncJob, SyncState
+from app.models.intelligence_sync import IntelligenceSyncRun
 from app.models.organization import BusinessProcess, Department, Organization
 from app.models.policy import Policy, PolicyAcknowledgement, PolicyControlMapping, PolicyVersion
 from app.models.preferences import UserPreferences
@@ -115,6 +116,7 @@ __all__ = [
     "IncidentEvidence",
     "IncidentIndicator",
     "IncidentTask",
+    "IntelligenceSyncRun",
     "Integration",
     "Investigation",
     "KevRecord",

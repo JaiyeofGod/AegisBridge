@@ -38,6 +38,29 @@ class Settings(BaseSettings):
     # Pytest only. Ignored unless APP_ENV=test. Never a fallback for local or production.
     test_database_url: str | None = Field(default=None, alias="TEST_DATABASE_URL")
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
+    # Empty uses REDIS_URL. Valkey is the broker. Task results are not stored in the broker.
+    celery_broker_url: str | None = Field(default=None, alias="CELERY_BROKER_URL")
+    vulnerability_sync_enabled: bool = Field(default=True, alias="VULNERABILITY_SYNC_ENABLED")
+    vulnerability_sync_hour_utc: int = Field(
+        default=6,
+        alias="VULNERABILITY_SYNC_HOUR_UTC",
+        ge=0,
+        le=23,
+    )
+    vulnerability_sync_lock_ttl_seconds: int = Field(
+        default=1800,
+        alias="VULNERABILITY_SYNC_LOCK_TTL_SECONDS",
+        ge=30,
+        le=86_400,
+    )
+    # Pause between NVD CVE lookups. The public NVD API allows about five requests
+    # per 30 seconds. The first CVE in a run is not delayed.
+    vulnerability_sync_nvd_pause_seconds: float = Field(
+        default=6.0,
+        alias="VULNERABILITY_SYNC_NVD_PAUSE_SECONDS",
+        ge=0,
+        le=30,
+    )
 
     session_secret: str = Field(
         default="change-me-generate-a-long-random-secret",
@@ -86,6 +109,10 @@ class Settings(BaseSettings):
 
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    def celery_broker(self) -> str:
+        configured = (self.celery_broker_url or "").strip()
+        return configured or self.redis_url
 
 
 @lru_cache

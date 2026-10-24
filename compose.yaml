@@ -1,5 +1,6 @@
 # AegisBridge local data plane (Phase 1)
 # Host-run React/FastAPI connect via localhost. No application services here.
+# Celery worker and Beat also run on the host and use the Valkey service as the broker.
 # Local object storage: SeaweedFS S3-compatible weed mini (production remains Cloudflare R2).
 
 name: aegisbridge
@@ -34,6 +35,7 @@ services:
       retries: 10
       start_period: 10s
 
+  # Celery broker for the host-run worker and Beat. Redis protocol. No result backend.
   valkey:
     image: valkey/valkey:8
     container_name: aegis-valkey

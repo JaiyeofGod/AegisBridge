@@ -55,7 +55,9 @@ Render Postgres  Render Key Value  Cloudflare R2
 
 ATT&CK updates are version-aware/manual — do not silently schedule to `latest`.
 
-The current NVD, CISA KEV, and FIRST EPSS refresh is an on-demand API request (`POST /api/v1/vulnerabilities/{id}/intelligence/refresh`). It runs in the API process with a short timeout and a few retries. It is not the `aegis-sync-*` cron jobs and it does not download the NVD catalog. Those workers remain future work.
+Local and current application behavior is one Celery Beat schedule, not the three `aegis-sync-*` cron services. Every day at 06:00 UTC the worker refreshes CVEs already tracked by AegisBridge: NVD once per CVE, the CISA KEV catalog once, and FIRST EPSS in batches of at most 100. It does not download the full NVD database. Manual refresh (`POST /api/v1/vulnerabilities/{id}/intelligence/refresh`) remains. The job does not change remediation, asset context, or `action_decision`.
+
+The `aegis-sync-*` cron names, worker autoscaling, a source-health dashboard, refresh history in the UI, notification rules, user-editable schedules, scheduled MITRE ATT&CK, ThreatFox, URLhaus, Wazuh ingestion, dataset download workers, and a production managed queue are not implemented.
 
 Describe deployable resources in `render.yaml` (stub allowed in Phase 1; live deploy Phase 10+).
 
@@ -85,7 +87,7 @@ The API uses an S3-compatible storage abstraction (`app/storage`). Switching hos
 | SeaweedFS (S3 `weed mini`) | Docker Compose |
 | FastAPI | Mac host (hot reload); container-ready |
 | React (Vite) | Mac host (hot reload); container-ready |
-| Celery worker | Minimal foundation; host or Compose later; no meaningful jobs in Phase 1 |
+| Celery worker and Beat | Host-run against Compose Valkey. One daily vulnerability-intelligence task on the solo pool. No API image in Compose |
 | Backend tests | Same Compose PostgreSQL container. Development database `aegis`. Test database `aegis_test` via `TEST_DATABASE_URL`. No extra host port |
 
 Local pytest does not use the development database. `python -m app.db.test_db ensure` creates the test database on an existing volume. Init scripts do not re-run after the first data directory is created. Production startup reads `DATABASE_URL` only.

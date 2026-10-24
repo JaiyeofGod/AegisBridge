@@ -16,6 +16,11 @@ uv run pytest
 
 # Run API against Compose Postgres (repo-root `.env`)
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+# Host-run worker and scheduler. Valkey must be listening on REDIS_URL.
+# Upgrade the development database before the first worker start (`alembic upgrade head`).
+uv run celery -A app.workers.celery_app:celery_app worker --loglevel=info -Q intelligence --pool=solo
+uv run celery -A app.workers.celery_app:celery_app beat --loglevel=info
 ```
 
 Alembic (from repository root, with `apps/api` venv active or `uv run` from `apps/api`):
@@ -30,7 +35,15 @@ uv run --project apps/api python -m app.db.seed
 uv run --project apps/api python -m app.db.seed --reset
 ```
 
-The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. Threat-intelligence tables and `integrations.human_id` are `20261020_0003`. Report definitions and dataset registry metadata are `20261020_0004`. Cyber-range catalog tables and detection metadata columns are `20261020_0005`. Local credentials and sessions are `20261020_0006`. CSRF digests and `user_preferences` are `20261020_0007`. Control-test public ids (`control_tests.human_id`) are `20261020_0008`. Evidence object metadata (`evidence_objects`) is `20261020_0009`. Policy version lifecycle (`policy_versions.status`, `change_summary`, policy status check) is `20261020_0010`. Policy↔control relationship table (`policy_control_mappings`) is `20261020_0011`. Risk↔control relationship table (`risk_control_mappings`) is `20261020_0012`. Incident task public ids and completion time (`incident_tasks.human_id`, `completed_at`) are `20261020_0013`. Seed data is not in the migration. Re-running the seed ensures contract rows when the organization already exists.
+The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. Threat-intelligence tables and `integrations.human_id` are `20261020_0003`. Report definitions and dataset registry metadata are `20261020_0004`. Cyber-range catalog tables and detection metadata columns are `20261020_0005`. Local credentials and sessions are `20261020_0006`. CSRF digests and `user_preferences` are `20261020_0007`. Control-test public ids (`control_tests.human_id`) are `20261020_0008`. Evidence object metadata (`evidence_objects`) is `20261020_0009`. Policy version lifecycle (`policy_versions.status`, `change_summary`, policy status check) is `20261020_0010`. Policy↔control relationship table (`policy_control_mappings`) is `20261020_0011`. Risk↔control relationship table (`risk_control_mappings`) is `20261020_0012`. Incident task public ids and completion time (`incident_tasks.human_id`, `completed_at`) are `20261020_0013`. Vulnerability intelligence provenance is `20261024_0014`. Synchronization run records (`intelligence_sync_runs`) are `20261024_0015`. Seed data is not in the migration. Re-running the seed ensures contract rows when the organization already exists.
+
+### Vulnerability intelligence sync
+
+Daily at 06:00 UTC, Celery Beat enqueues `intelligence.sync_vulnerability_intelligence` on the `intelligence` queue. The worker loads tracked CVE identifiers, then calls NVD once per CVE, downloads the CISA KEV catalog once, and requests FIRST EPSS in batches of at most 100. Successful source updates are stored. A failed source keeps the previous values. One missing EPSS row is not a source failure. The run is recorded in `intelligence_sync_runs` with status `completed`, `partial`, or `failed`. A second overlapping run exits as skipped while the Valkey lock is held. The lock expires if a worker stops. This path does not write an audit event for a person and does not change remediation, asset context, or `action_decision`. There is no combined score. The manual refresh endpoint remains.
+
+Worker health is separate from API readiness. `GET /api/v1/health/ready` still requires only PostgreSQL. Redis/Valkey is optional.
+
+Not in this phase: scheduler UI, source-health dashboard, refresh-history UI, notification rules, worker autoscaling, MITRE ATT&CK, ThreatFox, URLhaus, Wazuh ingestion, dataset download workers, and a production managed queue.
 
 ### Policy ↔ control mappings
 
@@ -99,7 +112,7 @@ See `docs/security/AUTHENTICATION_AND_RBAC.md`. Never commit a real password. Pr
 - `PATCH /api/v1/incidents/{incident_id}` (`incident.manage` + CSRF; `incident.close` to resolve/close)
 - `GET|POST /api/v1/incidents/{incident_id}/tasks` and `GET|PATCH /api/v1/incidents/{incident_id}/tasks/{task_id}` (`incident.read` to view, `incident.manage` + CSRF to create/update). Public ids are `TASK-NNNN`. Completing a task does not close the incident. Cancel keeps the row; hard delete is not implemented.
 - `PATCH /api/v1/vulnerabilities/{vulnerability_id}/remediation` (`vulnerability.manage` + CSRF)
-- `POST /api/v1/vulnerabilities/{vulnerability_id}/intelligence/refresh` (`vulnerability.manage` + CSRF). Looks up one CVE at NVD, matches it against one CISA KEV catalog fetch, and reads FIRST EPSS. CVSS, EPSS, and KEV stay separate fields. Remediation state and `action_decision` are not updated. There is no bulk refresh.
+- `POST /api/v1/vulnerabilities/{vulnerability_id}/intelligence/refresh` (`vulnerability.manage` + CSRF). Looks up one CVE at NVD, matches it against one CISA KEV catalog fetch, and reads FIRST EPSS. CVSS, EPSS, and KEV stay separate fields. Remediation state and `action_decision` are not updated. The daily worker calls the same adapters directly. It does not call this endpoint. Local worker pool is `solo`. Beat may write a local `celerybeat-schedule` clock file; that file is not a user-editable schedule.
 - `PATCH /api/v1/administration/access-reviews/{review_id}` (`administration.manage` + CSRF)
 - `PATCH /api/v1/administration/users/{user_id}` (`administration.manage` + CSRF; status only)
 - `PUT /api/v1/administration/users/{user_id}/roles` (`administration.manage` + `user.role.manage` + CSRF)

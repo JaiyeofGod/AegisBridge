@@ -1,6 +1,6 @@
 # AegisBridge Project Status
 
-**Last updated:** October 22, 2026  
+**Last updated:** October 24, 2026  
 **Current phase:** Phase 2 — auth + domain GET RBAC + CSRF-protected writes, including evidence objects and policy lifecycle/versioning/acknowledgement  
 **Next:** Remaining mutations (integrations, reports). MFA, SSO, password reset, rate limiting, and Cyber Range control remain out of scope.
 
@@ -15,7 +15,7 @@
 | Phase 1 plan | Present (`PHASE_1_IMPLEMENTATION_PLAN.md` v1.1) — corrected routes/tooling |
 | Minimal Phase 0 docs | Complete |
 | Application code | API domain schema + web UI on local mocks |
-| Domain schema | Through `20261024_0014` (NVD / CISA KEV / FIRST EPSS provenance on existing CVE tables) |
+| Domain schema | Through `20261024_0015` (`intelligence_sync_runs` plus NVD / CISA KEV / FIRST EPSS provenance) |
 | Read API | `/api/v1` through reports, datasets, experiments, cyber-range, governance (controls catalog: page/`q`/framework/implementation_status/sort; control detail includes mapped risks), policies (catalog: page/`q`/status/sort + mapped controls), risks (detail includes mapped controls), incidents (detail task summaries + `/incidents/{id}/tasks`), operational directory (`GET /directory/users`, `directory.read`, active same-organization users only), evidence detail + private object download, vulnerability detail `intelligence` provenance (NVD timestamps, KEV catalog metadata, selected EPSS fetch time; list payload unchanged) |
 | Authentication | Sessions + CSRF synchronizer tokens; domain GET RBAC enforced |
 | Write API | Preferences, risk treatment, risk↔control link/unlink, incident update, incident response tasks (`TASK-NNNN`; completion does not close the incident), vulnerability remediation, vulnerability intelligence refresh (`POST /vulnerabilities/{id}/intelligence/refresh`; external CVSS/EPSS/KEV only; does not change remediation or `action_decision`), administration, governance, evidence objects, policy lifecycle, and policy↔control link/unlink; integration/report/cyber-range writes deferred |
@@ -25,6 +25,7 @@
 | Object storage | S3-compatible abstraction; SeaweedFS locally; Cloudflare R2 for hosted; optional health check |
 | Package installs | API via uv; web via pnpm (`apps/web`) |
 | Cyber range | Not started |
+| Background sync | Celery worker and Beat on the host. Valkey is the broker. Daily 06:00 UTC refresh of tracked CVEs: NVD per CVE, CISA KEV once, FIRST EPSS in batches of 100. Run status is stored in PostgreSQL. Manual refresh remains. Remediation and `action_decision` are unchanged. No UI schedule, source-health dashboard, or notification rules |
 | Hosting | Not started |
 
 ---
@@ -62,7 +63,7 @@
 - Complete Phase 0 before Phase 1 (**Option A**)
 - Tooling: **pnpm**, **uv**, **Pyright**, **Prettier**
 - Early dev: Compose for Postgres/Redis/Valkey/SeaweedFS; **host-run** React + FastAPI
-- Celery: minimal foundation, no meaningful jobs yet
+- Celery: Phase 0 started from a minimal foundation. Current code schedules one daily vulnerability-intelligence job. UI schedules, autoscaling, and a production managed queue remain future work
 - Routes: `/signin`, `/account/workspace`
 - Post-bootstrap UI: real Figma Sign-in + Overview
 - Figma access available

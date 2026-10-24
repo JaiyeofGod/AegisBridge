@@ -12,6 +12,8 @@ __pycache__/
 *$py.class
 *.egg-info/
 .pytest_cache/
+celerybeat-schedule
+celerybeat-schedule-*
 .mypy_cache/
 .ruff_cache/
 .coverage
