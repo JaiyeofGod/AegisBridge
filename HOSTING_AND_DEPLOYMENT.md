@@ -57,7 +57,9 @@ ATT&CK updates are version-aware/manual — do not silently schedule to `latest`
 
 Local and current application behavior is one Celery Beat schedule, not the three `aegis-sync-*` cron services. Every day at 06:00 UTC the worker refreshes CVEs already tracked by AegisBridge: NVD once per CVE, the CISA KEV catalog once, and FIRST EPSS in batches of at most 100. It does not download the full NVD database. Manual refresh (`POST /api/v1/vulnerabilities/{id}/intelligence/refresh`) remains. The job does not change remediation, asset context, or `action_decision`.
 
-The `aegis-sync-*` cron names, worker autoscaling, a source-health dashboard, refresh history in the UI, notification rules, user-editable schedules, scheduled MITRE ATT&CK, ThreatFox, URLhaus, Wazuh ingestion, dataset download workers, and a production managed queue are not implemented.
+ATT&CK Enterprise 20.0 is imported manually from pinned STIX 2.1. A weekly or version-based refresh is future work and is not on the Beat schedule.
+
+The `aegis-sync-*` cron names, worker autoscaling, a source-health dashboard, refresh history in the UI, notification rules, user-editable schedules, scheduled MITRE ATT&CK refresh, ThreatFox, URLhaus, Wazuh ingestion, dataset download workers, and a production managed queue are not implemented.
 
 Describe deployable resources in `render.yaml` (stub allowed in Phase 1; live deploy Phase 10+).
 

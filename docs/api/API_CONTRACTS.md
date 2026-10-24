@@ -95,6 +95,9 @@ All domain rows require a valid session (`401` otherwise) and the permission lis
 | POST | `/policies/{policy_id}/acknowledge` | Self-acknowledge current published version (`policy.read` + CSRF); idempotent |
 | POST | `/policies/{policy_id}/controls/{control_id}` | Link control to policy (`policy.manage` + CSRF); human ids; idempotent duplicate |
 | DELETE | `/policies/{policy_id}/controls/{control_id}` | Unlink relationship only (`policy.manage` + CSRF); missing link → 404 |
+| GET | `/attack/tactics` | Active Enterprise tactics. `threat_intel.read`. Revoked and deprecated omitted unless `include_deprecated=true` |
+| GET | `/attack/techniques` | Page of techniques. Query: `page`, `page_size` (1–100), `q` (id or name), `tactic`, `include_subtechniques`, `include_deprecated`. A page past the end returns 200 and an empty `items` list |
+| GET | `/attack/techniques/{technique_id}` | ATT&CK id such as `T1059.001`. Includes tactics, parent, platforms, description, revoked, and deprecated. Unknown id → 404. Internal UUIDs are not returned |
 | GET | `/threat-intelligence/summary` | Stored indicator, match, advisory, and source-status counts |
 | GET | `/threat-intelligence/indicators` | Filters: `search`, `indicator_type`, `source`, `status`, `internal_match` |
 | GET | `/threat-intelligence/indicators/{indicator_id}` | Simulated indicator, source, and stored ATT&CK link |

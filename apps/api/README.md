@@ -35,7 +35,7 @@ uv run --project apps/api python -m app.db.seed
 uv run --project apps/api python -m app.db.seed --reset
 ```
 
-The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. Threat-intelligence tables and `integrations.human_id` are `20261020_0003`. Report definitions and dataset registry metadata are `20261020_0004`. Cyber-range catalog tables and detection metadata columns are `20261020_0005`. Local credentials and sessions are `20261020_0006`. CSRF digests and `user_preferences` are `20261020_0007`. Control-test public ids (`control_tests.human_id`) are `20261020_0008`. Evidence object metadata (`evidence_objects`) is `20261020_0009`. Policy version lifecycle (`policy_versions.status`, `change_summary`, policy status check) is `20261020_0010`. Policy↔control relationship table (`policy_control_mappings`) is `20261020_0011`. Risk↔control relationship table (`risk_control_mappings`) is `20261020_0012`. Incident task public ids and completion time (`incident_tasks.human_id`, `completed_at`) are `20261020_0013`. Vulnerability intelligence provenance is `20261024_0014`. Synchronization run records (`intelligence_sync_runs`) are `20261024_0015`. Seed data is not in the migration. Re-running the seed ensures contract rows when the organization already exists.
+The empty baseline remains `20261020_0001`. Domain tables are `20261020_0002`. Threat-intelligence tables and `integrations.human_id` are `20261020_0003`. Report definitions and dataset registry metadata are `20261020_0004`. Cyber-range catalog tables and detection metadata columns are `20261020_0005`. Local credentials and sessions are `20261020_0006`. CSRF digests and `user_preferences` are `20261020_0007`. Control-test public ids (`control_tests.human_id`) are `20261020_0008`. Evidence object metadata (`evidence_objects`) is `20261020_0009`. Policy version lifecycle (`policy_versions.status`, `change_summary`, policy status check) is `20261020_0010`. Policy↔control relationship table (`policy_control_mappings`) is `20261020_0011`. Risk↔control relationship table (`risk_control_mappings`) is `20261020_0012`. Incident task public ids and completion time (`incident_tasks.human_id`, `completed_at`) are `20261020_0013`. Vulnerability intelligence provenance is `20261024_0014`. Synchronization run records (`intelligence_sync_runs`) are `20261024_0015`. The pinned ATT&CK Enterprise catalog is `20261024_0016`. Seed data is not in the migration. Re-running the seed ensures contract rows when the organization already exists.
 
 ### Vulnerability intelligence sync
 
@@ -43,7 +43,21 @@ Daily at 06:00 UTC, Celery Beat enqueues `intelligence.sync_vulnerability_intell
 
 Worker health is separate from API readiness. `GET /api/v1/health/ready` still requires only PostgreSQL. Redis/Valkey is optional.
 
-Not in this phase: scheduler UI, source-health dashboard, refresh-history UI, notification rules, worker autoscaling, MITRE ATT&CK, ThreatFox, URLhaus, Wazuh ingestion, dataset download workers, and a production managed queue.
+Not in this phase: scheduler UI, source-health dashboard, refresh-history UI, notification rules, worker autoscaling, scheduled ATT&CK refresh, ThreatFox, URLhaus, Wazuh ingestion, dataset download workers, and a production managed queue.
+
+### MITRE ATT&CK Enterprise
+
+Pinned release 20.0, STIX 2.1. From `apps/api`:
+
+```bash
+uv run python -m app.integrations.attack
+```
+
+The command downloads the server-configured bundle, checks the release version, and upserts tactics, techniques, sub-techniques, and tactic links. Bundle SHA-256 is calculated at ingestion. A failed fetch or version mismatch leaves the active release in place. There is no Beat schedule.
+
+`GET /api/v1/attack/tactics`, `GET /api/v1/attack/techniques`, and `GET /api/v1/attack/techniques/{technique_id}` require `threat_intel.read`. Lists omit revoked and deprecated objects unless `include_deprecated=true`. Detail by ATT&CK id still returns those flags. Responses use ATT&CK ids, not database UUIDs. Detection, lab, and indicator rows continue to store technique ids on `attack_techniques`.
+
+Future only: explorer UI, detection foreign keys, incident mapping UI, Sigma, Navigator export, coverage views, version diff, weekly sync, and Wazuh technique mapping.
 
 ### Policy ↔ control mappings
 

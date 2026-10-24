@@ -7,6 +7,7 @@ from app.api.v1 import (
     administration,
     alerts,
     assets,
+    attack,
     auth,
     cyber_range,
     datasets,
@@ -33,6 +34,7 @@ api_router.include_router(assets.router)
 api_router.include_router(risks.router)
 api_router.include_router(vulnerabilities.router)
 api_router.include_router(alerts.router)
+api_router.include_router(attack.router)
 api_router.include_router(incidents.router)
 api_router.include_router(governance.router)
 api_router.include_router(policies.router)

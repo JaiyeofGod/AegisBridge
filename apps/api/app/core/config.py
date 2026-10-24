@@ -106,6 +106,17 @@ class Settings(BaseSettings):
         default=10.0,
         alias="VULNERABILITY_INTELLIGENCE_TIMEOUT_SECONDS",
     )
+    # Pinned Enterprise release. The unversioned "latest" bundle is not the default.
+    attack_enterprise_version: str = Field(default="20.0", alias="ATTACK_ENTERPRISE_VERSION")
+    attack_enterprise_stix_url: str = Field(
+        default=(
+            "https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/"
+            "enterprise-attack/enterprise-attack-20.0.json"
+        ),
+        alias="ATTACK_ENTERPRISE_STIX_URL",
+    )
+    attack_stix_timeout_seconds: float = Field(default=120.0, alias="ATTACK_STIX_TIMEOUT_SECONDS")
+    attack_stix_max_bytes: int = Field(default=80_000_000, alias="ATTACK_STIX_MAX_BYTES")
 
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

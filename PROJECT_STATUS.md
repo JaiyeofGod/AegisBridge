@@ -15,7 +15,7 @@
 | Phase 1 plan | Present (`PHASE_1_IMPLEMENTATION_PLAN.md` v1.1) — corrected routes/tooling |
 | Minimal Phase 0 docs | Complete |
 | Application code | API domain schema + web UI on local mocks |
-| Domain schema | Through `20261024_0015` (`intelligence_sync_runs` plus NVD / CISA KEV / FIRST EPSS provenance) |
+| Domain schema | Through `20261024_0016` (pinned ATT&CK Enterprise catalog plus `intelligence_sync_runs`) |
 | Read API | `/api/v1` through reports, datasets, experiments, cyber-range, governance (controls catalog: page/`q`/framework/implementation_status/sort; control detail includes mapped risks), policies (catalog: page/`q`/status/sort + mapped controls), risks (detail includes mapped controls), incidents (detail task summaries + `/incidents/{id}/tasks`), operational directory (`GET /directory/users`, `directory.read`, active same-organization users only), evidence detail + private object download, vulnerability detail `intelligence` provenance (NVD timestamps, KEV catalog metadata, selected EPSS fetch time; list payload unchanged) |
 | Authentication | Sessions + CSRF synchronizer tokens; domain GET RBAC enforced |
 | Write API | Preferences, risk treatment, risk↔control link/unlink, incident update, incident response tasks (`TASK-NNNN`; completion does not close the incident), vulnerability remediation, vulnerability intelligence refresh (`POST /vulnerabilities/{id}/intelligence/refresh`; external CVSS/EPSS/KEV only; does not change remediation or `action_decision`), administration, governance, evidence objects, policy lifecycle, and policy↔control link/unlink; integration/report/cyber-range writes deferred |
@@ -25,7 +25,8 @@
 | Object storage | S3-compatible abstraction; SeaweedFS locally; Cloudflare R2 for hosted; optional health check |
 | Package installs | API via uv; web via pnpm (`apps/web`) |
 | Cyber range | Not started |
-| Background sync | Celery worker and Beat on the host. Valkey is the broker. Daily 06:00 UTC refresh of tracked CVEs: NVD per CVE, CISA KEV once, FIRST EPSS in batches of 100. Run status is stored in PostgreSQL. Manual refresh remains. Remediation and `action_decision` are unchanged. No UI schedule, source-health dashboard, or notification rules |
+| Background sync | Celery worker and Beat on the host. Valkey is the broker. Daily 06:00 UTC refresh of tracked CVEs: NVD per CVE, CISA KEV once, FIRST EPSS in batches of 100. Run status is stored in PostgreSQL. Manual refresh remains. Remediation and `action_decision` are unchanged. ATT&CK Enterprise 20.0 is a manual STIX import, not a Beat job |
+| ATT&CK catalog | Pinned Enterprise STIX 2.1 release 20.0. Tactics, techniques, and sub-techniques. Read APIs under `/api/v1/attack` use `threat_intel.read`. Detection string ids stay on `attack_techniques` |
 | Hosting | Not started |
 
 ---

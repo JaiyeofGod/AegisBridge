@@ -42,6 +42,7 @@ ROUTE_PERMISSIONS = [
     ("/api/v1/governance/summary", "control.read"),
     ("/api/v1/policies", "policy.read"),
     ("/api/v1/threat-intelligence/summary", "threat_intel.read"),
+    ("/api/v1/attack/tactics", "threat_intel.read"),
     ("/api/v1/reports/summary", "report.read"),
     ("/api/v1/datasets", "dataset.read"),
     ("/api/v1/dataset-experiments", "dataset.read"),

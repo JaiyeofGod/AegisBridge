@@ -58,6 +58,8 @@ Tracked CVE intelligence refreshes once a day at 06:00 UTC. Celery Beat enqueues
 
 API readiness does not require the worker or Beat. Redis/Valkey stays an optional health check.
 
+MITRE ATT&CK Enterprise is loaded from a pinned STIX 2.1 bundle for release 20.0. Ingestion is a manual command, not a daily Beat job. The catalog stores tactics, techniques, sub-techniques, and tactic membership. Read APIs use `threat_intel.read`. Existing detection and indicator rows keep their string technique ids.
+
 ---
 
 ## 4. Critical Separations

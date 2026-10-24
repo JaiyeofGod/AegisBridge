@@ -9,6 +9,12 @@ from app.models.assets import (
     DataAsset,
     SoftwareProduct,
 )
+from app.models.attack_catalog import (
+    AttackCatalogTactic,
+    AttackCatalogTacticLink,
+    AttackCatalogTechnique,
+    AttackRelease,
+)
 from app.models.audit import AuditEvent
 from app.models.auth import AuthSession, UserCredential
 from app.models.base import Base
@@ -86,6 +92,10 @@ __all__ = [
     "AssetSoftware",
     "AssetType",
     "AssetVulnerability",
+    "AttackCatalogTactic",
+    "AttackCatalogTacticLink",
+    "AttackCatalogTechnique",
+    "AttackRelease",
     "AttackTechnique",
     "AuditEvent",
     "Base",
