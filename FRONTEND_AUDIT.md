@@ -15,7 +15,7 @@ Audit date: 22 Oct 2026 (updated after Governance/Policy catalog server-side sea
 | Account preferences | `GET` + `PATCH /api/v1/account/preferences` (CSRF). Persistence `default` \| `stored`. |
 | Risk treatment | `PATCH /api/v1/risks/{id}/treatment` when `risk.manage` (CSRF). Read-only without it. |
 | Incident update | `PATCH /api/v1/incidents/{id}` when `incident.manage` (CSRF). Close/resolve also needs `incident.close`. Owner stays read-only (no user catalog on page). |
-| Incident response tasks | `GET/POST /api/v1/incidents/{id}/tasks` and `GET/PATCH .../tasks/{task_id}` when `incident.read` / `incident.manage` (CSRF on writes). Public ids `TASK-NNNN`. `incident.close` is not required to complete a task. Completion does not close the incident. Cancel keeps history; no delete. Assignee stays read-only (no operational user catalog). |
+| Incident response tasks | `GET/POST /api/v1/incidents/{id}/tasks` and `GET/PATCH .../tasks/{task_id}` when `incident.read` / `incident.manage` (CSRF on writes). Public ids `TASK-NNNN`. `incident.close` is not required to complete a task. Completion does not close the incident. Cancel keeps history; no delete. Assignee editing uses `GET /api/v1/directory/users` when both `incident.manage` and `directory.read` are present. Human ids only. No Administration user API, email, roles, or permissions. |
 | Vulnerability remediation | `PATCH /api/v1/vulnerabilities/{id}/remediation` when `vulnerability.manage` (CSRF). CVSS/EPSS/KEV/action_decision immutable. `asset_id` selector only. |
 | Access review update | `PATCH /api/v1/administration/access-reviews/{id}` when `administration.manage` (CSRF). Name/status only. Findings deferred. |
 | User status update | `PATCH /api/v1/administration/users/{id}` when `administration.manage` (CSRF). `active`/`inactive` only; inactive requires confirmation. |
@@ -58,7 +58,7 @@ Development sign-in hint shows seeded email `amara.okonkwo@aegisbridge.example` 
 | `/assets/FIN-APP-01` | Protected (UX). |
 | `/vulnerabilities` | Protected (UX). Remediation editable with `vulnerability.manage`; enrichment fields read-only. |
 | `/soc` | Protected (UX). |
-| `/incidents` | Protected (UX). Incident fields editable with `incident.manage`. Response Tasks use `TASK-NNNN`, server pagination/status filter, and `incident.manage` for create/edit/complete/reopen/cancel. Assignee editing is deferred. |
+| `/incidents` | Protected (UX). Incident fields editable with `incident.manage`. Response Tasks use `TASK-NNNN`, server pagination/status filter, and `incident.manage` for create/edit/complete/reopen/cancel. Assignee selection uses the operational directory when `directory.read` is also present. |
 | `/threat-intelligence` | Protected (UX). |
 | `/cyber-range` | Protected (UX). Controls still disabled. |
 | `/reports` | Protected (UX). |
@@ -73,7 +73,7 @@ Unknown paths redirect to `/signin`. Auth status unknown shows a session loading
 ## Issues intentionally deferred
 
 - Integration credential writes, Cyber Range control, reports.
-- Incident task assignee editing (no safe operational user catalog yet), task priority, due date, description, and hard deletion. Automated containment and SOAR remain unsupported.
+- Incident task priority, due date, description, and hard deletion. Automated containment and SOAR remain unsupported. Incident owner selection is still deferred.
 - Policy rich-text editors, PDF/document generation, e-signature, email notifications, AI generation, attachments, policy↔risk mappings, evidence↔risk direct mappings, bulk/drag-drop mapping, graph views, URL-persisted catalog query state, infinite scroll.
 - Evidence malware scanning, independent integrity re-verification, public evidence URLs, browser-to-S3 uploads, R2 production cutover UI.
 - MFA enrollment, SSO/OIDC, password reset.

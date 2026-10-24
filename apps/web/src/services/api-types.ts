@@ -302,12 +302,31 @@ export type IncidentTaskRecord = {
 export type IncidentTaskCreate = {
   title: string;
   status?: IncidentTaskStatusValue;
+  /** User human id. Omit to leave the task unassigned. */
+  assignee?: string;
 };
 
 export type IncidentTaskUpdate = {
   title?: string;
   status?: IncidentTaskStatusValue;
+  /** User human id. Null clears the assignee. Omit when unchanged. */
+  assignee?: string | null;
   expected_updated_at?: string;
+};
+
+/** Active same-organization user for operational selection. Not an administration account. */
+export type DirectoryUser = {
+  id: string;
+  display_name: string;
+  account_status: string;
+  department: string | null;
+  job_title: string | null;
+};
+
+export type DirectoryUserListQuery = {
+  page?: number;
+  pageSize?: number;
+  q?: string;
 };
 
 export type IncidentTaskQuery = {

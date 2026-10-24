@@ -5,9 +5,12 @@ import { Button } from "@/components/buttons/Button";
 import { CatalogPager } from "@/components/navigation/CatalogPager";
 import { StatusBadge } from "@/components/status/StatusBadge";
 import { useAuthActions, useAuthStatus } from "@/features/auth/useAuthSession";
+import { AssigneePicker } from "@/features/incidents/AssigneePicker";
 import { formatTimestamp } from "@/lib/format";
 import { ApiError } from "@/services/api-client";
 import type {
+  DirectoryUser,
+  IncidentTaskCreate,
   IncidentTaskRecord,
   IncidentTaskStatusValue,
   IncidentTaskUpdate,
@@ -72,15 +75,20 @@ export function IncidentTasksPanel({ incidentId, incidentStatus, openTaskCount }
   const auth = useAuthStatus();
   const { handleAccountUnauthorized } = useAuthActions();
   const canManage = auth.user?.permissions.includes("incident.manage") === true;
+  const canAssign = canManage && auth.user?.permissions.includes("directory.read") === true;
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftStatus, setDraftStatus] = useState<IncidentTaskStatusValue>("open");
+  const [draftAssigneeId, setDraftAssigneeId] = useState<string | null>(null);
+  const [draftAssigneeLabel, setDraftAssigneeLabel] = useState("Unassigned");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editStatus, setEditStatus] = useState<IncidentTaskStatusValue>("open");
+  const [editAssignee, setEditAssignee] = useState<string | null | undefined>(undefined);
+  const [editAssigneeLabel, setEditAssigneeLabel] = useState("Unassigned");
   const [cancelId, setCancelId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -140,6 +148,12 @@ export function IncidentTasksPanel({ incidentId, incidentStatus, openTaskCount }
         return;
       }
       if (error.status === 422) {
+        if (/assignee/i.test(error.message)) {
+          setErrorMessage("The selected assignee is no longer eligible.");
+          void queryClient.invalidateQueries({ queryKey: ["directory", "users"] });
+          void refreshTaskViews();
+          return;
+        }
         setErrorMessage(error.message || "Task values are invalid.");
         return;
       }
@@ -154,11 +168,7 @@ export function IncidentTasksPanel({ incidentId, incidentStatus, openTaskCount }
   }
 
   const createTask = useMutation({
-    mutationFn: () =>
-      createIncidentTask(incidentId, {
-        title: draftTitle.trim(),
-        status: draftStatus,
-      }),
+    mutationFn: (body: IncidentTaskCreate) => createIncidentTask(incidentId, body),
     onSuccess: async (record) => {
       setSuccessMessage("Response task created.");
       setErrorMessage(null);
@@ -166,6 +176,8 @@ export function IncidentTasksPanel({ incidentId, incidentStatus, openTaskCount }
       setCreating(false);
       setDraftTitle("");
       setDraftStatus("open");
+      setDraftAssigneeId(null);
+      setDraftAssigneeLabel("Unassigned");
       setStatusFilter("all");
       setPage(1);
       setSelectedId(record.id);
@@ -209,6 +221,8 @@ export function IncidentTasksPanel({ incidentId, incidentStatus, openTaskCount }
     setEditingId(task.id);
     setEditTitle(task.title);
     setEditStatus(isTaskStatus(task.status) ? task.status : "open");
+    setEditAssignee(undefined);
+    setEditAssigneeLabel(assigneeLabel(task.assignee));
     setCancelId(null);
     setSuccessMessage(null);
     setErrorMessage(null);
@@ -216,11 +230,44 @@ export function IncidentTasksPanel({ incidentId, incidentStatus, openTaskCount }
     setSelectedId(task.id);
   }
 
+  function chooseDraftAssignee(user: DirectoryUser | null) {
+    if (user === null) {
+      setDraftAssigneeId(null);
+      setDraftAssigneeLabel("Unassigned");
+      return;
+    }
+    setDraftAssigneeId(user.id);
+    setDraftAssigneeLabel(assigneeLabel(user));
+  }
+
+  function chooseEditAssignee(user: DirectoryUser | null) {
+    if (user === null) {
+      setEditAssignee(null);
+      setEditAssigneeLabel("Unassigned");
+      return;
+    }
+    setEditAssignee(user.id);
+    setEditAssigneeLabel(assigneeLabel(user));
+  }
+
+  function buildCreateBody(): IncidentTaskCreate {
+    const body: IncidentTaskCreate = {
+      title: draftTitle.trim(),
+      status: draftStatus,
+    };
+    if (draftAssigneeId) body.assignee = draftAssigneeId;
+    return body;
+  }
+
   function submitEdit(task: IncidentTaskRecord) {
     const patch: IncidentTaskUpdate = {};
     const title = editTitle.trim();
     if (title !== task.title) patch.title = title;
     if (editStatus !== task.status) patch.status = editStatus;
+    const currentAssigneeId = task.assignee?.id ?? null;
+    if (editAssignee !== undefined && editAssignee !== currentAssigneeId) {
+      patch.assignee = editAssignee;
+    }
     if (Object.keys(patch).length === 0) {
       setSuccessMessage(null);
       setErrorMessage("No task changes to save.");
@@ -242,9 +289,6 @@ export function IncidentTasksPanel({ incidentId, incidentStatus, openTaskCount }
       <p className="text-sm text-[var(--text)]" data-testid="task-incident-status">
         Incident status: {incidentStatus}. Task status does not automatically change the incident
         status.
-      </p>
-      <p className="text-xs text-[var(--muted)]">
-        Assignee stays read-only. A safe operational user list is not available on this page.
       </p>
       {showSummary ? (
         <p className="text-sm font-semibold text-[var(--text)]" data-testid="task-summary">
@@ -307,7 +351,7 @@ export function IncidentTasksPanel({ incidentId, incidentStatus, openTaskCount }
                 setErrorMessage("Task title is required.");
                 return;
               }
-              createTask.mutate();
+              createTask.mutate(buildCreateBody());
             }}
           >
             <label className="block text-xs text-[var(--muted)]">
@@ -335,6 +379,18 @@ export function IncidentTasksPanel({ incidentId, incidentStatus, openTaskCount }
                 ))}
               </select>
             </label>
+            {canAssign ? (
+              <AssigneePicker
+                selectedId={draftAssigneeId}
+                selectedLabel={draftAssigneeLabel}
+                onSelect={chooseDraftAssignee}
+                testId="task-assignee-picker"
+              />
+            ) : (
+              <p className="text-xs text-[var(--muted)]" data-testid="task-assignee-readonly">
+                Assignee stays read-only.
+              </p>
+            )}
             <div className="flex flex-wrap gap-2">
               <Button
                 type="submit"
@@ -350,6 +406,8 @@ export function IncidentTasksPanel({ incidentId, incidentStatus, openTaskCount }
                   setCreating(false);
                   setDraftTitle("");
                   setDraftStatus("open");
+                  setDraftAssigneeId(null);
+                  setDraftAssigneeLabel("Unassigned");
                 }}
               >
                 Close
@@ -511,6 +569,20 @@ export function IncidentTasksPanel({ incidentId, incidentStatus, openTaskCount }
                       ))}
                     </select>
                   </label>
+                  {canAssign ? (
+                    <AssigneePicker
+                      selectedId={
+                        editAssignee === undefined ? (task.assignee?.id ?? null) : editAssignee
+                      }
+                      selectedLabel={editAssigneeLabel}
+                      onSelect={chooseEditAssignee}
+                      testId={`task-assignee-picker-${task.id}`}
+                    />
+                  ) : (
+                    <p className="text-xs text-[var(--muted)]" data-testid="task-assignee-readonly">
+                      Assignee stays read-only.
+                    </p>
+                  )}
                   <Button type="submit" disabled={saveTask.isPending}>
                     {saveTask.isPending ? "Saving…" : "Save task"}
                   </Button>
