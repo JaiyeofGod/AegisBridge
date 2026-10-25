@@ -1,6 +1,6 @@
 # AegisBridge API (`apps/api`)
 
-FastAPI service with Phase 2 domain models, session authentication, enforced RBAC on domain reads, synchronizer CSRF, and authenticated writes for account preferences, risk treatment, incidents, vulnerability remediation, administration, governance, evidence (including private objects), **policy lifecycle / versioning / acknowledgement**, **policy↔control mapping**, and **incident response tasks**. `GET /api/v1/directory/users` is a read-only operational picker (`directory.read`) of active users in the caller's organization. Administration remains the only place for account, role, and status changes. Object storage uses an S3-compatible abstraction (SeaweedFS locally / Cloudflare R2 hosted). Frontend guards are UX only. Integration/report/cyber-range writes, SSO/MFA, and rate limiting remain deferred. Task completion does not close an incident. Automated containment and SOAR are not implemented. The incident task assignee picker reads this directory.
+FastAPI service with Phase 2 domain models, session authentication, enforced RBAC on domain reads, synchronizer CSRF, and authenticated writes for account preferences, risk treatment, incidents, vulnerability remediation, administration, governance, evidence (including private objects), **policy lifecycle / versioning / acknowledgement**, **policy↔control mapping**, and **incident response tasks**. `GET /api/v1/directory/users` is a read-only operational picker (`directory.read`) of active users in the caller's organization. Administration remains the only place for account, role, and status changes. Object storage uses an S3-compatible abstraction (SeaweedFS locally / Cloudflare R2 hosted). Frontend guards are UX only. Integration/report/cyber-range writes, SSO/MFA, and a shared rate limiter remain deferred. Production sign-in is limited inside each API process. Task completion does not close an incident. Automated containment and SOAR are not implemented. The incident task assignee picker reads this directory.
 
 ## Commands
 
@@ -21,7 +21,12 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 # Upgrade the development database before the first worker start (`alembic upgrade head`).
 uv run celery -A app.workers.celery_app:celery_app worker --loglevel=info -Q intelligence,integrations --pool=solo
 uv run celery -A app.workers.celery_app:celery_app beat --loglevel=info
+
+# Review a production environment without printing secrets
+uv run python -m app.production_check
 ```
+
+Production processes are documented in `docs/deployment/PRODUCTION_CHECKLIST.md`. `APP_ENV=production` refuses the development seed unless `--demo` is passed, and it refuses `AEGIS_DEV_ADMIN_PASSWORD`. The first administrator is `python -m app.bootstrap` using `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD`. That command is not an HTTP route. Migrations stay a separate `alembic upgrade head` before the new processes start. Do not run that migration from every worker.
 
 Alembic (from repository root, with `apps/api` venv active or `uv run` from `apps/api`):
 

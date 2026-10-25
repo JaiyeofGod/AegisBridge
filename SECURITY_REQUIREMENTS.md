@@ -28,11 +28,12 @@ Visual mockups never weaken authentication, authorization, or data-handling requ
 - Login success/failure (and logout) audit events
 - Auth + Account APIs; reusable RBAC dependencies
 
-**Still required before production**
+**Production readiness**
 
-- CSRF defense for authenticated write APIs (SameSite+proxy mitigates some cases; write CSRF not complete)
-- Login rate limiting / lockout
-- Broader CSRF-protected domain writes beyond preferences + risk treatment; MFA; SSO; login rate limiting (CSRF foundation + first write slice implemented)
+- CSRF remains a synchronizer token on authenticated state changes. GET does not require it. The token stays out of browser storage.
+- Production session cookies are Secure, HttpOnly, and SameSite=Lax. Local and test leave Secure off unless it is set.
+- Production sign-in allows 10 attempts per client address per 15 minutes inside one API process. A limited attempt returns a generic retry message and does not say whether the account exists. It is not a permanent lockout. A limiter shared across instances is still future work.
+- MFA and SSO are not part of this deployment slice.
 
 **Later**
 

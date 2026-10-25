@@ -30,8 +30,10 @@ from app.security.sessions import (
 from app.services.audit_write import record_audit_event
 
 GENERIC_CREDENTIAL_ERROR = "Invalid email or password."
-# Hook point for future rate limiting / lockout without changing call sites.
-AUTH_RATE_LIMIT_NOTE = "Production deployments must add login rate limiting before public exposure."
+# Production sign-in uses a per-process window. It is not a shared lockout.
+AUTH_RATE_LIMIT_NOTE = (
+    "Production sign-in is limited per API process. A shared limiter is still future work."
+)
 # Absolute expiry from session creation; last_seen_at never extends expires_at.
 SESSION_EXPIRY_POLICY = "fixed_duration"
 

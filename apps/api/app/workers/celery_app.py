@@ -6,11 +6,14 @@ from celery import Celery
 from celery.schedules import crontab
 
 from app.core.config import get_settings
+from app.core.production import is_production, require_production
 
 # A stale environment value must not enable broker-side task results.
 os.environ.pop("CELERY_RESULT_BACKEND", None)
 
 settings = get_settings()
+if is_production(settings):
+    require_production(settings)
 
 celery_app = Celery("aegisbridge", broker=settings.celery_broker())
 celery_app.conf.update(

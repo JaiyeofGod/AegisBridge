@@ -2068,6 +2068,13 @@ def check_dev_admin_credential(session: Session) -> str:
     )
 
 
+def production_seed_permitted(app_env: str, *, demo: bool) -> bool:
+    """Production loads the portfolio dataset only when the operator passes --demo."""
+    if app_env.lower() in _PRODUCTION_ENVS:
+        return demo
+    return True
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Load deterministic development domain seed.")
     parser.add_argument(
@@ -2080,7 +2087,18 @@ def main() -> None:
         action="store_true",
         help="Report whether the development Administrator credential matches the environment.",
     )
+    parser.add_argument(
+        "--demo",
+        action="store_true",
+        help="Load the portfolio dataset when APP_ENV=production. Does not set a password.",
+    )
     args = parser.parse_args()
+    if not production_seed_permitted(get_settings().app_env, demo=args.demo):
+        raise SystemExit(
+            "Refusing to seed while APP_ENV=production. "
+            "Pass --demo for the portfolio dataset, or use python -m app.bootstrap "
+            "for an empty organization. The development admin password is not applied."
+        )
     synced = False
     try:
         with SessionLocal() as session:

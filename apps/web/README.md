@@ -16,6 +16,8 @@ pnpm build
 
 Requires Node.js 24 LTS. Dev server: `http://127.0.0.1:5173` (proxies `/api` to `http://127.0.0.1:8000`).
 
+`VITE_API_BASE_URL` is a public build value. Local development uses `http://localhost:8000` or the Vite proxy. A hosted build sets it to the https API origin and runs `AEGIS_REQUIRE_PUBLIC_API=1 pnpm build`, which rejects a localhost URL. Do not put API secrets, database URLs, or object-storage credentials in any `VITE_` variable. The static host must rewrite application paths such as `/reports` to `index.html`, cache hashed `/assets/` files, and avoid caching `index.html` indefinitely. The sign-in scene is self-hosted. A hosted build with `AEGIS_REQUIRE_PUBLIC_API=1` writes `dist/content-security-policy.txt` from `VITE_API_BASE_URL`. That policy allows `wasm-unsafe-eval` and inline styles. `render.yaml` does not contain a Content-Security-Policy, because a blueprint header cannot take the API origin. Copy the generated line to the static site response header, as described in `docs/deployment/PRODUCTION_CHECKLIST.md`.
+
 ## Authentication
 
 - Session cookies are HttpOnly. All auth and account fetches use `credentials: "include"`.

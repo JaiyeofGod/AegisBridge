@@ -34,6 +34,21 @@ Out of scope for this document’s deep detail: full cyber-range host hardening 
 ## 3. Trust Boundaries
 
 ```text
+Browser
+  -> HTTPS frontend
+  -> HTTPS API
+       -> managed PostgreSQL
+       -> managed private broker
+       -> private R2
+       -> public intelligence APIs (NVD, CISA KEV, FIRST EPSS, ThreatFox, URLhaus)
+
+The Lenovo host and Wazuh stay outside this public boundary.
+Nothing on the public internet is allowed to open a connection into that lab.
+```
+
+The first public deployment trusts the hosting proxy to terminate TLS and to set forwarded protocol and client address. Arbitrary clients are not trusted for those headers. Session cookies, CSRF tokens, database URLs, and object-storage credentials stay off the browser and out of health responses.
+
+```text
 Public browser  <->  Frontend (static)
 Frontend        <->  API (REST/JSON)
 API             <->  PostgreSQL

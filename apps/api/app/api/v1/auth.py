@@ -14,6 +14,7 @@ from app.api.deps import (
     get_settings_dep,
     require_csrf_for_active_session,
 )
+from app.api.errors import ApiError
 from app.core.config import Settings
 from app.models.auth import AuthSession
 from app.schemas.auth import (
@@ -24,6 +25,7 @@ from app.schemas.auth import (
     SessionStatus,
 )
 from app.security.csrf import CSRF_HEADER_NAME
+from app.security.login_limit import get_login_rate_limiter
 from app.security.sessions import cookie_secure
 from app.services import auth as auth_service
 
@@ -77,6 +79,18 @@ def login(
     session: DbSession,
     settings: Annotated[Settings, Depends(get_settings_dep)],
 ) -> LoginResponse:
+    if settings.login_rate_limit_active():
+        host = request.client.host if request.client else "unknown"
+        limiter = get_login_rate_limiter(
+            settings.login_rate_limit,
+            settings.login_rate_window_seconds,
+        )
+        if not limiter.allow(host):
+            raise ApiError(
+                429,
+                "sign_in_limited",
+                "Sign-in is temporarily unavailable. Try again later.",
+            )
     token, _auth_session, user, csrf_token = auth_service.authenticate_and_create_session(
         session,
         email=body.email,

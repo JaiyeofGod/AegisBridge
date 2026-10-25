@@ -28,6 +28,8 @@ Two components:
 | 4 Asynchronous Processing | Celery + Redis-compatible queue |
 | 5 Integration and Intelligence | NVD, EPSS, KEV, ATT&CK, OSV, lab sync |
 | 6 Telemetry and Security Operations | Wazuh / Suricata retain raw events |
+
+The first public deployment is a managed HTTPS frontend, a managed HTTPS API, managed PostgreSQL, a private Redis-compatible broker, and a private R2 bucket. Celery runs as one worker and one Beat scheduler. The Lenovo cyber range is not on that public path. See `docs/deployment/PRODUCTION_CHECKLIST.md`.
 | 7 Cyber Range | Isolated lab systems generating authentic telemetry |
 
 ---

@@ -30,6 +30,20 @@ class Settings(BaseSettings):
         default="http://localhost:5173,http://127.0.0.1:5173",
         alias="CORS_ORIGINS",
     )
+    # Public https origin of this API. Required in production. Not a secret.
+    public_api_url: str | None = Field(default=None, alias="PUBLIC_API_URL")
+    # Comma-separated hostnames accepted in the Host header. Required in production.
+    trusted_hosts: str = Field(default="", alias="TRUSTED_HOSTS")
+    # Immediate proxy addresses allowed to set X-Forwarded-Proto and X-Forwarded-For.
+    # Use * only when the platform proxy is the only network path to this process.
+    forwarded_allow_ips: str = Field(default="", alias="FORWARDED_ALLOW_IPS")
+    login_rate_limit: int = Field(default=10, alias="LOGIN_RATE_LIMIT", ge=1, le=100)
+    login_rate_window_seconds: int = Field(
+        default=900,
+        alias="LOGIN_RATE_WINDOW_SECONDS",
+        ge=60,
+        le=86_400,
+    )
 
     database_url: str = Field(
         default="postgresql+psycopg://aegis:aegis@localhost:5432/aegis",
@@ -183,6 +197,12 @@ class Settings(BaseSettings):
 
     def wazuh_lookback(self) -> int:
         return min(max(self.wazuh_lookback_minutes, 1), 1440)
+
+    def trusted_host_list(self) -> list[str]:
+        return [host.strip().lower() for host in self.trusted_hosts.split(",") if host.strip()]
+
+    def login_rate_limit_active(self) -> bool:
+        return self.app_env.lower() in {"production", "prod"}
 
 
 @lru_cache

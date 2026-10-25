@@ -67,7 +67,7 @@ Research datasets are not on the Beat schedule. `python -m app.datasets ingest D
 
 The `aegis-sync-*` cron names, worker autoscaling, a source-health dashboard, refresh history in the UI, notification rules, user-editable schedules, scheduled MITRE ATT&CK refresh, dataset revision checks, background dataset downloads, and a production managed queue are not implemented. IOC expiry, asset correlation, and automated blocking are also not implemented.
 
-Describe deployable resources in `render.yaml` (stub allowed in Phase 1; live deploy Phase 10+).
+`render.yaml` is a reviewed blueprint, not an applied deployment. `docs/deployment/PRODUCTION_CHECKLIST.md` is the release checklist. Production startup rejects localhost database, broker, and object-storage defaults. Migrations run once per release (`alembic upgrade head`) before processes start. The API, one worker listening on `intelligence,integrations`, and one Beat process are separate. Beat is not duplicated.
 
 ---
 
@@ -82,7 +82,7 @@ Optional later: `aegis-public-reports`
 
 Local: `aegis-dev-evidence` on SeaweedFS S3 (`127.0.0.1:8333`)
 
-The API uses an S3-compatible storage abstraction (`app/storage`). Switching hosted environments to Cloudflare R2 is a configuration change (`S3_ENDPOINT_URL`, credentials, bucket, `OBJECT_STORAGE_PROVIDER`), not a domain rewrite. Evidence objects are private; downloads are authorized API streams. Object-storage outage must not take down read-only platform readiness.
+The API uses an S3-compatible storage abstraction (`app/storage`). Hosted environments set `OBJECT_STORAGE_PROVIDER=r2` and put the R2 S3 token in `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. Evidence, derived datasets, and experiment artifacts use that private bucket. Downloads stay on authorized API routes. Production startup fails when that configuration is missing or still points at the local SeaweedFS bucket. A later storage outage does not by itself mark the API unready; PostgreSQL is the required readiness check.
 
 ---
 
@@ -125,7 +125,7 @@ api.<domain>
 
 or single-origin with `/api` proxy.
 
-Requirements: HTTPS only, HSTS after stable config, secure cookies, no mixed content, restrictive CORS. Custom domain optional until portfolio demo matures.
+Production requires HTTPS origins, Secure cookies, HSTS `max-age=15552000` without `includeSubDomains` or preload, explicit CORS, and explicit `TRUSTED_HOSTS`. The platform proxy terminates TLS. `FORWARDED_ALLOW_IPS` names that proxy. The application does not redirect internal HTTP to HTTPS. Custom domain remains optional until the first deploy.
 
 ---
 

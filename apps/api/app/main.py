@@ -1,14 +1,17 @@
 """FastAPI application entry point."""
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app import __version__
 from app.api.errors import register_exception_handlers
 from app.api.v1.router import api_router
 from app.core.config import get_settings
+from app.core.http_security import SecurityHeadersMiddleware
+from app.core.production import is_production, require_production
 
 # Paths that remain callable without a session cookie.
 _PUBLIC_API_PATHS = frozenset(
@@ -22,38 +25,35 @@ _PUBLIC_API_PATHS = frozenset(
 )
 
 
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Baseline response headers. CSP belongs to the frontend/deployment layer."""
-
-    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        response = await call_next(request)
-        response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        path = request.url.path
-        if path.startswith("/api/v1/auth") or path.startswith("/api/v1/account"):
-            response.headers["Cache-Control"] = "no-store"
-            response.headers["Pragma"] = "no-cache"
-        return response
-
-
 def create_app() -> FastAPI:
     settings = get_settings()
+    if is_production(settings):
+        require_production(settings)
     origins = settings.cors_origin_list()
     if "*" in origins:
         raise RuntimeError("CORS_ORIGINS must not use wildcard when credentials are enabled.")
+    production = is_production(settings)
     application = FastAPI(
         title="AegisBridge API",
         version=__version__,
-        docs_url="/docs",
-        redoc_url="/redoc",
+        docs_url=None if production else "/docs",
+        redoc_url=None if production else "/redoc",
     )
+    # First added is innermost. Proxy headers run first so later checks see https.
     application.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Accept", "Content-Type", "X-CSRF-Token"],
     )
-    application.add_middleware(SecurityHeadersMiddleware)
+    hosts = settings.trusted_host_list()
+    if hosts:
+        application.add_middleware(TrustedHostMiddleware, allowed_hosts=hosts, www_redirect=False)
+    application.add_middleware(SecurityHeadersMiddleware, settings=settings)
+    forwarded = settings.forwarded_allow_ips.strip()
+    if forwarded:
+        application.add_middleware(ProxyHeadersMiddleware, trusted_hosts=forwarded)
     register_exception_handlers(application)
     application.include_router(api_router)
 

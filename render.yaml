@@ -1,0 +1,259 @@
+# Future Render blueprint. Applying this file creates services only after a
+# deliberate Render import. It does not contain secret values.
+# Confirm the host image provides CPython 3.14 before the first apply.
+# Run `python -m app.production_check` against the production environment first.
+
+services:
+  - type: web
+    name: aegis-api
+    runtime: python
+    plan: starter
+    rootDir: .
+    buildCommand: pip install uv && uv sync --project apps/api --frozen --no-dev
+    # One migration step for the release. Workers do not migrate.
+    preDeployCommand: uv run --project apps/api alembic upgrade head
+    startCommand: uv run --project apps/api uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips "$FORWARDED_ALLOW_IPS"
+    healthCheckPath: /api/v1/health/live
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: PYTHON_VERSION
+        value: "3.14"
+      - key: DATABASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: CELERY_BROKER_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: PUBLIC_API_URL
+        sync: false
+      - key: TRUSTED_HOSTS
+        sync: false
+      - key: FORWARDED_ALLOW_IPS
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: OBJECT_STORAGE_PROVIDER
+        value: r2
+      - key: S3_ENDPOINT_URL
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_REGION
+        value: auto
+      - key: ABUSECH_AUTH_KEY
+        sync: false
+      - key: NVD_API_KEY
+        sync: false
+      - key: WAZUH_ENABLED
+        value: "false"
+
+  - type: worker
+    name: aegis-worker
+    runtime: python
+    plan: starter
+    rootDir: .
+    buildCommand: pip install uv && uv sync --project apps/api --frozen --no-dev
+    startCommand: uv run --project apps/api celery -A app.workers.celery_app:celery_app worker --loglevel=info -Q intelligence,integrations
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: PYTHON_VERSION
+        value: "3.14"
+      - key: DATABASE_URL
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: DATABASE_URL
+      - key: SESSION_SECRET
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: SESSION_SECRET
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: CELERY_BROKER_URL
+      - key: REDIS_URL
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: REDIS_URL
+      - key: PUBLIC_API_URL
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: PUBLIC_API_URL
+      - key: TRUSTED_HOSTS
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: TRUSTED_HOSTS
+      - key: FORWARDED_ALLOW_IPS
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: FORWARDED_ALLOW_IPS
+      - key: CORS_ORIGINS
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: CORS_ORIGINS
+      - key: OBJECT_STORAGE_PROVIDER
+        value: r2
+      - key: S3_ENDPOINT_URL
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: S3_ENDPOINT_URL
+      - key: AWS_ACCESS_KEY_ID
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: AWS_ACCESS_KEY_ID
+      - key: AWS_SECRET_ACCESS_KEY
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: AWS_SECRET_ACCESS_KEY
+      - key: S3_BUCKET
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: S3_BUCKET
+      - key: S3_REGION
+        value: auto
+      - key: ABUSECH_AUTH_KEY
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: ABUSECH_AUTH_KEY
+      - key: NVD_API_KEY
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: NVD_API_KEY
+      - key: WAZUH_ENABLED
+        value: "false"
+
+  - type: worker
+    name: aegis-beat
+    runtime: python
+    plan: starter
+    rootDir: .
+    buildCommand: pip install uv && uv sync --project apps/api --frozen --no-dev
+    startCommand: uv run --project apps/api celery -A app.workers.celery_app:celery_app beat --loglevel=info
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: PYTHON_VERSION
+        value: "3.14"
+      - key: DATABASE_URL
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: DATABASE_URL
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: CELERY_BROKER_URL
+      - key: REDIS_URL
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: REDIS_URL
+      - key: SESSION_SECRET
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: SESSION_SECRET
+      - key: PUBLIC_API_URL
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: PUBLIC_API_URL
+      - key: TRUSTED_HOSTS
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: TRUSTED_HOSTS
+      - key: FORWARDED_ALLOW_IPS
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: FORWARDED_ALLOW_IPS
+      - key: CORS_ORIGINS
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: CORS_ORIGINS
+      - key: OBJECT_STORAGE_PROVIDER
+        value: r2
+      - key: S3_ENDPOINT_URL
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: S3_ENDPOINT_URL
+      - key: AWS_ACCESS_KEY_ID
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: AWS_ACCESS_KEY_ID
+      - key: AWS_SECRET_ACCESS_KEY
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: AWS_SECRET_ACCESS_KEY
+      - key: S3_BUCKET
+        fromService:
+          name: aegis-api
+          type: web
+          envVarKey: S3_BUCKET
+      - key: S3_REGION
+        value: auto
+      - key: WAZUH_ENABLED
+        value: "false"
+
+  - type: web
+    name: aegis-web
+    runtime: static
+    rootDir: apps/web
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && AEGIS_REQUIRE_PUBLIC_API=1 pnpm build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=15552000
+    # Content-Security-Policy is omitted. Blueprint header values are literal and
+    # cannot take the API origin. The production frontend build writes
+    # dist/content-security-policy.txt from VITE_API_BASE_URL.
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false
