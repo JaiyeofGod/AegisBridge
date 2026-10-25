@@ -201,15 +201,29 @@ def _backend_links(by_name: dict[str, dict[str, Any]]) -> list[str]:
             expected = {"name": "aegis-broker", "type": "keyvalue", "property": "connectionString"}
             if broker != expected:
                 issues.append(f"{name} must take {key} from the Key Value connection string.")
-    public = _env(by_name["aegis-api"], "PUBLIC_API_URL").get("fromService")
-    hosts = _env(by_name["aegis-api"], "TRUSTED_HOSTS").get("fromService")
-    cors = _env(by_name["aegis-api"], "CORS_ORIGINS").get("fromService")
-    if public != {"name": "aegis-api", "type": "web", "envVarKey": "RENDER_EXTERNAL_URL"}:
-        issues.append("PUBLIC_API_URL must copy RENDER_EXTERNAL_URL.")
-    if hosts != {"name": "aegis-api", "type": "web", "envVarKey": "RENDER_EXTERNAL_HOSTNAME"}:
-        issues.append("TRUSTED_HOSTS must copy RENDER_EXTERNAL_HOSTNAME.")
-    if cors != {"name": "aegis-web", "type": "web", "envVarKey": "RENDER_EXTERNAL_URL"}:
-        issues.append("CORS_ORIGINS must copy the frontend RENDER_EXTERNAL_URL.")
+    origins = {
+        "PUBLIC_API_URL": {
+            "name": "aegis-api",
+            "type": "web",
+            "envVarKey": "RENDER_EXTERNAL_URL",
+        },
+        "TRUSTED_HOSTS": {
+            "name": "aegis-api",
+            "type": "web",
+            "envVarKey": "RENDER_EXTERNAL_HOSTNAME",
+        },
+        "CORS_ORIGINS": {
+            "name": "aegis-web",
+            "type": "web",
+            "envVarKey": "RENDER_EXTERNAL_URL",
+        },
+    }
+    for name in ("aegis-api", "aegis-worker", "aegis-beat"):
+        for key, expected in origins.items():
+            actual = _env(by_name[name], key).get("fromService")
+            if actual != expected:
+                issues.append(f"{name} {key} must reference the original Render value.")
+    issues.extend(transitive_reference_issues(list(by_name.values())))
     for key in ("S3_ENDPOINT_URL", "S3_BUCKET", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"):
         if _env(by_name["aegis-api"], key).get("sync") is not False:
             issues.append(f"{key} must be an operator-supplied secret or value.")
@@ -217,6 +231,36 @@ def _backend_links(by_name: dict[str, dict[str, Any]]) -> list[str]:
             copied = _env(by_name[name], key).get("fromService")
             if copied != {"name": "aegis-api", "type": "web", "envVarKey": key}:
                 issues.append(f"{name} must copy {key} from the API.")
+    return issues
+
+
+def transitive_reference_issues(services: list[Any]) -> list[str]:
+    """Reject an env var that copies another env var which is itself a reference."""
+    by_name: dict[str, dict[str, Any]] = {}
+    for service in services:
+        if isinstance(service, dict) and isinstance(service.get("name"), str):
+            by_name[service["name"]] = service
+    issues: list[str] = []
+    for service in by_name.values():
+        env_vars = service.get("envVars")
+        if not isinstance(env_vars, list):
+            continue
+        for item in env_vars:
+            if not isinstance(item, dict):
+                continue
+            source = item.get("fromService")
+            if not isinstance(source, dict) or "envVarKey" not in source:
+                continue
+            target = by_name.get(str(source.get("name")))
+            if not isinstance(target, dict):
+                continue
+            target_env = _env(target, str(source.get("envVarKey")))
+            referenced = "fromService" in target_env or "fromDatabase" in target_env
+            if referenced:
+                issues.append(
+                    f"{service.get('name')} cannot refer to reference env var "
+                    f"{source.get('envVarKey')}."
+                )
     return issues
 
 

@@ -130,17 +130,17 @@ services:
         fromService:
           name: aegis-api
           type: web
-          envVarKey: PUBLIC_API_URL
+          envVarKey: RENDER_EXTERNAL_URL
       - key: TRUSTED_HOSTS
         fromService:
           name: aegis-api
           type: web
-          envVarKey: TRUSTED_HOSTS
+          envVarKey: RENDER_EXTERNAL_HOSTNAME
       - key: CORS_ORIGINS
         fromService:
-          name: aegis-api
+          name: aegis-web
           type: web
-          envVarKey: CORS_ORIGINS
+          envVarKey: RENDER_EXTERNAL_URL
       - key: FORWARDED_ALLOW_IPS
         value: "*"
       - key: DB_POOL_SIZE
@@ -214,17 +214,17 @@ services:
         fromService:
           name: aegis-api
           type: web
-          envVarKey: PUBLIC_API_URL
+          envVarKey: RENDER_EXTERNAL_URL
       - key: TRUSTED_HOSTS
         fromService:
           name: aegis-api
           type: web
-          envVarKey: TRUSTED_HOSTS
+          envVarKey: RENDER_EXTERNAL_HOSTNAME
       - key: CORS_ORIGINS
         fromService:
-          name: aegis-api
+          name: aegis-web
           type: web
-          envVarKey: CORS_ORIGINS
+          envVarKey: RENDER_EXTERNAL_URL
       - key: FORWARDED_ALLOW_IPS
         value: "*"
       - key: DB_POOL_SIZE

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.core.blueprint import review_repository_blueprint
+from app.core.blueprint import review_repository_blueprint, transitive_reference_issues
 from app.workers.celery_app import celery_app
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -12,6 +12,55 @@ ROOT = Path(__file__).resolve().parents[3]
 
 def test_render_blueprint_matches_the_launch_contract() -> None:
     assert review_repository_blueprint(ROOT) == ()
+
+
+def test_worker_cannot_copy_an_api_reference_variable() -> None:
+    services = [
+        {
+            "name": "aegis-api",
+            "envVars": [
+                {
+                    "key": "PUBLIC_API_URL",
+                    "fromService": {
+                        "name": "aegis-api",
+                        "type": "web",
+                        "envVarKey": "RENDER_EXTERNAL_URL",
+                    },
+                },
+                {"key": "SESSION_SECRET", "generateValue": True},
+                {"key": "S3_BUCKET", "sync": False},
+            ],
+        },
+        {
+            "name": "aegis-worker",
+            "envVars": [
+                {
+                    "key": "PUBLIC_API_URL",
+                    "fromService": {
+                        "name": "aegis-api",
+                        "type": "web",
+                        "envVarKey": "PUBLIC_API_URL",
+                    },
+                },
+                {
+                    "key": "SESSION_SECRET",
+                    "fromService": {
+                        "name": "aegis-api",
+                        "type": "web",
+                        "envVarKey": "SESSION_SECRET",
+                    },
+                },
+                {
+                    "key": "S3_BUCKET",
+                    "fromService": {"name": "aegis-api", "type": "web", "envVarKey": "S3_BUCKET"},
+                },
+            ],
+        },
+    ]
+    issues = transitive_reference_issues(services)
+    assert any("PUBLIC_API_URL" in issue for issue in issues)
+    assert not any("SESSION_SECRET" in issue for issue in issues)
+    assert not any("S3_BUCKET" in issue for issue in issues)
 
 
 def test_owned_tasks_use_only_the_listened_queues() -> None:

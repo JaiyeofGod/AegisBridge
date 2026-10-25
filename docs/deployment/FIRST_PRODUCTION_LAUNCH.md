@@ -60,7 +60,7 @@ Postgres has no PgBouncer in front of it. Each of the API, worker, and Beat proc
 
 ## Secrets and configuration
 
-Enter these on `aegis-api` when the Blueprint asks. Worker and Beat copy them. The static site does not receive them.
+Enter the operator values on `aegis-api` when the Blueprint asks. Worker and Beat copy `SESSION_SECRET` and the R2 values. `PUBLIC_API_URL`, `TRUSTED_HOSTS`, and `CORS_ORIGINS` on the worker and Beat point at the original Render URLs, not at the API copies of those URLs. The static site does not receive database, broker, session, or R2 values.
 
 | Variable | Class | Where it is set |
 |---|---|---|
