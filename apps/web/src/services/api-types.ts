@@ -1009,6 +1009,20 @@ export type DatasetVersionItem = {
   file_count: number;
   experiment_count: number;
   created_at: string;
+  source_revision?: string | null;
+  ingestion_status?: string | null;
+  validation_status?: string | null;
+  ingested_at?: string | null;
+  row_count?: number | null;
+  column_count?: number | null;
+  byte_size?: number | null;
+  sha256?: string | null;
+  label_counts?: Record<string, number> | null;
+  derived?: boolean | null;
+  derivation_profile?: string | null;
+  derivation_fingerprint?: string | null;
+  derivation_type?: string | null;
+  split_label_counts?: Record<string, Record<string, number>> | null;
 };
 
 export type DatasetExperimentRef = {
@@ -1047,8 +1061,76 @@ export type ExperimentListItem = {
   dataset: RelatedRecord;
 };
 
+export type ExperimentFeatureConfig = {
+  pipeline?: string;
+  ngram_length?: number;
+  min_count_exclusive?: number;
+  max_features?: number;
+  representation?: string;
+  vocabulary_fit?: string;
+  vocabulary_size?: number;
+  ordering?: string;
+  index_zero_included?: boolean;
+  final_ngram_included?: boolean;
+};
+
+export type ExperimentModelSettings = {
+  architecture?: string;
+  framework?: string;
+  device?: string;
+  hidden_units?: number;
+  activation?: string;
+  output?: string;
+  loss?: string;
+  optimizer?: string;
+  learning_rate?: number;
+  epochs?: number;
+  batch_size?: number;
+  threshold?: number;
+  validation?: string;
+  parameter_count?: number;
+  input_dim?: number;
+};
+
+export type ExperimentConfusionMatrix = {
+  labels?: string[];
+  matrix?: number[][];
+  true_negative?: number;
+  false_positive?: number;
+  false_negative?: number;
+  true_positive?: number;
+};
+
+export type ExperimentMetrics = {
+  accuracy?: number;
+  precision?: number;
+  recall?: number;
+  f1?: number;
+  true_positive?: number;
+  true_negative?: number;
+  false_positive?: number;
+  false_negative?: number;
+  phishing_caught?: number;
+  phishing_support?: number;
+  benign_false_positives?: number;
+  benign_support?: number;
+  threshold?: number;
+  vocabulary_size?: number;
+  parameter_count?: number;
+  confusion_matrix?: ExperimentConfusionMatrix;
+};
+
 export type ExperimentDetail = ExperimentListItem & {
   dataset_version_label: string;
+  experiment_profile: string | null;
+  derivation_fingerprint: string | null;
+  feature_config: ExperimentFeatureConfig | null;
+  model_settings: ExperimentModelSettings | null;
+  metrics: ExperimentMetrics | null;
+  confusion_matrix: ExperimentConfusionMatrix | null;
+  model_sha256: string | null;
+  vocabulary_sha256: string | null;
+  manifest_sha256: string | null;
 };
 
 export type ExperimentQuery = {

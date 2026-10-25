@@ -1680,7 +1680,19 @@ export const experimentItems: ExperimentListItem[] = [
 
 export function experimentDetail(id: string): ExperimentDetail {
   const item = experimentItems.find((row) => row.id === id) ?? experimentItems[0];
-  return { ...item, dataset_version_label: "registry" };
+  return {
+    ...item,
+    dataset_version_label: "registry",
+    experiment_profile: null,
+    derivation_fingerprint: null,
+    feature_config: null,
+    model_settings: null,
+    metrics: null,
+    confusion_matrix: null,
+    model_sha256: null,
+    vocabulary_sha256: null,
+    manifest_sha256: null,
+  };
 }
 
 export function filteredExperiments(url: string) {

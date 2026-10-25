@@ -1,6 +1,6 @@
 # Frontend audit
 
-Audit date: 22 Oct 2026 (updated after Governance/Policy catalog server-side search & pagination). Scope is the implemented web client.
+Audit date: 24 Oct 2026 (updated after Research experiment results on `/reports`). Scope is the implemented web client.
 
 ## Auth / session / CSRF (current)
 
@@ -62,7 +62,7 @@ Development sign-in hint shows seeded email `amara.okonkwo@aegisbridge.example` 
 | `/incidents` | Protected (UX). Incident fields editable with `incident.manage`. Response Tasks use `TASK-NNNN`, server pagination/status filter, and `incident.manage` for create/edit/complete/reopen/cancel. Assignee selection uses the operational directory when `directory.read` is also present. |
 | `/threat-intelligence` | Protected (UX). Indicators, advisories, enrichment, and sources stay on the page. The indicator list is server-paged (25) and shows value, type, source, last seen, and status. The selected row loads detail for subtype, data origin (external feed or simulated), threat type, malware family, tags, source status, source confidence, fetch time, and a source reference link. Indicator URL values stay plain text. `threat_intel.read` adds a MITRE ATT&CK tab: pinned Enterprise 20.0 tactics and techniques, server-side search, tactic filter, sub-techniques, pagination, and read-only detail. Revoked and deprecated rows stay out of the default list. |
 | `/cyber-range` | Protected (UX). Controls still disabled. |
-| `/reports` | Protected (UX). |
+| `/reports` | Protected (UX). Research tab lists stored experiments and loads one detail (`dataset.read`). Completed `RSCH-0005` shows provenance, feature pipeline, model settings, metrics, confusion matrix, and SHA-256 integrity hashes. No training control, model download, or raw URL. |
 | `/administration` | Protected (UX). Access-review / user status / role assignment wired; integration credential writes still disabled. |
 | `/account/profile` | Protected (UX). API profile fields; save still disabled. |
 | `/account/security` | Protected (UX). MFA honestly not configured; logout-all CSRF-protected. |

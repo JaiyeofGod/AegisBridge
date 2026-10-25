@@ -80,7 +80,15 @@ The header states the pinned Enterprise release returned by the API (20.0 in the
 
 `GET /api/v1/threat-intelligence/indicators/{id}` supplies the selected row: subtype, `data_origin` (`external_feed` or `simulated`), threat type, malware family, tags, source status, integer source confidence, fetch time, and a source reference when present. `normalized_value` is not in the response and is not shown. A null AegisBridge confidence is labeled "Not assigned". The integer source confidence is shown as that integer. A URL value is text, never an anchor. The source reference opens in a new tab with `rel="noopener noreferrer"`. Online or offline source status is the feed's label, not a compromise finding. Healthy on the Sources tab means the most recent feed read succeeded. There is no automatic blocking.
 
-Backend remains the authorization boundary. Evidence files are stored outside PostgreSQL (local SeaweedFS / future R2) via the API only. SHA-256 is calculated server-side at ingestion; `integrity_verified` remains false; malware scanning is not implemented. Policy UI preserves version history and Policy → Control → Test → Evidence traceability; licensed CIS safeguard prose is never surfaced. E-sign, email, and rich docs remain unsupported. Integration credential writes, reports, and Cyber Range control stay disabled in the UI.
+Backend remains the authorization boundary. Evidence files are stored outside PostgreSQL (local SeaweedFS / future R2) via the API only. SHA-256 is calculated server-side at ingestion; `integrity_verified` remains false; malware scanning is not implemented. Policy UI preserves version history and Policy → Control → Test → Evidence traceability; licensed CIS safeguard prose is never surfaced. E-sign, email, and rich docs remain unsupported. Integration credential writes, report generation, and Cyber Range control stay disabled in the UI.
+
+### Research experiments
+
+`/reports` keeps the existing Reports, Exports, Datasets, and Research tabs. Research calls `GET /api/v1/dataset-experiments` for the list and `GET /api/v1/dataset-experiments/{id}` for the selected row. Dataset provenance uses the existing dataset detail read. Both are authenticated GETs with `credentials: "include"` and no CSRF header. Permission stays `dataset.read` on the server.
+
+A completed URL experiment shows the catalog id, source revision, derivation profile and fingerprint, train and test counts, character n-gram settings, NumPy CPU model settings, accuracy, precision, recall, F1, phishing caught, benign false positives, and a labeled confusion matrix. SHA-256 values for the model, vocabulary, and experiment manifest are integrity hashes, shown in full, and are not signatures. Object-storage keys are not returned and are not rendered. The historical adapted comparison is shown only for `phreshphish-url-ffn-v1` and states that the sampled rows and feature pipeline differ.
+
+Planned or older experiments with null metrics, model settings, or hashes render "Not recorded" or omit the result section. The page has no rerun, hyperparameter editor, model download, raw URL, or raw dataset preview.
 
 ### Incident → Response Tasks
 

@@ -11,7 +11,10 @@ import { PageContainer } from "@/components/navigation/PageContainer";
 import { PageHeader } from "@/components/navigation/PageHeader";
 import { StatusBadge } from "@/components/status/StatusBadge";
 import { StaleDataIndicator } from "@/components/status/StaleDataIndicator";
+import { useAuthActions } from "@/features/auth/useAuthSession";
 import { SEEDED_DATA_LABEL, SEEDED_DATA_NOTE } from "@/features/data-origin";
+import { ExperimentResultPanel } from "@/features/reports/ExperimentResultPanel";
+import { experimentErrorCopy } from "@/features/reports/experimentResult";
 import {
   DatasetRegistryTable,
   type DatasetTableFilters,
@@ -42,6 +45,7 @@ import {
 } from "@/features/reports/useReportData";
 import { cn } from "@/lib/cn";
 import { formatTimestamp } from "@/lib/format";
+import { ApiError } from "@/services/api-client";
 import type { DatasetQuery, ExperimentQuery, ReportDefinitionQuery } from "@/services/api-types";
 import type { ReportSectionId } from "@/types/reports";
 
@@ -75,6 +79,7 @@ const emptyExperimentFilters = {
 };
 
 export function ReportsPage() {
+  const { handleAccountUnauthorized } = useAuthActions();
   const summary = useReportsSummary();
   const reportCatalog = useReportDefinitionCatalog();
   const datasetCatalog = useDatasetCatalog();
@@ -142,6 +147,23 @@ export function ReportsPage() {
   const reportDetail = useReportDefinitionDetail(selectedReportId);
   const datasetDetail = useDatasetDetail(selectedDatasetId);
   const experimentDetail = useExperimentDetail(selectedExperimentId);
+  const experimentDatasetId =
+    experimentItems.find((item) => item.id === selectedExperimentId)?.datasetId ??
+    experimentDetail.data?.dataset.id ??
+    "";
+  const experimentDataset = useDatasetDetail(experimentDatasetId);
+
+  useEffect(() => {
+    if (experimentCatalog.error instanceof ApiError && experimentCatalog.error.status === 401) {
+      void handleAccountUnauthorized(experimentCatalog.error);
+    }
+  }, [experimentCatalog.error, handleAccountUnauthorized]);
+
+  useEffect(() => {
+    if (experimentDetail.error instanceof ApiError && experimentDetail.error.status === 401) {
+      void handleAccountUnauthorized(experimentDetail.error);
+    }
+  }, [experimentDetail.error, handleAccountUnauthorized]);
 
   const selectedReport =
     (reportDetail.data ? mapReportDefinition(reportDetail.data) : null) ??
@@ -537,11 +559,10 @@ export function ReportsPage() {
             ) : null}
 
             {section === "research" ? (
-              <>
+              <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]">
                 <Panel
-                  title="Research"
-                  description="Experiment metadata tied to registry entries. No research runtime is installed."
-                  action={<StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />}
+                  title="Research experiments"
+                  description="Stored experiment results. Training is not started from this page."
                 >
                   {experimentCatalog.isPending && !hasExperimentFilters ? (
                     <LoadingState label="Updating" rows={2} />
@@ -571,21 +592,34 @@ export function ReportsPage() {
                         ? "Updating experiment filters."
                         : hasExperimentFilters
                           ? "No experiments match the current filters."
-                          : "No experiments are stored."
+                          : "No research experiments are available."
                     }
                   />
                 </Panel>
-                <Panel title="Experiment detail">
-                  {selectedExperiment ? (
-                    <ExperimentDetailPanel
-                      experiment={selectedExperiment}
-                      detailPending={experimentDetail.isPending}
+                <Panel title="Selected experiment">
+                  {!selectedExperimentId ? (
+                    <p className="text-sm text-[var(--muted)]">No experiment is selected.</p>
+                  ) : experimentDetail.isError &&
+                    !(
+                      experimentDetail.error instanceof ApiError &&
+                      experimentDetail.error.status === 401
+                    ) ? (
+                    <ErrorState
+                      title={experimentErrorCopy(experimentDetail.error).title}
+                      description={experimentErrorCopy(experimentDetail.error).description}
+                      onRetry={() => void experimentDetail.refetch()}
+                    />
+                  ) : experimentDetail.data ? (
+                    <ExperimentResultPanel
+                      detail={experimentDetail.data}
+                      dataset={experimentDataset.data}
+                      datasetPending={experimentDataset.isPending}
                     />
                   ) : (
-                    <p className="text-sm text-[var(--muted)]">No experiment is selected.</p>
+                    <LoadingState label="Loading experiment" rows={3} />
                   )}
                 </Panel>
-              </>
+              </div>
             ) : null}
           </div>
         ) : null}
@@ -787,6 +821,8 @@ function ExperimentList({
             <option value="all">All</option>
             <option value="completed">Completed</option>
             <option value="planned">Planned</option>
+            <option value="running">Running</option>
+            <option value="failed">Failed</option>
           </select>
         </div>
         <div>
@@ -845,16 +881,19 @@ function ExperimentList({
                 type="button"
                 aria-pressed={selectedId === item.id}
                 onClick={() => onSelect(item.id)}
-                className="w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-4 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                className={cn(
+                  "w-full rounded-[var(--radius-control)] border bg-[var(--raised)] px-4 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",
+                  selectedId === item.id ? "border-[var(--accent)]" : "border-[var(--border)]",
+                )}
               >
-                <p className="font-medium text-[var(--text)]">
-                  {item.id} · {item.name}
+                <p className="font-medium text-[var(--text)]">{item.id}</p>
+                <p className="mt-1 text-sm text-[var(--text)]">{item.name}</p>
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  {item.datasetId} · {item.approach}
                 </p>
                 <p className="mt-1 text-sm text-[var(--muted)]">
-                  {item.datasetId} · {item.statusLabel} · {item.experimentType} · {item.completedAt}
+                  {item.statusLabel} · {item.completedAt}
                 </p>
-                <p className="mt-1 text-sm text-[var(--text)]">{item.approach}</p>
-                <p className="mt-1 text-sm text-[var(--muted)]">{item.metricsSummary}</p>
               </button>
             </li>
           ))}
@@ -864,59 +903,6 @@ function ExperimentList({
         Showing {experiments.length} of {total} stored experiments · Metrics are shown exactly as
         stored
       </p>
-    </div>
-  );
-}
-
-function ExperimentDetailPanel({
-  experiment,
-  detailPending,
-}: {
-  experiment: ExperimentView;
-  detailPending: boolean;
-}) {
-  return (
-    <div className="space-y-4 text-sm" data-testid="experiment-detail">
-      {detailPending ? <p className="text-[var(--muted)]">Updating experiment detail…</p> : null}
-      <div>
-        <p className="text-[var(--muted)]">Experiment</p>
-        <p className="mt-1 text-[var(--text)]">
-          {experiment.id} · {experiment.name}
-        </p>
-      </div>
-      <div>
-        <p className="text-[var(--muted)]">Dataset reference</p>
-        <p className="mt-1 text-[var(--text)]">
-          {experiment.datasetId} · {experiment.datasetTitle}. Version{" "}
-          {experiment.datasetVersionLabel}.
-        </p>
-      </div>
-      <div>
-        <p className="text-[var(--muted)]">Type and approach</p>
-        <p className="mt-1 text-[var(--text)]">
-          Status {experiment.statusLabel} ({experiment.status}). Type {experiment.experimentType}.
-          Approach {experiment.approach}.
-        </p>
-      </div>
-      <div>
-        <p className="text-[var(--muted)]">Metrics</p>
-        <p className="mt-1 text-[var(--text)]">
-          {experiment.hasMetrics ? experiment.metricsSummary : "No metrics or results are stored."}
-        </p>
-        <p className="mt-1 text-xs text-[var(--muted)]">
-          Stored metric text is not a stronger model-performance claim.
-        </p>
-      </div>
-      <div>
-        <p className="text-[var(--muted)]">Timestamps</p>
-        <p className="mt-1 text-[var(--text)]">
-          Started {experiment.startedAt}. Completed {experiment.completedAt}.
-        </p>
-      </div>
-      <div>
-        <p className="text-[var(--muted)]">Notes</p>
-        <p className="mt-1 text-[var(--text)]">{experiment.notes}</p>
-      </div>
     </div>
   );
 }

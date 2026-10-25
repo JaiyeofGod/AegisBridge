@@ -201,20 +201,24 @@ describe("Reports and analytics", () => {
     await user.click(await within(page).findByRole("tab", { name: "Research" }));
     const research = within(page).getByTestId("report-research");
     expect(research).toHaveTextContent("RSCH-0001");
-    expect(research).toHaveTextContent(
-      "Category counts were tabulated from the registry note. No model runtime was used.",
-    );
     expect(research).toHaveTextContent("RSCH-0004");
-    expect(research).toHaveTextContent("No metrics or results are stored.");
     expect(research).not.toHaveTextContent("accuracy");
     expect(research).not.toHaveTextContent("F1");
+
+    const initial = within(page).getByTestId("experiment-detail");
+    expect(initial).toHaveTextContent(
+      "Category counts were tabulated from the registry note. No model runtime was used.",
+    );
+    expect(initial).toHaveTextContent("not a stronger model-performance claim");
 
     await user.click(within(research).getByRole("button", { name: /RSCH-0004/ }));
     const detail = within(page).getByTestId("experiment-detail");
     expect(detail).toHaveTextContent("RSCH-0004");
     expect(detail).toHaveTextContent("DS-0005");
-    expect(detail).toHaveTextContent("No metrics or results are stored.");
-    expect(detail).toHaveTextContent("not a stronger model-performance claim");
+    expect(detail).toHaveTextContent(
+      "No evaluation metrics have been recorded for this experiment.",
+    );
+    expect(detail).not.toHaveTextContent("true positives");
     expect(detail).toHaveTextContent("Not recorded");
   });
 
@@ -264,7 +268,7 @@ describe("Reports and analytics", () => {
 
     await user.click(within(page).getByRole("tab", { name: "Research" }));
     expect(within(page).getByTestId("report-research")).toHaveTextContent(
-      "No experiments are stored.",
+      "No research experiments are available.",
     );
   });
 
