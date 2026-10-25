@@ -208,10 +208,70 @@ def get_experiment(session: Session, experiment_id: str) -> ExperimentDetail:
     if row is None:
         raise not_found("Dataset experiment", experiment_id)
     base = _experiment(row)
+    config = row.config if isinstance(row.config, dict) else {}
+    metrics = _public_mapping(row.metrics)
+    dataset = _public_mapping(config.get("dataset"))
+    confusion = None
+    if metrics is not None:
+        confusion = _public_mapping(metrics.get("confusion_matrix"))
     return ExperimentDetail(
         **base.model_dump(),
         dataset_version_label=row.dataset_version.version_label,
+        experiment_profile=_text(config.get("profile")),
+        derivation_fingerprint=_text(dataset.get("derivation_fingerprint") if dataset else None),
+        feature_config=_public_mapping(config.get("feature")),
+        model_settings=_public_mapping(config.get("model")),
+        metrics=metrics,
+        confusion_matrix=confusion,
+        model_sha256=row.model_sha256,
+        vocabulary_sha256=row.vocabulary_sha256,
+        manifest_sha256=row.manifest_sha256,
     )
+
+
+_HIDDEN_EXPERIMENT_KEYS = frozenset(
+    {
+        "object_key",
+        "storage_uri",
+        "private_artifacts",
+        "url",
+        "urls",
+        "token",
+        "secret",
+        "password",
+    }
+)
+
+
+def _text(value: object) -> str | None:
+    if isinstance(value, str) and value and "://" not in value:
+        return value
+    return None
+
+
+def _public_mapping(value: object) -> dict[str, object] | None:
+    if not isinstance(value, dict):
+        return None
+    cleaned: dict[str, object] = {}
+    for key, item in value.items():
+        if not isinstance(key, str) or key in _HIDDEN_EXPERIMENT_KEYS:
+            continue
+        if isinstance(item, dict):
+            nested = _public_mapping(item)
+            if nested is not None:
+                cleaned[key] = nested
+            continue
+        if isinstance(item, str) and "://" in item:
+            continue
+        if isinstance(item, list):
+            cleaned[key] = [
+                nested if (nested := _public_mapping(entry)) is not None else entry
+                for entry in item
+                if not isinstance(entry, str) or "://" not in entry
+            ]
+            continue
+        cleaned[key] = item
+    return cleaned
 
 
 def _derived(profile: dict[str, object] | None) -> bool | None:

@@ -114,9 +114,23 @@ class DatasetFile(UUIDMixin, TimestampMixin, Base):
 
 
 class DatasetExperiment(UUIDMixin, TimestampMixin, Base):
-    """Stored experiment metadata. Metrics are only the text recorded in the row."""
+    """Experiment metadata. Model bytes stay in private object storage."""
 
     __tablename__ = "dataset_experiments"
+    __table_args__ = (
+        CheckConstraint(
+            "model_sha256 IS NULL OR model_sha256 ~ '^[0-9a-f]{64}$'",
+            name="model_sha256_hex",
+        ),
+        CheckConstraint(
+            "vocabulary_sha256 IS NULL OR vocabulary_sha256 ~ '^[0-9a-f]{64}$'",
+            name="vocabulary_sha256_hex",
+        ),
+        CheckConstraint(
+            "manifest_sha256 IS NULL OR manifest_sha256 ~ '^[0-9a-f]{64}$'",
+            name="manifest_sha256_hex",
+        ),
+    )
 
     dataset_version_id: Mapped[UUID] = mapped_column(
         ForeignKey("dataset_versions.id"), nullable=False, index=True
@@ -130,5 +144,11 @@ class DatasetExperiment(UUIDMixin, TimestampMixin, Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     notes: Mapped[str | None] = mapped_column(Text)
+    config: Mapped[dict[str, object] | None] = mapped_column(JSONB)
+    metrics: Mapped[dict[str, object] | None] = mapped_column(JSONB)
+    model_sha256: Mapped[str | None] = mapped_column(String(64))
+    vocabulary_sha256: Mapped[str | None] = mapped_column(String(64))
+    manifest_sha256: Mapped[str | None] = mapped_column(String(64))
+    private_artifacts: Mapped[dict[str, object] | None] = mapped_column(JSONB)
 
     dataset_version: Mapped[DatasetVersion] = relationship(back_populates="experiments")

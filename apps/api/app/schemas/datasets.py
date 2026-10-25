@@ -87,3 +87,12 @@ class ExperimentListItem(BaseModel):
 
 class ExperimentDetail(ExperimentListItem):
     dataset_version_label: str
+    experiment_profile: str | None = None
+    derivation_fingerprint: str | None = None
+    feature_config: dict[str, object] | None = None
+    model_settings: dict[str, object] | None = None
+    metrics: dict[str, object] | None = None
+    confusion_matrix: dict[str, object] | None = None
+    model_sha256: str | None = None
+    vocabulary_sha256: str | None = None
+    manifest_sha256: str | None = None
