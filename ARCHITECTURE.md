@@ -66,6 +66,8 @@ Wazuh remains the SIEM. When `WAZUH_ENABLED` is set, Celery polls the Wazuh inde
 
 Research datasets are versioned artifacts, not live feeds. The first approved source is the public Hugging Face dataset `phreshphish/phreshphish` (`DS-0006`). A manual command resolves that catalog id, pins the source commit, checks the declared size, and refuses the download when it exceeds `DATASET_MAX_DOWNLOAD_BYTES` (default 512 MiB). A download that fits the cap is hashed, validated as Parquet, profiled with a row cap, and stored through the private object-storage interface. PostgreSQL keeps the revision, SHA-256, and profile. It does not keep raw rows. There is no training job and no Beat schedule. Callers cannot supply a download URL.
 
+The full PhreshPhish artifact is about 36.6 GB, so it is not stored. `python -m app.datasets derive DS-0006 --profile phreshphish-url-baseline-v1` builds a separate derived version from the pinned revision `eca603e0ecd4f698f8d4d226c088659e72681239`. It reads only the `url` and `label` column chunks, samples 1,000 training rows from the official train split and 200 test rows (100 benign and 100 phish) from the official test split, and stores `train.parquet`, `test.parquet`, and a manifest. The derivation transfer cap is `DATASET_DERIVATION_MAX_DOWNLOAD_BYTES` (default 256 MiB). The catalog row stays `not_downloaded` because the full source was not ingested. Materializing this artifact does not train a model.
+
 ---
 
 ## 4. Critical Separations

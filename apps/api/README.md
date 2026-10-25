@@ -59,7 +59,11 @@ Future only: Lenovo Wazuh deployment, Windows Sysmon and Linux agents, Suricata,
 
 Integrity wording: SHA-256 calculated by AegisBridge at ingestion.
 
-Future only: an experiment runner, training jobs, feature extraction, a fixed PhreshPhish feature-indexing rerun, comparison across datasets, revision checking, background downloads, a dataset profile screen, downloadable experiment reports, a model registry, and an experiment reproducibility bundle. The earlier adapted 79% CPU baseline is not rewritten into this pipeline.
+`python -m app.datasets derive DS-0006 --profile phreshphish-url-baseline-v1` materializes a derived version from the pinned PhreshPhish commit. The profile is fixed in server code: columns `url` and `label`, seed 42, 1,000 training rows sampled uniformly from the official train split, and 200 test rows with 100 benign and 100 phish from the official test split. Exact stripped URLs are removed from train when they were selected for test. Null labels are skipped. Any other label fails the run. The command reads Parquet footers, estimates the `url` and `label` column bytes, and stops when `DATASET_DERIVATION_MAX_DOWNLOAD_BYTES` (default 256 MiB) would be exceeded. HTTP range responses must be 206. The same fingerprint is not downloaded again. A failed recipe leaves an older ready derived version in place. The parent catalog row stays `not_downloaded`. Private keys are `datasets/DS-0006/derived/{revision}/{fingerprint}/`. This command does not train a model.
+
+The historical adapted baseline remains separate: 1,000 training examples, 200 balanced test examples, 79% accuracy, 158/200 correct, 64 phishing caught, 6 benign false positives, and a noted feature-indexing issue. It was not produced from this derived artifact and has not been rerun.
+
+Future only: a reproducible experiment runner, corrected feature indexing, a bag-of-words pipeline, FFN training, metrics, a confusion matrix, a saved model artifact, comparison against that historical baseline, more derivation profiles, cross-dataset evaluation, a model registry, and a downloadable research report.
 
 ### ThreatFox and URLhaus
 

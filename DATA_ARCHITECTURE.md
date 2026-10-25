@@ -162,6 +162,8 @@ The artifact SHA-256 is calculated by AegisBridge at ingestion over the stored f
 
 `dataset_experiments` already references `dataset_version_id`. A future experiment can point at the ingested revision. Seeded `RSCH-*` rows are not rewritten. An earlier adapted PhreshPhish CPU baseline (1,000 training rows, 200 balanced test rows, 79% accuracy) is not a product of this pipeline and is not stored as an ingestion result.
 
+A derived artifact reuses `dataset_versions` and `dataset_files`. `source_type` is `derived`, `source_revision` is the pinned Hugging Face commit, and `version_label` is the derivation fingerprint. The profile JSON holds the recipe: profile name `phreshphish-url-baseline-v1`, columns `url` and `label`, seed 42, train count 1,000 under `source_distribution`, and a balanced test of 100 benign and 100 phish. The fingerprint hashes that recipe. `created_at` and file hashes are not part of the fingerprint. The artifact SHA-256 covers `train.parquet` and `test.parquet`. The catalog `datasets.status` and `datasets.row_count` stay unchanged, so a derived sample is not recorded as a full PhreshPhish ingest. No new table was added.
+
 Supported file format for this slice: Parquet. Archives, pickle, and HTML rendering are not used. There is no daily download.
 
 ## 9. Local vs Hosted Storage Mapping

@@ -30,6 +30,10 @@ class HuggingFacePhreshPhishSource:
     def close(self) -> None:
         self._http.close()
 
+    @property
+    def http(self) -> httpx.Client:
+        return self._http
+
     def describe(self) -> SourceManifest:
         payload = self._json(f"https://huggingface.co/api/datasets/{PHRESHPHISH_REPO}")
         if not isinstance(payload, dict):
@@ -38,13 +42,29 @@ class HuggingFacePhreshPhishSource:
         revision = info.get("sha")
         if not isinstance(revision, str) or _REVISION.fullmatch(revision) is None:
             raise DatasetError("malformed_revision")
+        manifest = self.list_revision(revision)
+        total = sum(item.size_bytes for item in manifest.files)
+        if total > self._settings.dataset_max_download_bytes:
+            raise DatasetError(
+                "too_large",
+                revision=revision,
+                reference=manifest.reference,
+                byte_size=total,
+                file_count=len(manifest.files),
+            )
+        self._manifest = manifest
+        return manifest
+
+    def list_revision(self, revision: str) -> SourceManifest:
+        """List Parquet files at one pinned revision. This does not download them."""
+        if _REVISION.fullmatch(revision) is None:
+            raise DatasetError("malformed_revision")
         tree = self._json(
             f"https://huggingface.co/api/datasets/{PHRESHPHISH_REPO}/tree/{revision}/data"
         )
         if not isinstance(tree, list):
-            raise DatasetError("malformed_response")
+            raise DatasetError("malformed_response", revision=revision)
         files: list[RemoteFile] = []
-        total = 0
         for item in tree:
             if not isinstance(item, dict):
                 continue
@@ -53,12 +73,12 @@ class HuggingFacePhreshPhishSource:
             if not isinstance(path, str) or _PARQUET.fullmatch(path) is None:
                 continue
             if isinstance(size, bool) or not isinstance(size, int) or size < 1:
-                raise DatasetError("malformed_response")
-            total += size
+                raise DatasetError("malformed_response", revision=revision)
             files.append(RemoteFile(path=path, size_bytes=size))
         if not files:
-            raise DatasetError("no_files")
-        manifest = SourceManifest(
+            raise DatasetError("no_files", revision=revision)
+        files.sort(key=lambda item: item.path)
+        return SourceManifest(
             source_type="huggingface",
             repository=PHRESHPHISH_REPO,
             revision=revision,
@@ -66,16 +86,6 @@ class HuggingFacePhreshPhishSource:
             license_label="CC BY 4.0",
             reference=f"https://huggingface.co/datasets/{PHRESHPHISH_REPO}/tree/{revision}",
         )
-        if total > self._settings.dataset_max_download_bytes:
-            raise DatasetError(
-                "too_large",
-                revision=revision,
-                reference=manifest.reference,
-                byte_size=total,
-                file_count=len(files),
-            )
-        self._manifest = manifest
-        return manifest
 
     def download(self, directory: Path) -> tuple[LocalArtifact, ...]:
         manifest = self._manifest or self.describe()
@@ -154,8 +164,14 @@ class HuggingFacePhreshPhishSource:
 
 
 def _require_host(url: str) -> None:
-    if urlsplit(url).hostname not in HUGGINGFACE_HOSTS:
-        raise DatasetError("endpoint_rejected")
+    hostname = urlsplit(url).hostname
+    if hostname in HUGGINGFACE_HOSTS:
+        return
+    if hostname is not None and (
+        hostname.endswith(".huggingface.co") or hostname.endswith(".hf.co")
+    ):
+        return
+    raise DatasetError("endpoint_rejected")
 
 
 def _headers(token: str | None) -> dict[str, str]:

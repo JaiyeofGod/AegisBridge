@@ -159,6 +159,10 @@ class Settings(BaseSettings):
     )
     dataset_max_profile_rows: int = Field(default=50_000, alias="DATASET_MAX_PROFILE_ROWS")
     dataset_temp_dir: str | None = Field(default=None, alias="DATASET_TEMP_DIR")
+    dataset_derivation_max_download_bytes: int = Field(
+        default=256 * 1024 * 1024,
+        alias="DATASET_DERIVATION_MAX_DOWNLOAD_BYTES",
+    )
     huggingface_token: str | None = Field(default=None, alias="HF_TOKEN")
 
     def cors_origin_list(self) -> list[str]:

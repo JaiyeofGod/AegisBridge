@@ -63,6 +63,8 @@ Wazuh alert metadata is polled every five minutes on the `integrations` queue (`
 
 Research datasets are not on the Beat schedule. `python -m app.datasets ingest DS-0006` is a manual command. It uses the same private S3 bucket as evidence (SeaweedFS locally, R2 when hosted). `DATASET_MAX_DOWNLOAD_BYTES` defaults to 512 MiB and `DATASET_TEMP_DIR` may point at a scratch directory outside the repository. Temporary files are removed when the command finishes. Dataset files are not committed.
 
+`python -m app.datasets derive DS-0006 --profile phreshphish-url-baseline-v1` is also manual. `DATASET_DERIVATION_MAX_DOWNLOAD_BYTES` defaults to 256 MiB. The command reads Parquet footers and the `url` and `label` column ranges from the pinned PhreshPhish revision. It does not transfer the HTML column or the 36.6 GB source. Derived objects use the same private bucket.
+
 The `aegis-sync-*` cron names, worker autoscaling, a source-health dashboard, refresh history in the UI, notification rules, user-editable schedules, scheduled MITRE ATT&CK refresh, dataset revision checks, background dataset downloads, and a production managed queue are not implemented. IOC expiry, asset correlation, and automated blocking are also not implemented.
 
 Describe deployable resources in `render.yaml` (stub allowed in Phase 1; live deploy Phase 10+).

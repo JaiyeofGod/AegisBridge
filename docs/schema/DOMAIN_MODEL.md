@@ -4,7 +4,7 @@ Phase 2 relational foundation. SQLAlchemy models live in `apps/api/app/models/`.
 
 Internal primary keys are UUIDs. Operational records also have a unique `human_id`. Closed value sets are strings with check constraints. There is no combined vulnerability score.
 
-`20261024_0019` adds provenance columns on `dataset_versions` for a pinned research-dataset revision. `dataset_files.storage_uri` remains the private object key and is not an API field. `dataset_experiments.dataset_version_id` already points at a version, so a future experiment can name an ingested revision without a new table. Seeded experiments are unchanged.
+`20261024_0019` adds provenance columns on `dataset_versions` for a pinned research-dataset revision. `dataset_files.storage_uri` remains the private object key and is not an API field. `dataset_experiments.dataset_version_id` already points at a version, so a future experiment can name an ingested revision without a new table. Seeded experiments are unchanged. A derived PhreshPhish sample uses those same columns: `source_type=derived`, `source_revision` is the pinned commit, and `version_label` is the derivation fingerprint. The profile JSON stores the recipe and split counts. No further migration was added for derivation.
 
 ## Ownership
 

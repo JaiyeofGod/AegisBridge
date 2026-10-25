@@ -52,6 +52,11 @@ class DatasetVersionItem(BaseModel):
     byte_size: int | None = None
     sha256: str | None = None
     label_counts: dict[str, int] | None = None
+    derived: bool | None = None
+    derivation_profile: str | None = None
+    derivation_fingerprint: str | None = None
+    derivation_type: str | None = None
+    split_label_counts: dict[str, dict[str, int]] | None = None
 
 
 class DatasetExperimentRef(BaseModel):

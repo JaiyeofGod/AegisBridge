@@ -138,6 +138,11 @@ def get_dataset(session: Session, dataset_id: str) -> DatasetDetail:
             byte_size=version.byte_size,
             sha256=version.artifact_sha256,
             label_counts=_label_counts(version.profile),
+            derived=_derived(version.profile),
+            derivation_profile=_profile_text(version.profile, "derivation_profile"),
+            derivation_fingerprint=_profile_text(version.profile, "derivation_fingerprint"),
+            derivation_type=_profile_text(version.profile, "derivation_type"),
+            split_label_counts=_split_label_counts(version.profile),
         )
         for version in sorted(row.versions, key=lambda item: item.version_label)
     ]
@@ -207,6 +212,40 @@ def get_experiment(session: Session, experiment_id: str) -> ExperimentDetail:
         **base.model_dump(),
         dataset_version_label=row.dataset_version.version_label,
     )
+
+
+def _derived(profile: dict[str, object] | None) -> bool | None:
+    if profile and profile.get("derived") is True:
+        return True
+    return None
+
+
+def _profile_text(profile: dict[str, object] | None, key: str) -> str | None:
+    if not profile:
+        return None
+    value = profile.get(key)
+    if not isinstance(value, str) or not value:
+        return None
+    return value
+
+
+def _split_label_counts(profile: dict[str, object] | None) -> dict[str, dict[str, int]] | None:
+    if not profile or profile.get("derived") is not True:
+        return None
+    parsed: dict[str, dict[str, int]] = {}
+    for split in ("train", "test"):
+        block = profile.get(split)
+        if not isinstance(block, dict):
+            return None
+        counts = block.get("label_counts")
+        if not isinstance(counts, dict):
+            return None
+        labels: dict[str, int] = {}
+        for key, value in counts.items():
+            if isinstance(key, str) and isinstance(value, int) and not isinstance(value, bool):
+                labels[key] = value
+        parsed[split] = labels
+    return parsed
 
 
 def _label_counts(profile: dict[str, object] | None) -> dict[str, int] | None:
