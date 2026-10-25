@@ -63,7 +63,7 @@ Administrator, CISO, GRC Analyst, SOC Analyst, Security Engineer, Auditor, Read 
 
 ## 5. Session and Transport Security
 
-- HTTPS only in hosted environments; HSTS after stable HTTPS
+- HTTPS only in hosted environments; HSTS `max-age=15552000` after stable HTTPS, without `includeSubDomains` or preload
 - Restrictive CORS (explicit origin allowlist)
 - No mixed content
 - Secure cookie attributes in staging/production

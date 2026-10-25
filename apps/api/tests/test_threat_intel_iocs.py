@@ -343,8 +343,10 @@ def test_missing_auth_does_not_call_the_client(seeded: None) -> None:
     client = ScriptedFeed({})
     result = _sync(client, abusech_auth_key=None)
     assert client.calls == []
-    assert result["status"] == "failed"
-    assert result["failed_source_count"] == 2
+    assert result["status"] == "skipped"
+    assert result["reason"] == "auth_unconfigured"
+    assert result["run_id"] is None
+    assert result["failed_source_count"] == 0
     _assert_seed_preserved()
 
 

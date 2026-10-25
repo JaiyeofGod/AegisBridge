@@ -119,7 +119,7 @@ Lab bridge      <->  Local Wazuh API
 
 - Mac developer machine is trusted relative to production
 - Lenovo lab network is private. The specified Wazuh stack binds to loopback and is not installed yet. No inbound path from the hosted app into the lab exists
-- Render and Cloudflare provide baseline platform controls
+- Render and Cloudflare provide baseline platform controls. The public API trusts Render's proxy with `FORWARDED_ALLOW_IPS=*` because public clients cannot bypass that proxy. The worker and Beat are the private-network peers. HSTS does not include subdomains or preload.
 - Public demo uses only synthetic data
 
 ---

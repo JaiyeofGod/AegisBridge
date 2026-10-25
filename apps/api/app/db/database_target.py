@@ -64,18 +64,31 @@ def assert_test_database_isolated(dev_url: str, test_url: str) -> DatabaseIdenti
     return test
 
 
+def postgresql_psycopg_url(url: str) -> str:
+    """Use the installed psycopg 3 driver without adding TLS parameters.
+
+    Render's internal Postgres URL uses the ``postgres://`` scheme and does not
+    set ``sslmode``. An external URL that already includes ``sslmode`` keeps it.
+    """
+    parsed = make_url(url)
+    driver = parsed.drivername.split("+", 1)[0]
+    if driver in {"postgres", "postgresql"} and "+" not in parsed.drivername:
+        parsed = parsed.set(drivername="postgresql+psycopg")
+    return parsed.render_as_string(hide_password=False)
+
+
 def runtime_database_url(settings: Settings) -> str:
     """Return the URL this process may open.
 
     ``APP_ENV=production`` ignores ``TEST_DATABASE_URL`` even when the variable is set.
     """
     if settings.app_env.lower() in _PRODUCTION_ENVS:
-        return settings.database_url
+        return postgresql_psycopg_url(settings.database_url)
     if settings.app_env.lower() == "test":
         test_url = settings.test_database_url or ""
         assert_test_database_isolated(settings.database_url, test_url)
-        return test_url
-    return settings.database_url
+        return postgresql_psycopg_url(test_url)
+    return postgresql_psycopg_url(settings.database_url)
 
 
 def test_database_name(settings: Settings) -> str:

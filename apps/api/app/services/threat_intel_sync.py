@@ -76,6 +76,9 @@ def sync_threat_intelligence_iocs(
     runtime = settings or get_settings()
     if not runtime.threat_intel_sync_enabled:
         return _result("skipped", reason="disabled")
+    if not (runtime.abusech_auth_key or "").strip():
+        logger.info("threat intelligence ioc sync skipped reason=auth_unconfigured")
+        return _result("skipped", reason="auth_unconfigured")
     try:
         token = lock.acquire()
     except Exception:

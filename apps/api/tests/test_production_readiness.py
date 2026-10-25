@@ -35,6 +35,7 @@ def _production(**overrides: object) -> Settings:
         "AWS_ACCESS_KEY_ID": "r2-access-example",
         "AWS_SECRET_ACCESS_KEY": "r2-secret-example",
         "S3_BUCKET": "aegis-prod-evidence",
+        "S3_REGION": "auto",
         "CELERY_BROKER_URL": "rediss://broker.internal:6379/0",
         "REDIS_URL": "rediss://broker.internal:6379/0",
         "AEGIS_DEV_ADMIN_PASSWORD": "",
@@ -60,6 +61,7 @@ def production_app(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
         "AWS_ACCESS_KEY_ID": "r2-access-example",
         "AWS_SECRET_ACCESS_KEY": "r2-secret-example",
         "S3_BUCKET": "aegis-prod-evidence",
+        "S3_REGION": "auto",
         "CELERY_BROKER_URL": "rediss://broker.internal:6379/0",
         "REDIS_URL": "rediss://broker.internal:6379/0",
         "AEGIS_DEV_ADMIN_PASSWORD": "",
@@ -95,6 +97,12 @@ def test_production_rejects_missing_and_insecure_settings() -> None:
     assert any("SESSION_COOKIE_SECURE" in issue for issue in insecure_cookie.issues)
     dev_bucket = review_production(_production(S3_BUCKET="aegis-dev-evidence"))
     assert any("S3_BUCKET" in issue for issue in dev_bucket.issues)
+    region = review_production(_production(S3_REGION="us-east-1"))
+    assert any("S3_REGION" in issue for issue in region.issues)
+    same_origin = review_production(
+        _production(CORS_ORIGINS="https://api.example", PUBLIC_API_URL="https://api.example")
+    )
+    assert any("frontend origin" in issue for issue in same_origin.issues)
     local_broker = review_production(_production(CELERY_BROKER_URL="redis://localhost:6379/0"))
     assert any("CELERY_BROKER_URL" in issue for issue in local_broker.issues)
     dev_password = review_production(_production(AEGIS_DEV_ADMIN_PASSWORD="local-only"))
@@ -172,6 +180,7 @@ def test_forwarded_https_sets_hsts_only_from_the_trusted_proxy(
         "AWS_ACCESS_KEY_ID": "r2-access-example",
         "AWS_SECRET_ACCESS_KEY": "r2-secret-example",
         "S3_BUCKET": "aegis-prod-evidence",
+        "S3_REGION": "auto",
         "CELERY_BROKER_URL": "rediss://broker.internal:6379/0",
         "AEGIS_DEV_ADMIN_PASSWORD": "",
     }.items():

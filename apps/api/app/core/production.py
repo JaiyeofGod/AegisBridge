@@ -70,11 +70,14 @@ def review_production(settings: Settings) -> ProductionReview:
     else:
         notes.append("Optional NVD API key: configured.")
     if settings.threat_intel_sync_enabled and not (settings.abusech_auth_key or "").strip():
-        notes.append("Optional abuse.ch key: unset. Indicator ingestion fails closed.")
+        notes.append("Optional abuse.ch key: unset. Indicator sync skips without a failed run.")
     elif (settings.abusech_auth_key or "").strip():
         notes.append("Optional abuse.ch key: configured.")
     else:
         notes.append("Optional abuse.ch key: unused because indicator sync is disabled.")
+    connections = settings.db_pool_size + settings.db_max_overflow
+    if connections > 5:
+        notes.append("Database pool per process is above the portfolio ceiling of 5.")
     if (settings.huggingface_token or "").strip():
         notes.append("Optional dataset token: configured.")
     else:
@@ -142,6 +145,8 @@ def _origin_issues(settings: Settings) -> list[str]:
     public = (settings.public_api_url or "").strip()
     if not _https_origin(public):
         issues.append("PUBLIC_API_URL must be the public https API origin.")
+    elif _hostname(public) in {_hostname(origin) for origin in origins}:
+        issues.append("CORS_ORIGINS must be the frontend origin, not the API host.")
     hosts = _host_list(settings.trusted_hosts)
     if not hosts:
         issues.append("TRUSTED_HOSTS must list the public API hostnames.")
@@ -164,10 +169,18 @@ def _storage_issues(settings: Settings) -> list[str]:
         issues.append("OBJECT_STORAGE_PROVIDER must be r2 in production.")
     endpoint = (settings.s3_endpoint_url or "").strip()
     host = _hostname(endpoint)
-    if not endpoint.startswith("https://") or not host.endswith(".r2.cloudflarestorage.com"):
+    lowered = endpoint.lower()
+    if (
+        not endpoint.startswith("https://")
+        or not host.endswith(".r2.cloudflarestorage.com")
+        or "seaweed" in lowered
+        or ":8333" in lowered
+    ):
         issues.append("S3_ENDPOINT_URL must be the private https R2 endpoint.")
+    if settings.s3_region.strip().lower() != "auto":
+        issues.append("S3_REGION must be auto for Cloudflare R2.")
     bucket = settings.s3_bucket.strip()
-    if not bucket or bucket == "aegis-dev-evidence":
+    if not bucket or bucket == "aegis-dev-evidence" or "seaweed" in bucket.lower():
         issues.append("S3_BUCKET must be the private production bucket.")
     access = (settings.aws_access_key_id or "").strip()
     secret = (settings.aws_secret_access_key or "").strip()

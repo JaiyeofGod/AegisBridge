@@ -49,6 +49,10 @@ class Settings(BaseSettings):
         default="postgresql+psycopg://aegis:aegis@localhost:5432/aegis",
         alias="DATABASE_URL",
     )
+    # Each of the API, worker, and Beat processes opens its own pool.
+    # 2 + 1 per process is 9 connections at the portfolio ceiling.
+    db_pool_size: int = Field(default=2, alias="DB_POOL_SIZE", ge=1, le=10)
+    db_max_overflow: int = Field(default=1, alias="DB_MAX_OVERFLOW", ge=0, le=10)
     # Pytest only. Ignored unless APP_ENV=test. Never a fallback for local or production.
     test_database_url: str | None = Field(default=None, alias="TEST_DATABASE_URL")
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")

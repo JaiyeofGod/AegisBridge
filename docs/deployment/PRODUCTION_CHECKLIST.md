@@ -55,7 +55,7 @@ Missing R2 configuration fails process startup. An unreachable bucket does not f
 ## Optional settings
 
 - `NVD_API_KEY`
-- `ABUSECH_AUTH_KEY` (ThreatFox and URLhaus fail closed without it)
+- `ABUSECH_AUTH_KEY` (ThreatFox and URLhaus skip, without a failed run, until this is set and indicator sync is enabled)
 - `HF_TOKEN`
 - Wazuh indexer URL, username, and password, only when `WAZUH_ENABLED=true`
 
@@ -77,29 +77,29 @@ Set these in the host secret store. Do not commit them.
 
 ## Processes
 
-From the repository root, after `uv sync --project apps/api --frozen --no-dev`:
+The launch sequence is `docs/deployment/FIRST_PRODUCTION_LAUNCH.md`. Every command below assumes the repository root as the working directory and `PYTHONPATH=apps/api`. `uv run` from the root does not import `app` without that path.
 
 ```text
 uv run --project apps/api alembic upgrade head
 uv run --project apps/api uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips "$FORWARDED_ALLOW_IPS"
-uv run --project apps/api celery -A app.workers.celery_app:celery_app worker --loglevel=info -Q intelligence,integrations
-uv run --project apps/api celery -A app.workers.celery_app:celery_app beat --loglevel=info
+uv run --project apps/api celery -A app.workers.celery_app:celery_app worker --loglevel=info --pool=solo -Q intelligence,integrations
+uv run --project apps/api celery -A app.workers.celery_app:celery_app beat --loglevel=info --schedule /tmp/celerybeat-schedule
 ```
 
-Run the migration once per release, before new processes start. A failed migration stops the release. Do not start a second copy of the web process that also migrates, and do not run `alembic downgrade` against production. The worker must listen to both `intelligence` and `integrations`. The Celery app pins the solo pool for Python 3.14. Run exactly one Beat process. Beat keeps the current cadence: vulnerability intelligence daily at 06:00 UTC, ThreatFox and URLhaus at 00:15, 06:15, 12:15, and 18:15 UTC, and the Wazuh poll every five minutes. The Wazuh task returns before any network call while it is disabled.
+The API pre-deploy command is the only migration. A failed migration stops that deploy. Workers do not migrate. Do not run `alembic downgrade` against production. The worker listens to `intelligence` and `integrations` and uses the solo pool. Run one Beat process. Its schedule file is ephemeral. Vulnerability intelligence is 06:00 UTC daily. Indicator sync is 00:15, 06:15, 12:15, and 18:15 UTC, and the blueprint leaves it disabled until an abuse.ch key is added. Wazuh remains every five minutes and returns before any network call while disabled.
 
 Celery accepts JSON only. Results are not stored in the broker.
 
-Frontend, from `apps/web`, with `VITE_API_BASE_URL` set to the same public https origin as `PUBLIC_API_URL`:
+Frontend, from the repository root, with `VITE_API_BASE_URL` set to the same public https origin as `PUBLIC_API_URL`:
 
 ```text
 pnpm install --frozen-lockfile
-AEGIS_REQUIRE_PUBLIC_API=1 pnpm build
+AEGIS_REQUIRE_PUBLIC_API=1 pnpm --filter @aegisbridge/web build
 ```
 
 That build rejects a localhost API URL. It writes `dist/content-security-policy.txt` and adds the same policy to `index.html`. `connect-src` is `'self'`, that API origin, and the Google Fonts hosts already referenced by `index.html`. The sign-in scene stays self-hosted. The policy allows `'wasm-unsafe-eval'` and inline styles. It does not allow a source wildcard or `'unsafe-eval'`.
 
-Render blueprint headers are literal strings, so `render.yaml` does not contain a Content-Security-Policy or an API hostname. After this build, set the static site response header `Content-Security-Policy` to the single line in `dist/content-security-policy.txt`. A meta tag cannot enforce `frame-ancestors`. `X-Frame-Options: DENY` remains in the blueprint until that response header is in place, and the generated policy includes `frame-ancestors 'none'`.
+The blueprint copies `VITE_API_BASE_URL` and `PUBLIC_API_URL` from the API service's `RENDER_EXTERNAL_URL` for the first `onrender.com` launch. That value already includes `https://`. A custom domain later replaces those references; the blueprint cannot strip or join a hostname itself. `render.yaml` does not contain a Content-Security-Policy. After the production build, copy `apps/web/dist/content-security-policy.txt` to the static site response header. The response header is authoritative. The meta tag cannot enforce `frame-ancestors`. `X-Frame-Options: DENY` stays in the blueprint.
 
 Serve `apps/web/dist` with a rewrite of unknown paths to `index.html`. Cache hashed files under `/assets/` for a long time. Do not cache `index.html` indefinitely.
 
@@ -107,38 +107,59 @@ Serve `apps/web/dist` with a rewrite of unknown paths to `index.html`. Cache has
 
 Do not run the development seed from a production start command.
 
-- Empty organization: `python -m app.bootstrap` with `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` set in the environment. It refuses to replace an existing password. It is not an HTTP endpoint.
+- Empty organization: `uv run --project apps/api python -m app.bootstrap` from the repository root, with `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` set in the environment. It refuses to replace an existing password. It is not an HTTP endpoint. Remove both variables after the first sign-in.
 - Portfolio demo: `python -m app.db.seed --demo` after the migration. That flag does not apply `AEGIS_DEV_ADMIN_PASSWORD`. Set the first password with bootstrap only when that email has no credential yet.
 
 ## Review command
 
 ```text
-cd apps/api && uv run python -m app.production_check
+PYTHONPATH=apps/api uv run --project apps/api python -m app.production_check --deployment
 ```
 
-Exit 0 only when `APP_ENV=production` and the required settings pass. The output does not include secret values.
+Exit 0 only when `APP_ENV=production` and the required settings pass. `--deployment` also checks this repository's pins and blueprint. `--connectivity` then runs read-only probes and is separate from the configuration result. The output does not include secret values.
 
 ## Checklist
 
-- [ ] Public URLs are HTTPS
-- [ ] Secure, HttpOnly session cookies
-- [ ] HSTS without preload
-- [ ] API CSP from the application, and the frontend response header copied from `dist/content-security-policy.txt` after the production build
-- [ ] Explicit CORS origins
-- [ ] Trusted hosts
-- [ ] Forwarded headers limited to the platform proxy
-- [ ] Managed PostgreSQL
-- [ ] Managed private broker
-- [ ] Private R2 bucket
-- [ ] Secrets in the host store, not in git
-- [ ] `python -m app.production_check` reports ready
-- [ ] `alembic upgrade head` applied once
-- [ ] Bootstrap or an intentional `--demo` seed, not both by accident
+Repository items below are done. Everything that needs a live account stays open.
+
+### Pre-resource
+
+- [x] Python 3.14.8 pinned in `.python-version` and `PYTHON_VERSION`
+- [x] Node 24.22.0 and pnpm 10.18.2 pinned for the frontend build
+- [x] Blueprint commands, one Beat process, both queues, and one migration command reviewed
+- [x] Frontend CSP generated from the public API origin, not stored in `render.yaml`
+- [x] No automatic seed or bootstrap
+- [ ] Operator has a Render account and a Cloudflare account
+
+### Resource created
+
+- [ ] Blueprint imported
+- [ ] Private Postgres and private Key Value exist
+- [ ] Private R2 bucket exists
+
+### Configured
+
+- [ ] R2 endpoint, bucket, and scoped token entered on the API service
+- [ ] `SESSION_SECRET` generated once and shared with worker and Beat
+- [ ] `PUBLIC_API_URL`, `TRUSTED_HOSTS`, `CORS_ORIGINS`, and `VITE_API_BASE_URL` come from the assigned HTTPS origins
+
+### Pre-launch
+
+- [ ] `python -m app.production_check --deployment` reports ready
+- [ ] Optional `--connectivity` reports the database, broker, and bucket reachable
 - [ ] No `AEGIS_DEV_ADMIN_PASSWORD`
-- [ ] Web, worker, and one Beat process
-- [ ] Wazuh left disabled unless its indexer is private
-- [ ] Database backup, R2 retention, and secret rotation are known
-- [ ] Rollback is a restored backup or a forward fix, not an automatic downgrade
+
+### Post-launch
+
+- [ ] API liveness and readiness succeed
+- [ ] Migration applied once by the API pre-deploy command
+- [ ] Worker and one Beat process are running
+- [ ] Empty organization bootstrapped, then `BOOTSTRAP_ADMIN_PASSWORD` removed
+- [ ] Frontend CSP response header copied from `dist/content-security-policy.txt`
+- [ ] Security headers and the smoke tests in the launch runbook pass
+- [ ] Wazuh remains disabled
+- [ ] Indicator sync stays disabled until its key is added
+- [ ] Database backup and rollback path are known
 
 ## Still later
 

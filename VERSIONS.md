@@ -71,8 +71,12 @@ Patch versions may move after testing. Major architectural changes require an AD
 
 | Component | Baseline |
 |---|---|
-| Render Postgres | 18 |
-| Render Key Value | Valkey-backed for new instances |
+| Render Postgres | 18 (`postgresMajorVersion: "18"` in `render.yaml`) |
+| Render Key Value | Private `256mb` instance, `noeviction` |
+| Production Python | **3.14.8** in `.python-version` and `PYTHON_VERSION` |
+| Production Node | **24.22.0** via `NODE_VERSION` |
+| Production pnpm | **10.18.2** via root `packageManager` |
+| Production uv | **0.13.3** in the blueprint build command |
 | Cloudflare R2 | S3-compatible API (hosted) |
 | SeaweedFS (local S3) | `chrislusf/seaweedfs:4.48` (`weed mini`) |
 

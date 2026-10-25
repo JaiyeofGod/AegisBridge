@@ -22,11 +22,14 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 uv run celery -A app.workers.celery_app:celery_app worker --loglevel=info -Q intelligence,integrations --pool=solo
 uv run celery -A app.workers.celery_app:celery_app beat --loglevel=info
 
-# Review a production environment without printing secrets
+# Review a production environment without printing secrets.
+# From the repository root, set PYTHONPATH=apps/api first.
 uv run python -m app.production_check
+uv run python -m app.production_check --deployment
+uv run python -m app.production_check --connectivity
 ```
 
-Production processes are documented in `docs/deployment/PRODUCTION_CHECKLIST.md`. `APP_ENV=production` refuses the development seed unless `--demo` is passed, and it refuses `AEGIS_DEV_ADMIN_PASSWORD`. The first administrator is `python -m app.bootstrap` using `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD`. That command is not an HTTP route. Migrations stay a separate `alembic upgrade head` before the new processes start. Do not run that migration from every worker.
+The launch sequence is `docs/deployment/FIRST_PRODUCTION_LAUNCH.md`. `APP_ENV=production` refuses the development seed unless `--demo` is passed, and it refuses `AEGIS_DEV_ADMIN_PASSWORD`. The first administrator is `uv run --project apps/api python -m app.bootstrap` from the repository root, using `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD`. That command is not an HTTP route. Migrations stay a separate `alembic upgrade head` on the API pre-deploy command. Do not run that migration from every worker.
 
 Alembic (from repository root, with `apps/api` venv active or `uv run` from `apps/api`):
 

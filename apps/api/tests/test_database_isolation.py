@@ -16,6 +16,7 @@ from app.db.database_target import (
     TEST_DATABASE_MISSING,
     TEST_DATABASE_NOT_ISOLATED,
     TestDatabaseConfigError,
+    postgresql_psycopg_url,
     runtime_database_url,
 )
 
@@ -83,3 +84,17 @@ def test_pytest_session_uses_configured_test_database() -> None:
     assert current == test_name
     assert current != dev_name
     assert version == head
+
+
+def test_render_internal_postgres_url_selects_psycopg_without_adding_tls() -> None:
+    rewritten = postgresql_psycopg_url(
+        "postgres://aegis_app:example-secret@dpg-internal/aegisbridge"
+    )
+    parsed = make_url(rewritten)
+    assert parsed.drivername == "postgresql+psycopg"
+    assert "sslmode" not in rewritten
+    preserved = postgresql_psycopg_url(
+        "postgresql://aegis_app:example-secret@dpg-internal/aegisbridge?sslmode=require"
+    )
+    assert "sslmode=require" in preserved
+    assert make_url(preserved).drivername == "postgresql+psycopg"

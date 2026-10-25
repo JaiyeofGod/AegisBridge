@@ -15,8 +15,8 @@ def create_db_engine(settings: Settings | None = None) -> Engine:
     return create_engine(
         runtime_database_url(cfg),
         pool_pre_ping=True,
-        pool_size=5,
-        max_overflow=5,
+        pool_size=cfg.db_pool_size,
+        max_overflow=cfg.db_max_overflow,
         pool_recycle=1800,
         future=True,
     )

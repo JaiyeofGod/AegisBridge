@@ -67,7 +67,7 @@ Research datasets are not on the Beat schedule. `python -m app.datasets ingest D
 
 The `aegis-sync-*` cron names, worker autoscaling, a source-health dashboard, refresh history in the UI, notification rules, user-editable schedules, scheduled MITRE ATT&CK refresh, dataset revision checks, background dataset downloads, and a production managed queue are not implemented. IOC expiry, asset correlation, and automated blocking are also not implemented.
 
-`render.yaml` is a reviewed blueprint, not an applied deployment. `docs/deployment/PRODUCTION_CHECKLIST.md` is the release checklist. Production startup rejects localhost database, broker, and object-storage defaults. Migrations run once per release (`alembic upgrade head`) before processes start. The API, one worker listening on `intelligence,integrations`, and one Beat process are separate. Beat is not duplicated.
+`render.yaml` is a reviewed blueprint, not an applied deployment. The launch sequence is `docs/deployment/FIRST_PRODUCTION_LAUNCH.md`, and `docs/deployment/PRODUCTION_CHECKLIST.md` separates repository work from live-account work. Python 3.14.8, Node 24.22.0, and pnpm 10.18.2 are pinned. Migrations run once per release from the API pre-deploy command. The API, one solo-pool worker on `intelligence,integrations`, and one Beat process are separate.
 
 ---
 
