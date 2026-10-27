@@ -1,0 +1,214 @@
+# Production stack for Coolify on one virtual machine.
+# Local development stays in compose.yaml and still uses SeaweedFS.
+# This file has no secret values. Coolify generates SERVICE_* values
+# and the operator supplies the Cloudflare R2 values in Coolify.
+
+x-backend-environment: &backend-environment
+  APP_ENV: production
+  PYTHONPATH: /app/apps/api
+  DATABASE_URL: postgresql+psycopg://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in Coolify}
+  CELERY_BROKER_URL: redis://valkey:6379/0
+  REDIS_URL: redis://valkey:6379/0
+  SESSION_SECRET: ${SERVICE_PASSWORD_64_SESSION}
+  PUBLIC_API_URL: ${SERVICE_URL_API_8000:?Assign the API domain in Coolify before deploying}
+  TRUSTED_HOSTS: ${SERVICE_FQDN_API_8000:?Assign the API domain in Coolify before deploying}
+  CORS_ORIGINS: ${SERVICE_URL_WEB_80:?Assign the web domain in Coolify before deploying}
+  FORWARDED_ALLOW_IPS: "*"
+  OBJECT_STORAGE_PROVIDER: r2
+  S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:?Set the private R2 S3 endpoint in Coolify}
+  S3_REGION: auto
+  S3_BUCKET: ${S3_BUCKET:?Set the private R2 bucket name in Coolify}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?Set the R2 access key id in Coolify}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?Set the R2 secret access key in Coolify}
+  DB_POOL_SIZE: "2"
+  DB_MAX_OVERFLOW: "1"
+  THREAT_INTEL_SYNC_ENABLED: "false"
+  VULNERABILITY_SYNC_ENABLED: "true"
+  WAZUH_ENABLED: "false"
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: ${SERVICE_USER_POSTGRES}
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_64_POSTGRES}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - aegis_coolify_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    mem_limit: 1g
+    restart: unless-stopped
+
+  valkey:
+    image: valkey/valkey:8
+    command:
+      - valkey-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - noeviction
+    volumes:
+      - aegis_coolify_valkey_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    mem_limit: 384m
+    restart: unless-stopped
+
+  migrate:
+    build: &api-build
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: aegisbridge-api:production
+    command:
+      - uv
+      - run
+      - --project
+      - apps/api
+      - alembic
+      - upgrade
+      - head
+    environment:
+      <<: *backend-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 768m
+    restart: "no"
+    exclude_from_hc: true
+
+  api:
+    build: *api-build
+    image: aegisbridge-api:production
+    command:
+      - uv
+      - run
+      - --project
+      - apps/api
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --proxy-headers
+      - --forwarded-allow-ips
+      - ${FORWARDED_ALLOW_IPS:-*}
+    environment:
+      <<: *backend-environment
+      SERVICE_URL_API_8000: ""
+    expose:
+      - "8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/live', timeout=5)"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    mem_limit: 1g
+    stop_grace_period: 20s
+    restart: unless-stopped
+
+  worker:
+    build: *api-build
+    image: aegisbridge-api:production
+    command:
+      - uv
+      - run
+      - --project
+      - apps/api
+      - celery
+      - -A
+      - app.workers.celery_app:celery_app
+      - worker
+      - --loglevel=info
+      - --pool=solo
+      - -Q
+      - intelligence,integrations
+    environment:
+      <<: *backend-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    mem_limit: 1536m
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  beat:
+    build: *api-build
+    image: aegisbridge-api:production
+    command:
+      - uv
+      - run
+      - --project
+      - apps/api
+      - celery
+      - -A
+      - app.workers.celery_app:celery_app
+      - beat
+      - --loglevel=info
+      - --schedule
+      - /tmp/celerybeat-schedule
+    environment:
+      <<: *backend-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    mem_limit: 512m
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_BASE_URL: ${SERVICE_URL_API_8000:?Assign the API domain in Coolify before deploying}
+    image: aegisbridge-web:production
+    environment:
+      SERVICE_URL_WEB_80: ""
+    expose:
+      - "80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    mem_limit: 128m
+    restart: unless-stopped
+
+volumes:
+  aegis_coolify_postgres_data:
+  aegis_coolify_valkey_data:
