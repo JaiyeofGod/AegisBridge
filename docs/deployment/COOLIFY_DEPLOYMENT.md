@@ -20,13 +20,29 @@ The production stack is:
 | `postgres` | PostgreSQL 18 | No |
 | `valkey` | Valkey 8 broker | No |
 
-Coolify's Traefik proxy terminates HTTPS. The Compose file does not publish host ports and does not hard-code a hostname or the Google Cloud IP. Declaring `SERVICE_URL_API_8000` and `SERVICE_URL_WEB_80` tells Coolify to assign domains and route to ports 8000 and 80.
+Coolify's Traefik proxy terminates HTTPS. The Compose file does not publish host ports and does not hard-code a hostname or the Google Cloud IP. Assign the `api` and `web` domains in Coolify, then set the public variables below from those HTTPS origins. Ports 8000 and 80 stay on the Compose network for the proxy.
 
-After Coolify parses the file, open the `api` and `web` domain fields and confirm both URLs use `https://`. The frontend build reads `SERVICE_URL_API_8000` as `VITE_API_BASE_URL`. A later hostname change requires a web image rebuild so the Content Security Policy matches the new API origin.
+`VITE_API_BASE_URL` is the frontend image build argument. A later hostname change requires a web image rebuild so the Content Security Policy matches the new API origin.
 
-## Required secrets
+## Environment variables
 
 Set these in Coolify's environment variables for the Compose resource. Do not commit them.
+
+Set these for both build-time parsing and container runtime. Compose requires them before `docker compose build` because the backend environment uses required substitutions. The Dockerfiles do not receive them.
+
+| Name | Source |
+| --- | --- |
+| `PUBLIC_API_URL` | Operator. Public API origin, including `https://`. |
+| `TRUSTED_HOSTS` | Operator. API hostname only. |
+| `CORS_ORIGINS` | Operator. Browser origin, including `https://`. |
+
+Set this for the frontend image build only:
+
+| Name | Source |
+| --- | --- |
+| `VITE_API_BASE_URL` | Operator. Same public API origin as `PUBLIC_API_URL`. |
+
+Set these for container runtime only. Compose does not require them while it parses the build.
 
 | Name | Source |
 | --- | --- |
@@ -36,20 +52,17 @@ Set these in Coolify's environment variables for the Compose resource. Do not co
 | `AWS_ACCESS_KEY_ID` | R2 token with object read, write, and delete on that bucket only. |
 | `AWS_SECRET_ACCESS_KEY` | Matching R2 secret. |
 
-Coolify generates and stores these because their names appear in the Compose file:
+Coolify generates and stores these because their names appear in the Compose file. They are runtime substitutions, not image build arguments.
 
 | Name | Use |
 | --- | --- |
 | `SERVICE_USER_POSTGRES` | Database user |
 | `SERVICE_PASSWORD_64_POSTGRES` | Database password |
 | `SERVICE_PASSWORD_64_SESSION` | `SESSION_SECRET` |
-| `SERVICE_URL_API_8000` | Public API origin |
-| `SERVICE_FQDN_API_8000` | API hostname for `TRUSTED_HOSTS` |
-| `SERVICE_URL_WEB_80` | Browser origin for `CORS_ORIGINS` |
 
 `OBJECT_STORAGE_PROVIDER=r2` and `S3_REGION=auto` are fixed in the Compose file. `THREAT_INTEL_SYNC_ENABLED=false` and `WAZUH_ENABLED=false` are also fixed. Vulnerability intelligence stays enabled and does not need an NVD key to start. Do not set `ABUSECH_AUTH_KEY`, `NVD_API_KEY`, or `HF_TOKEN` until that feature is intentionally turned on.
 
-The frontend image build receives only `VITE_API_BASE_URL`. It does not receive the database URL, session secret, or R2 credentials.
+The frontend image build receives only `VITE_API_BASE_URL`. It does not receive the database URL, session secret, or R2 credentials. `APP_ENV`, `OBJECT_STORAGE_PROVIDER`, `S3_REGION`, `THREAT_INTEL_SYNC_ENABLED`, `WAZUH_ENABLED`, and `FORWARDED_ALLOW_IPS` are fixed in the Compose file, so Coolify does not need to supply them.
 
 ## Migration
 
@@ -156,7 +169,7 @@ Do not enable HSTS preload before that move.
 ## First deploy checks
 
 1. Coolify resource uses `compose.coolify.yaml`.
-2. `POSTGRES_DB` and the four R2 values are set. Generated passwords are still the Coolify values.
+2. `PUBLIC_API_URL`, `TRUSTED_HOSTS`, `CORS_ORIGINS`, and `VITE_API_BASE_URL` are available when the image build starts. `POSTGRES_DB` and the four R2 values are available when containers start. Generated passwords are still the Coolify values.
 3. API and web domains are HTTPS.
 4. Deploy, then confirm `migrate` exited successfully and was not started a second time in parallel.
 5. `GET /api/v1/health/live` returns success through the public API domain.

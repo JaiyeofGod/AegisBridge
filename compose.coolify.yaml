@@ -1,25 +1,25 @@
 # Production stack for Coolify on one virtual machine.
 # Local development stays in compose.yaml and still uses SeaweedFS.
-# This file has no secret values. Coolify generates SERVICE_* values
-# and the operator supplies the Cloudflare R2 values in Coolify.
+# This file has no secret values. Coolify generates the database and session
+# secrets. The operator supplies domains and the Cloudflare R2 values.
 
 x-backend-environment: &backend-environment
   APP_ENV: production
   PYTHONPATH: /app/apps/api
-  DATABASE_URL: postgresql+psycopg://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in Coolify}
+  DATABASE_URL: postgresql+psycopg://${SERVICE_USER_POSTGRES-}:${SERVICE_PASSWORD_64_POSTGRES-}@postgres:5432/${POSTGRES_DB-}
   CELERY_BROKER_URL: redis://valkey:6379/0
   REDIS_URL: redis://valkey:6379/0
-  SESSION_SECRET: ${SERVICE_PASSWORD_64_SESSION}
-  PUBLIC_API_URL: ${SERVICE_URL_API_8000:?Assign the API domain in Coolify before deploying}
-  TRUSTED_HOSTS: ${SERVICE_FQDN_API_8000:?Assign the API domain in Coolify before deploying}
-  CORS_ORIGINS: ${SERVICE_URL_WEB_80:?Assign the web domain in Coolify before deploying}
+  SESSION_SECRET: ${SERVICE_PASSWORD_64_SESSION-}
+  PUBLIC_API_URL: ${PUBLIC_API_URL:?Set PUBLIC_API_URL in Coolify}
+  TRUSTED_HOSTS: ${TRUSTED_HOSTS:?Set TRUSTED_HOSTS in Coolify}
+  CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS in Coolify}
   FORWARDED_ALLOW_IPS: "*"
   OBJECT_STORAGE_PROVIDER: r2
-  S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:?Set the private R2 S3 endpoint in Coolify}
+  S3_ENDPOINT_URL: ${S3_ENDPOINT_URL-}
   S3_REGION: auto
-  S3_BUCKET: ${S3_BUCKET:?Set the private R2 bucket name in Coolify}
-  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?Set the R2 access key id in Coolify}
-  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?Set the R2 secret access key in Coolify}
+  S3_BUCKET: ${S3_BUCKET-}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID-}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY-}
   DB_POOL_SIZE: "2"
   DB_MAX_OVERFLOW: "1"
   THREAT_INTEL_SYNC_ENABLED: "false"
@@ -30,9 +30,9 @@ services:
   postgres:
     image: postgres:18
     environment:
-      POSTGRES_USER: ${SERVICE_USER_POSTGRES}
-      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_64_POSTGRES}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${SERVICE_USER_POSTGRES-}
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_64_POSTGRES-}
+      POSTGRES_DB: ${POSTGRES_DB-}
     volumes:
       - aegis_coolify_postgres_data:/var/lib/postgresql
     healthcheck:
@@ -106,7 +106,6 @@ services:
       - ${FORWARDED_ALLOW_IPS:-*}
     environment:
       <<: *backend-environment
-      SERVICE_URL_API_8000: ""
     expose:
       - "8000"
     depends_on:
@@ -191,10 +190,8 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        VITE_API_BASE_URL: ${SERVICE_URL_API_8000:?Assign the API domain in Coolify before deploying}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:?Set VITE_API_BASE_URL in Coolify}
     image: aegisbridge-web:production
-    environment:
-      SERVICE_URL_WEB_80: ""
     expose:
       - "80"
     depends_on:
