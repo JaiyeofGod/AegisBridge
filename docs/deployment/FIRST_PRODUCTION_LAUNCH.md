@@ -167,7 +167,7 @@ Simulated, external-feed, manual, and derived research records already carry the
 
 ## CSP header
 
-The production frontend build writes `apps/web/dist/content-security-policy.txt` and the same policy as a meta tag. `connect-src` is `'self'`, the API origin, and the two Google Fonts hosts already used by `index.html`.
+The production frontend build writes `apps/web/dist/content-security-policy.txt` and the same policy as a meta tag. `connect-src` is `'self'`, the API origin, the two Google Fonts hosts already used by `index.html`, and `https://www.gstatic.com` for the self-hosted Spline scene's Draco decoder.
 
 The meta tag does not enforce `frame-ancestors`. After the build, set the static site response header `Content-Security-Policy` to that exact line. The response header is authoritative when both are present. They are generated from the same string, so they do not conflict. `X-Frame-Options: DENY` remains.
 

@@ -97,7 +97,7 @@ pnpm install --frozen-lockfile
 AEGIS_REQUIRE_PUBLIC_API=1 pnpm --filter @aegisbridge/web build
 ```
 
-That build rejects a localhost API URL. It writes `dist/content-security-policy.txt` and adds the same policy to `index.html`. `connect-src` is `'self'`, that API origin, and the Google Fonts hosts already referenced by `index.html`. The sign-in scene stays self-hosted. The policy allows `'wasm-unsafe-eval'` and inline styles. It does not allow a source wildcard or `'unsafe-eval'`.
+That build rejects a localhost API URL. It writes `dist/content-security-policy.txt` and adds the same policy to `index.html`. `connect-src` is `'self'`, that API origin, the Google Fonts hosts already referenced by `index.html`, and `https://www.gstatic.com` for the self-hosted Spline scene's Draco decoder. The sign-in scene stays self-hosted. The policy allows `'wasm-unsafe-eval'` and inline styles. It does not allow a source wildcard or `'unsafe-eval'`.
 
 The blueprint copies `VITE_API_BASE_URL` and `PUBLIC_API_URL` from the API service's `RENDER_EXTERNAL_URL` for the first `onrender.com` launch. That value already includes `https://`. A custom domain later replaces those references; the blueprint cannot strip or join a hostname itself. `render.yaml` does not contain a Content-Security-Policy. After the production build, copy `apps/web/dist/content-security-policy.txt` to the static site response header. The response header is authoritative. The meta tag cannot enforce `frame-ancestors`. `X-Frame-Options: DENY` stays in the blueprint.
 

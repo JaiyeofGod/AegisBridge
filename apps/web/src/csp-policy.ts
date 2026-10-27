@@ -6,6 +6,7 @@
 
 const FONT_STYLESHEET_ORIGIN = "https://fonts.googleapis.com";
 const FONT_FILE_ORIGIN = "https://fonts.gstatic.com";
+const DRACO_DECODER_ORIGIN = "https://www.gstatic.com";
 
 export function frontendContentSecurityPolicy(apiBaseUrl: string): string {
   const origin = publicHttpsOrigin(apiBaseUrl);
@@ -15,7 +16,14 @@ export function frontendContentSecurityPolicy(apiBaseUrl: string): string {
     "style-src 'self' 'unsafe-inline' " + FONT_STYLESHEET_ORIGIN,
     "img-src 'self' data: blob:",
     "font-src 'self' data: " + FONT_FILE_ORIGIN,
-    "connect-src 'self' " + origin + " " + FONT_STYLESHEET_ORIGIN + " " + FONT_FILE_ORIGIN,
+    "connect-src 'self' " +
+      origin +
+      " " +
+      FONT_STYLESHEET_ORIGIN +
+      " " +
+      FONT_FILE_ORIGIN +
+      " " +
+      DRACO_DECODER_ORIGIN,
     "worker-src 'self' blob:",
     "frame-src 'none'",
     "frame-ancestors 'none'",
