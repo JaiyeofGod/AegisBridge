@@ -10,7 +10,6 @@ COPY apps/api/pyproject.toml apps/api/uv.lock apps/api/README.md apps/api/
 COPY apps/api/app apps/api/app
 COPY alembic.ini alembic.ini
 COPY migrations migrations
-COPY .python-version .python-version
 
 ENV PYTHONPATH=/app/apps/api \
     UV_LINK_MODE=copy \
