@@ -35,7 +35,7 @@ export function GovernanceSectionNav({
             aria-controls={`governance-panel-${section.id}`}
             tabIndex={isActive ? 0 : -1}
             className={cn(
-              "inline-flex min-h-11 items-center rounded-[var(--radius-control)] px-3 text-sm font-semibold",
+              "motion-control inline-flex min-h-11 items-center rounded-[var(--radius-control)] px-3 text-sm font-semibold",
               "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",
               isActive
                 ? "bg-[var(--raised)] text-[var(--accent)]"

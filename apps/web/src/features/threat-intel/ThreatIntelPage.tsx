@@ -143,7 +143,7 @@ export function ThreatIntelPage() {
                 role="tab"
                 aria-selected={active}
                 className={cn(
-                  "inline-flex min-h-11 items-center rounded-[var(--radius-control)] px-3 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",
+                  "motion-control inline-flex min-h-11 items-center rounded-[var(--radius-control)] px-3 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",
                   active
                     ? "bg-[var(--raised)] text-[var(--accent)]"
                     : "text-[var(--muted)] hover:bg-[var(--raised)] hover:text-[var(--text)]",
@@ -156,7 +156,11 @@ export function ThreatIntelPage() {
           })}
         </div>
 
-        {section === "attack" && canReadAttack ? <AttackExplorer /> : null}
+        {section === "attack" && canReadAttack ? (
+          <div key="attack" className="motion-panel">
+            <AttackExplorer />
+          </div>
+        ) : null}
 
         {section !== "attack" && summary.isPending ? (
           <LoadingState label="Updating" rows={4} />
@@ -193,7 +197,7 @@ export function ThreatIntelPage() {
         ) : null}
 
         {section !== "attack" && summary.isSuccess && metrics ? (
-          <div className="space-y-8">
+          <div key={section} className="motion-panel space-y-8">
             {section === "indicators" && indicators.isPending ? (
               <LoadingState label="Updating" rows={3} />
             ) : null}

@@ -28,7 +28,7 @@
   --focus-ring: 2px solid var(--accent);
   --focus-offset: 2px;
 
-  /* Motion Phase 1. Not applied to existing components yet. */
+  /* Shared motion tokens. Phase 2 applies the fast and standard values. */
   --motion-duration-fast: 150ms;
   --motion-duration-standard: 200ms;
   --motion-duration-cinematic: 400ms;

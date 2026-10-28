@@ -121,10 +121,11 @@ export function RiskPage() {
 
         {catalog.isSuccess && snapshot ? (
           <div
+            key={section}
             role="tabpanel"
             id={`risk-panel-${section}`}
             aria-labelledby={`risk-tab-${section}`}
-            className="space-y-8"
+            className="motion-panel space-y-8"
           >
             {section === "register" ? (
               <RegisterSection

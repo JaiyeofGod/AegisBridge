@@ -8,6 +8,7 @@ describe("Sidebar", () => {
   it("links every primary module, including administration", async () => {
     await renderWithProviders(<Sidebar />);
     expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("href", "/overview");
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveClass("motion-nav");
     expect(await screen.findByRole("link", { name: "Administration" })).toHaveAttribute(
       "href",
       "/administration",

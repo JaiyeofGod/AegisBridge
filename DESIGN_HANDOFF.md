@@ -618,9 +618,14 @@ or business logic as part of this motion pass.
 
 Motion Phase 1 adds shared tokens only. They live in
 `apps/web/src/styles/tokens.css` and `apps/web/src/lib/motion.ts`.
-No animation library was added. Existing transitions, the Spline scene,
-and the global reduced-motion rule are unchanged. The welcome sequence,
-pointer tilt, and application animations remain proposed.
+No animation library was added. The global reduced-motion rule is unchanged.
+
+Motion Phase 2 applies those tokens with CSS. Buttons and tab triggers
+use the fast duration. Sidebar active color and the mobile navigation
+drawer use the standard duration. Tab panels fade in by half the
+8px distance. Radix Dialog remains the mobile drawer. The welcome
+sequence, pointer tilt, Spline camera, toasts, and data animations
+remain proposed.
 
 | Token | Value | Intended use |
 |---|---|---|

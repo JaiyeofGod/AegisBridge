@@ -24,8 +24,8 @@ export function AppShell({
 
       <Dialog.Root open={mobileOpen} onOpenChange={setMobileOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-40 bg-black/60 lg:hidden" />
-          <Dialog.Content className="fixed inset-y-0 left-0 z-50 w-[min(100%,280px)] bg-[var(--surface)] shadow-xl outline-none lg:hidden">
+          <Dialog.Overlay className="motion-overlay fixed inset-0 z-40 bg-black/60 lg:hidden" />
+          <Dialog.Content className="motion-drawer fixed inset-y-0 left-0 z-50 w-[min(100%,280px)] bg-[var(--surface)] shadow-xl outline-none lg:hidden">
             <VisuallyHidden>
               <Dialog.Title>Navigation</Dialog.Title>
             </VisuallyHidden>

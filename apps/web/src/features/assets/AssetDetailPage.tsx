@@ -132,7 +132,7 @@ export function AssetDetailPage() {
                 role="tab"
                 aria-selected={active}
                 className={cn(
-                  "inline-flex min-h-11 items-center rounded-[var(--radius-control)] px-3 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",
+                  "motion-control inline-flex min-h-11 items-center rounded-[var(--radius-control)] px-3 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",
                   active
                     ? "bg-[var(--raised)] text-[var(--accent)]"
                     : "text-[var(--muted)] hover:bg-[var(--raised)] hover:text-[var(--text)]",
@@ -154,7 +154,7 @@ export function AssetDetailPage() {
           </div>
         ) : null}
 
-        <div className="space-y-8">
+        <div key={section} className="motion-panel space-y-8">
           {section === "summary" ? (
             <div className="mb-4 flex justify-end">
               <StatusBadge label={SEEDED_DATA_LABEL} tone="warning" />

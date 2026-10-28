@@ -260,7 +260,7 @@ export function RiskControlMappingsPanel({ riskId, mappings, canManage, status, 
 
               {pendingUnlinkId === item.id ? (
                 <div
-                  className="mt-3 space-y-2 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] p-3"
+                  className="motion-dialog mt-3 space-y-2 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] p-3"
                   role="dialog"
                   aria-labelledby={`risk-unlink-title-${item.id}`}
                   data-testid="risk-control-mapping-unlink-confirm"

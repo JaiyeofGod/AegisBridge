@@ -84,4 +84,114 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  .motion-control {
+    transition-property: color, background-color, border-color, opacity, filter;
+    transition-duration: var(--motion-duration-fast);
+    transition-timing-function: var(--motion-ease-enter);
+  }
+
+  .motion-control:active:not(:disabled) {
+    opacity: 0.92;
+  }
+
+  .motion-nav {
+    transition-property: color, background-color, border-color;
+    transition-duration: var(--motion-duration-standard);
+    transition-timing-function: var(--motion-ease-enter);
+  }
+
+  .motion-panel {
+    animation: motion-panel-enter var(--motion-duration-fast) var(--motion-ease-enter);
+  }
+
+  .motion-overlay {
+    animation-duration: var(--motion-duration-standard);
+    animation-timing-function: var(--motion-ease-enter);
+  }
+
+  .motion-overlay[data-state="open"] {
+    animation-name: motion-fade-in;
+  }
+
+  .motion-overlay[data-state="closed"] {
+    animation-name: motion-fade-out;
+    animation-timing-function: var(--motion-ease-exit);
+  }
+
+  .motion-drawer {
+    animation-duration: var(--motion-duration-standard);
+    animation-timing-function: var(--motion-ease-enter);
+  }
+
+  .motion-drawer[data-state="open"] {
+    animation-name: motion-drawer-in;
+  }
+
+  .motion-drawer[data-state="closed"] {
+    animation-name: motion-drawer-out;
+    animation-timing-function: var(--motion-ease-exit);
+  }
+
+  .motion-dialog {
+    animation: motion-dialog-in var(--motion-duration-standard) var(--motion-ease-enter);
+  }
+}
+
+@keyframes motion-panel-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, calc(var(--motion-distance) / 2), 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes motion-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes motion-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes motion-drawer-in {
+  from {
+    transform: translate3d(-100%, 0, 0);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes motion-drawer-out {
+  from {
+    transform: none;
+  }
+  to {
+    transform: translate3d(-100%, 0, 0);
+  }
+}
+
+@keyframes motion-dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }

@@ -21,7 +21,7 @@ export function GlobalHeader({
       {onOpenNav ? (
         <button
           type="button"
-          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border)] lg:hidden"
+          className="motion-control inline-flex min-h-11 min-w-11 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border)] lg:hidden"
           aria-label="Open navigation"
           onClick={onOpenNav}
         >
@@ -34,7 +34,7 @@ export function GlobalHeader({
         <NotificationButton />
         <Link
           to="/account/profile"
-          className="inline-flex min-h-11 items-center rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-3 text-sm font-medium text-[var(--text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+          className="motion-control inline-flex min-h-11 items-center rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-3 text-sm font-medium text-[var(--text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
           aria-label="Open my profile"
         >
           {auth.user?.display_name ?? "My Profile"}

@@ -590,7 +590,7 @@ export function IncidentTasksPanel({ incidentId, incidentStatus, openTaskCount }
               ) : null}
               {cancelId === task.id ? (
                 <div
-                  className="mt-3 space-y-2 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--canvas)] p-3"
+                  className="motion-dialog mt-3 space-y-2 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--canvas)] p-3"
                   role="dialog"
                   aria-labelledby={`cancel-heading-${task.id}`}
                   data-testid={`task-cancel-dialog-${task.id}`}

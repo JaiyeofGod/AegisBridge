@@ -126,10 +126,11 @@ export function GovernancePage() {
 
         {governance.isSuccess && view ? (
           <div
+            key={section}
             role="tabpanel"
             id={`governance-panel-${section}`}
             aria-labelledby={`governance-tab-${section}`}
-            className="space-y-8"
+            className="motion-panel space-y-8"
           >
             {section === "summary" ? <SummarySection data={view} /> : null}
             {section === "frameworks" ? <FrameworksSection data={view} /> : null}

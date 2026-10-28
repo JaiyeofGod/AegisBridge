@@ -7,7 +7,7 @@ export function SidebarNavItem({ item, onNavigate }: { item: NavItem; onNavigate
   if (!item.implemented) {
     return (
       <span
-        className="flex min-h-11 items-center justify-between gap-2 rounded-[var(--radius-control)] px-3 py-2 text-sm leading-snug text-[var(--muted)] opacity-70"
+        className="motion-nav flex min-h-11 items-center justify-between gap-2 rounded-[var(--radius-control)] px-3 py-2 text-sm leading-snug text-[var(--muted)] opacity-70"
         title="Not available in this phase"
         aria-disabled="true"
       >
@@ -23,7 +23,7 @@ export function SidebarNavItem({ item, onNavigate }: { item: NavItem; onNavigate
       onClick={onNavigate}
       className={({ isActive }) =>
         cn(
-          "flex min-h-11 items-center rounded-[var(--radius-control)] px-3 py-2 text-sm leading-snug font-medium",
+          "motion-nav flex min-h-11 items-center rounded-[var(--radius-control)] px-3 py-2 text-sm leading-snug font-medium",
           "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",
           isActive
             ? "bg-[var(--raised)] text-[var(--accent)]"
