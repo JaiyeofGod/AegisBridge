@@ -28,6 +28,14 @@
   --focus-ring: 2px solid var(--accent);
   --focus-offset: 2px;
 
+  /* Motion Phase 1. Not applied to existing components yet. */
+  --motion-duration-fast: 150ms;
+  --motion-duration-standard: 200ms;
+  --motion-duration-cinematic: 400ms;
+  --motion-ease-enter: cubic-bezier(0, 0, 0.2, 1);
+  --motion-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --motion-distance: 8px;
+
   color-scheme: dark;
 }
 

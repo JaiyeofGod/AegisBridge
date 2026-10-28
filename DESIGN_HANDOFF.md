@@ -616,6 +616,21 @@ current functional milestone is stable.
 Do not change API contracts, authentication behavior, permissions,
 or business logic as part of this motion pass.
 
+Motion Phase 1 adds shared tokens only. They live in
+`apps/web/src/styles/tokens.css` and `apps/web/src/lib/motion.ts`.
+No animation library was added. Existing transitions, the Spline scene,
+and the global reduced-motion rule are unchanged. The welcome sequence,
+pointer tilt, and application animations remain proposed.
+
+| Token | Value | Intended use |
+|---|---|---|
+| `--motion-duration-fast` | 150ms | Immediate control feedback |
+| `--motion-duration-standard` | 200ms | Navigation, tabs, drawers, and dialogs |
+| `--motion-duration-cinematic` | 400ms | Welcome copy and artwork crossfades |
+| `--motion-ease-enter` | `cubic-bezier(0, 0, 0.2, 1)` | Ease-out entrances |
+| `--motion-ease-exit` | `cubic-bezier(0.4, 0, 1, 1)` | Ease-in exits |
+| `--motion-distance` | 8px | Maximum subtle travel |
+
 ### 17.13. Acceptance Criteria
 
 The motion pass is complete when:

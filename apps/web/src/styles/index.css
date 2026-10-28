@@ -17,6 +17,11 @@
   --font-body: var(--font-body);
   --radius-control: var(--radius-control);
   --radius-panel: var(--radius-panel);
+  --duration-motion-fast: var(--motion-duration-fast);
+  --duration-motion-standard: var(--motion-duration-standard);
+  --duration-motion-cinematic: var(--motion-duration-cinematic);
+  --ease-motion-enter: var(--motion-ease-enter);
+  --ease-motion-exit: var(--motion-ease-exit);
 }
 
 @layer base {
@@ -62,6 +67,7 @@
     outline-offset: var(--focus-offset);
   }
 
+  /* Matches motionDuration(..., true) in src/lib/motion.ts. */
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
