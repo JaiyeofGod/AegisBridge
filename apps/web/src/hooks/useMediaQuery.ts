@@ -1,4 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+
+import {
+  applyMotionDocumentState,
+  getMotionPreference,
+  prefersReducedMotion,
+  subscribeMotionPreference,
+} from "@/lib/motion-preference";
 
 export function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(() => {
@@ -23,5 +30,16 @@ export function useMediaQuery(query: string): boolean {
 }
 
 export function usePrefersReducedMotion(): boolean {
-  return useMediaQuery("(prefers-reduced-motion: reduce)");
+  const osReduced = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const preference = useSyncExternalStore(
+    subscribeMotionPreference,
+    getMotionPreference,
+    () => "system" as const,
+  );
+
+  useEffect(() => {
+    applyMotionDocumentState(preference, osReduced);
+  }, [preference, osReduced]);
+
+  return prefersReducedMotion(preference, osReduced);
 }

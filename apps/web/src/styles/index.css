@@ -93,6 +93,32 @@
       transform: none !important;
     }
   }
+
+  /* Same stop as the media query, for the Account Preferences "Reduce motion" choice. */
+  :root[data-motion="reduce"],
+  :root[data-motion="reduce"] *,
+  :root[data-motion="reduce"] *::before,
+  :root[data-motion="reduce"] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  :root[data-motion="reduce"] .motion-signin-enter,
+  :root[data-motion="reduce"] .motion-status-enter,
+  :root[data-motion="reduce"] .motion-workspace-loader span:nth-child(2) {
+    animation: none !important;
+  }
+
+  :root[data-motion="reduce"] .motion-glass-primary:hover,
+  :root[data-motion="reduce"] .motion-glass-primary:active,
+  :root[data-motion="reduce"] .motion-surface-interactive:hover,
+  :root[data-motion="reduce"] .motion-surface-interactive:active,
+  :root[data-motion="reduce"] .motion-surface-interactive[aria-pressed="true"]:hover,
+  :root[data-motion="reduce"] .motion-artwork-parallax {
+    transform: none !important;
+  }
 }
 
 @layer utilities {

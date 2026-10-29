@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { AppRouter } from "@/app/router";
+import { MOTION_PREFERENCE_KEY } from "@/lib/motion-preference";
 import { installApiFetch } from "@/test/api-fixtures";
 import { renderWithProviders } from "@/test/render";
 
@@ -145,6 +146,54 @@ describe("Account", () => {
     expect(await screen.findByTestId("preferences-error")).toHaveTextContent(
       /theme must be one of/i,
     );
+  });
+
+  it("stores the motion preference in this browser and keeps it keyboard accessible", async () => {
+    localStorage.removeItem(MOTION_PREFERENCE_KEY);
+    const { inits, calls } = installApiFetch(undefined, { authenticated: true });
+    const user = userEvent.setup();
+    const view = await renderWithProviders(<AppRouter />, {
+      initialEntries: ["/account/preferences"],
+    });
+    const preferences = await screen.findByTestId("account-preferences");
+    const follow = within(preferences).getByRole("radio", { name: "Follow system setting" });
+    const reduce = within(preferences).getByRole("radio", { name: "Reduce motion" });
+
+    expect(preferences).toHaveTextContent(
+      "Reduced motion removes nonessential animation and cinematic effects.",
+    );
+    expect(follow).toBeChecked();
+    expect(reduce).not.toBeChecked();
+    follow.focus();
+    expect(follow).toHaveFocus();
+    await user.keyboard("{ArrowDown}");
+    expect(reduce).toBeChecked();
+    expect(localStorage.getItem(MOTION_PREFERENCE_KEY)).toBe("reduce");
+    expect(document.documentElement.dataset.motion).toBe("reduce");
+
+    view.unmount();
+    const reloaded = await renderWithProviders(<AppRouter />, {
+      initialEntries: ["/account/preferences"],
+    });
+    expect(await screen.findByRole("radio", { name: "Reduce motion" })).toBeChecked();
+
+    localStorage.setItem(MOTION_PREFERENCE_KEY, "always");
+    reloaded.unmount();
+    const restored = await renderWithProviders(<AppRouter />, {
+      initialEntries: ["/account/preferences"],
+    });
+    expect(await screen.findByRole("radio", { name: "Follow system setting" })).toBeChecked();
+
+    await user.click(screen.getByRole("radio", { name: "dark" }));
+    await user.click(screen.getByTestId("preferences-save"));
+    await screen.findByTestId("preferences-success");
+    const patchIndex = calls.findIndex(
+      (url, index) =>
+        url.includes("/api/v1/account/preferences") && inits[index]?.method === "PATCH",
+    );
+    expect(JSON.parse(String(inits[patchIndex]?.body))).toEqual({ theme: "dark" });
+    restored.unmount();
+    localStorage.removeItem(MOTION_PREFERENCE_KEY);
   });
 
   it("renders workspace roles and privileged flag from the API", async () => {

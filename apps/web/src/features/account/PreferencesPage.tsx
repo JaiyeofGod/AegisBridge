@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/buttons/Button";
 import { Panel } from "@/components/cards/Panel";
@@ -11,6 +11,12 @@ import { useAccountPreferencesQuery } from "@/features/account/useAccountData";
 import { accountKeys } from "@/features/auth/auth-keys";
 import { useAuthActions } from "@/features/auth/useAuthSession";
 import { cn } from "@/lib/cn";
+import {
+  getMotionPreference,
+  setMotionPreference,
+  subscribeMotionPreference,
+  type MotionPreference,
+} from "@/lib/motion-preference";
 import { ApiError } from "@/services/api-client";
 import { updateAccountPreferences } from "@/services/account";
 import type { AccountPreferencesUpdate, DensityValue, ThemeValue } from "@/services/api-types";
@@ -26,29 +32,25 @@ export function PreferencesPage() {
 
   const [theme, setTheme] = useState<ThemeValue | null>(null);
   const [density, setDensity] = useState<DensityValue | null>(null);
-  const [reducedMotion, setReducedMotion] = useState<boolean | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const motionPreference = useSyncExternalStore(
+    subscribeMotionPreference,
+    getMotionPreference,
+    () => "system" as const,
+  );
 
   // Reset local drafts when the server snapshot changes after save/refetch.
   useEffect(() => {
     if (!preferences) return;
     setTheme(null);
     setDensity(null);
-    setReducedMotion(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional field snapshot
-  }, [
-    preferences?.theme,
-    preferences?.density,
-    preferences?.reducedMotion,
-    preferences?.updatedAt,
-    preferences?.persistence,
-  ]);
+  }, [preferences?.theme, preferences?.density, preferences?.updatedAt, preferences?.persistence]);
 
   const themeValue = theme ?? (preferences?.theme as ThemeValue | undefined) ?? "system";
   const densityValue =
     density ?? (preferences?.density as DensityValue | undefined) ?? "comfortable";
-  const reducedMotionValue = reducedMotion ?? preferences?.reducedMotion ?? false;
 
   const save = useMutation({
     mutationFn: async () => {
@@ -62,9 +64,6 @@ export function PreferencesPage() {
       if (densityValue !== preferences.density) {
         patch.density = densityValue;
       }
-      if (reducedMotionValue !== preferences.reducedMotion) {
-        patch.reduced_motion = reducedMotionValue;
-      }
       if (Object.keys(patch).length === 0) {
         throw new ApiError("No preference changes to save.", 400, "no_changes");
       }
@@ -75,7 +74,6 @@ export function PreferencesPage() {
       setSuccessMessage("Preferences saved.");
       setTheme(null);
       setDensity(null);
-      setReducedMotion(null);
       queryClient.setQueryData(accountKeys.preferences, result);
       await queryClient.invalidateQueries({ queryKey: accountKeys.preferences });
     },
@@ -108,7 +106,7 @@ export function PreferencesPage() {
     <AccountLayout
       title="Preferences"
       crumb="Preferences"
-      description="Choose how AegisBridge looks. Supported settings are saved to your account."
+      description="Choose how AegisBridge looks. Theme and density are saved to your account. Motion is stored in this browser."
       actions={
         <Button
           type="button"
@@ -189,28 +187,90 @@ export function PreferencesPage() {
                 value={preferences.landingPage}
                 hint="Only overview is supported. Other landing pages are not persisted."
               />
-              <ChoiceGroup
-                label="Reduced motion"
-                value={reducedMotionValue ? "on" : "off"}
-                options={["on", "off"]}
+              <MotionPreference
+                value={motionPreference}
                 onChange={(next) => {
-                  setReducedMotion(next === "on");
+                  setMotionPreference(next);
                   setSuccessMessage(null);
                 }}
-                hint="Saved to your account when you click Save changes."
               />
             </Panel>
             <Panel title="Persistence">
               <p className="text-sm text-[var(--muted)]">
-                Theme, density, and reduced motion are the supported stored fields. After a
-                successful save, values are marked Stored and remain after refresh. Unsupported
-                settings are not sent to the API.
+                Theme and density are saved to your account. After a successful save, those values
+                are marked Stored and remain after refresh. Motion is stored in this browser and
+                applies immediately. Unsupported settings are not sent to the API.
               </p>
             </Panel>
           </div>
         </div>
       ) : null}
     </AccountLayout>
+  );
+}
+
+function MotionPreference({
+  value,
+  onChange,
+}: {
+  value: MotionPreference;
+  onChange: (next: MotionPreference) => void;
+}) {
+  return (
+    <fieldset
+      className="border-b border-[var(--border)] py-4"
+      aria-describedby="motion-preference-description"
+      data-testid="motion-preference"
+    >
+      <legend className="text-xs text-[var(--muted)]">Motion</legend>
+      <p id="motion-preference-description" className="mt-2 text-sm text-[var(--text)]">
+        Reduced motion removes nonessential animation and cinematic effects.
+      </p>
+      <div className="mt-3 space-y-2">
+        <MotionChoice
+          value="system"
+          checked={value === "system"}
+          label="Follow system setting"
+          onChange={onChange}
+        />
+        <MotionChoice
+          value="reduce"
+          checked={value === "reduce"}
+          label="Reduce motion"
+          onChange={onChange}
+        />
+      </div>
+      <p className="mt-2 text-xs text-[var(--muted)]">
+        Stored in this browser and applied immediately. If your operating system asks for reduced
+        motion, that request stays in effect.
+      </p>
+    </fieldset>
+  );
+}
+
+function MotionChoice({
+  value,
+  checked,
+  label,
+  onChange,
+}: {
+  value: MotionPreference;
+  checked: boolean;
+  label: string;
+  onChange: (next: MotionPreference) => void;
+}) {
+  return (
+    <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-[var(--text)]">
+      <input
+        type="radio"
+        name="motion-preference"
+        value={value}
+        checked={checked}
+        onChange={() => onChange(value)}
+        className="size-4 accent-[var(--accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+      />
+      {label}
+    </label>
   );
 }
 

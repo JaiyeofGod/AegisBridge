@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { AppRouter } from "@/app/router";
+import { MOTION_PREFERENCE_KEY, setMotionPreference } from "@/lib/motion-preference";
 import motionCss from "@/styles/index.css?raw";
 import { currentUserFixture, installApiFetch } from "@/test/api-fixtures";
 import { renderWithProviders } from "@/test/render";
@@ -139,6 +140,43 @@ describe("Sign-in page", () => {
     expect(scene.querySelector(".duration-500")).toBeTruthy();
     expect(scene.querySelector(".duration-700")).toBeTruthy();
     expect(within(page).getByRole("textbox", { name: /work email/i })).toBeEnabled();
+  });
+
+  it("uses the static sign-in fallback when the saved preference is reduce", async () => {
+    installApiFetch(undefined, { authenticated: false });
+    stubMatchMedia({ desktop: true, reducedMotion: false, finePointer: true });
+    setMotionPreference("reduce");
+
+    try {
+      await renderWithProviders(<AppRouter />, { initialEntries: ["/signin"] });
+      const page = screen.getByTestId("signin-page");
+      expect(page).toHaveAttribute("data-background", "static-canvas");
+      expect(within(page).queryByTestId("signin-background-video")).not.toBeInTheDocument();
+      expect(within(page).getByTestId("signin-visual")).toHaveAttribute(
+        "data-visual-mode",
+        "static-fallback",
+      );
+      expect(within(page).getByTestId("signin-artwork")).toHaveAttribute("data-parallax", "off");
+      expect(within(page).getByRole("textbox", { name: /work email/i })).toBeEnabled();
+    } finally {
+      localStorage.removeItem(MOTION_PREFERENCE_KEY);
+    }
+  });
+
+  it("keeps sign-in static when the operating system requests reduced motion", async () => {
+    installApiFetch(undefined, { authenticated: false });
+    stubMatchMedia({ desktop: true, reducedMotion: true, finePointer: true });
+    setMotionPreference("system");
+
+    try {
+      await renderWithProviders(<AppRouter />, { initialEntries: ["/signin"] });
+      const page = screen.getByTestId("signin-page");
+      expect(page).toHaveAttribute("data-background", "static-canvas");
+      expect(within(page).queryByTestId("signin-background-video")).not.toBeInTheDocument();
+      expect(within(page).getByTestId("signin-artwork")).toHaveAttribute("data-parallax", "off");
+    } finally {
+      localStorage.removeItem(MOTION_PREFERENCE_KEY);
+    }
   });
 
   it("uses the static canvas instead of video below 1024px", async () => {

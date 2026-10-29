@@ -12,6 +12,17 @@
       rel="stylesheet"
     />
     <title>AegisBridge</title>
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("aegisbridge.motion.v1");
+          var os = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          document.documentElement.dataset.motion = stored === "reduce" || os ? "reduce" : "system";
+        } catch (error) {
+          document.documentElement.dataset.motion = "system";
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
