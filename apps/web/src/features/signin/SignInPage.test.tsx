@@ -67,6 +67,7 @@ describe("Sign-in page", () => {
     const card = within(visual).getByTestId("signin-visual-card");
     expect(card).toBeInTheDocument();
     expect(within(card).getByTestId("signin-scene-fallback")).toBeInTheDocument();
+    expect(within(page).queryByTestId("signin-spline-scene")).not.toBeInTheDocument();
     expect(
       within(page)
         .getByRole("heading", { name: /see the threat/i })
@@ -116,6 +117,8 @@ describe("Sign-in page", () => {
       "data-visual-mode",
       "static-fallback",
     );
+    expect(within(page).queryByTestId("signin-spline-scene")).not.toBeInTheDocument();
+    expect(within(page).getByTestId("signin-scene-fallback")).toBeInTheDocument();
   });
 
   it("no longer serves the cinematic login prototype route", async () => {

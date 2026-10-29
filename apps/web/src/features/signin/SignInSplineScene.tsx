@@ -47,6 +47,10 @@ function neutralizeHtmlOverlay(root: HTMLElement) {
 /**
  * Official @splinetool/react-spline runtime using the self-hosted .splinecode.
  * Mounts immediately so ParentSize can measure the explicit card box.
+ *
+ * Camera framing, light rigs, and pointer behavior are authored in the Spline
+ * editor. This export does not expose a safe runtime variable or follow event
+ * for those, so the React layer only reveals the canvas after load.
  */
 export function SignInSplineScene() {
   const [status, setStatus] = useState<SceneStatus>("loading");
@@ -58,6 +62,9 @@ export function SignInSplineScene() {
       if (root) {
         neutralizeHtmlOverlay(root);
       }
+    } catch {
+      // The scene has already loaded. A background or overlay adjustment must
+      // not be reported as a load failure, or the runtime will hide the canvas.
     } finally {
       setStatus("ready");
     }
