@@ -21,8 +21,33 @@ describe("Auth session guards", () => {
       initialEntries: ["/overview"],
       waitForAuth: false,
     });
-    expect(await screen.findByTestId("auth-loading")).toBeInTheDocument();
+    const loading = await screen.findByTestId("auth-loading");
+    expect(loading).toBeInTheDocument();
+    expect(screen.getByTestId("prominent-loading")).toHaveTextContent("Checking session…");
+    expect(screen.getByRole("status")).toHaveAttribute("aria-busy", "true");
+    expect(loading.querySelectorAll("div.h-12")).toHaveLength(0);
     expect(screen.queryByTestId("overview-page")).not.toBeInTheDocument();
+  });
+
+  it("keeps the sign-in session check on the stable skeleton", async () => {
+    installApiFetch(
+      (url) => {
+        if (url.includes("/api/v1/auth/session")) {
+          return new Promise(() => undefined);
+        }
+        return undefined;
+      },
+      { authenticated: false, allowAuthOverride: true },
+    );
+    await renderWithProviders(<AppRouter />, {
+      initialEntries: ["/signin"],
+      waitForAuth: false,
+    });
+    const loading = await screen.findByTestId("auth-loading");
+    expect(loading).toHaveTextContent("Checking session…");
+    expect(loading.querySelectorAll("div.h-12").length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("prominent-loading")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("signin-page")).not.toBeInTheDocument();
   });
 
   it("redirects unauthenticated users from protected routes to sign-in", async () => {

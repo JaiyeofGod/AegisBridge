@@ -79,7 +79,8 @@
     }
 
     .motion-signin-enter,
-    .motion-status-enter {
+    .motion-status-enter,
+    .motion-workspace-loader span:nth-child(2) {
       animation: none !important;
     }
 
@@ -158,6 +159,33 @@
 
   .motion-status-enter {
     animation: motion-status-enter var(--motion-duration-fast) var(--motion-ease-enter) both;
+  }
+
+  .motion-workspace-loader {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    width: 56px;
+    height: 18px;
+    gap: 5px;
+  }
+
+  .motion-workspace-loader span {
+    display: block;
+    width: 7px;
+    height: 18px;
+    border-radius: 2px;
+    background: var(--raised);
+  }
+
+  .motion-workspace-loader span:nth-child(2) {
+    width: 22px;
+    height: 3px;
+    margin-bottom: 7px;
+    background: var(--accent);
+    transform-origin: center;
+    animation: motion-workspace-loader calc(var(--motion-duration-cinematic) * 4)
+      var(--motion-ease-enter) infinite alternate;
   }
 
   .motion-glass-primary,
@@ -311,6 +339,15 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+@keyframes motion-workspace-loader {
+  from {
+    transform: scaleX(0.4);
+  }
+  to {
+    transform: scaleX(1);
   }
 }
 
