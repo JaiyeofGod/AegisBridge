@@ -23,11 +23,17 @@ vi.mock("@splinetool/react-spline", () => ({
   default: function MockSpline({
     onLoad,
   }: {
-    onLoad?: (app: { setBackgroundColor: (color: string) => void }) => void;
+    onLoad?: (app: {
+      setBackgroundColor: (color: string) => void;
+      canvas: HTMLCanvasElement;
+    }) => void;
   }) {
     if (onLoad) {
       queueMicrotask(() => {
-        onLoad({ setBackgroundColor: () => undefined });
+        const canvas = document.createElement("canvas");
+        const parent = document.createElement("div");
+        parent.appendChild(canvas);
+        onLoad({ setBackgroundColor: () => undefined, canvas });
       });
     }
     return null;

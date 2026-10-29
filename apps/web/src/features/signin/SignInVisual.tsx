@@ -2,19 +2,24 @@ import { SignInSceneFallback } from "@/features/signin/SignInSceneFallback";
 import { SignInSplineScene } from "@/features/signin/SignInSplineScene";
 import { useMediaQuery, usePrefersReducedMotion } from "@/hooks/useMediaQuery";
 
+export const signInCanvasBackground =
+  "bg-[radial-gradient(120%_80%_at_20%_10%,#1b3344_0%,#0c1118_55%,#082126_100%)]";
+
 /**
  * Left brand panel for Sign-in.
  * Padded hero copy at the top; remaining panel is a full-bleed transparent Spline canvas
  * (live on desktop, static fallback for compact / reduced-motion).
  */
-export function SignInVisual() {
+export function SignInVisual({ surface = "canvas" }: { surface?: "canvas" | "clear" }) {
   const prefersReducedMotion = usePrefersReducedMotion();
   const isDesktopViewport = useMediaQuery("(min-width: 1024px)");
   const useLiveScene = isDesktopViewport && !prefersReducedMotion;
 
   return (
     <div
-      className="relative flex h-full min-h-[320px] flex-col overflow-hidden bg-[radial-gradient(120%_80%_at_20%_10%,#1b3344_0%,#0c1118_55%,#082126_100%)] lg:min-h-screen"
+      className={`relative flex h-full min-h-[320px] flex-col overflow-hidden lg:min-h-screen ${
+        surface === "clear" ? "bg-transparent" : signInCanvasBackground
+      }`}
       data-testid="signin-visual"
       data-visual-mode={useLiveScene ? "spline-live" : "static-fallback"}
     >

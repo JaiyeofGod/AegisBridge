@@ -404,252 +404,303 @@ The following areas need further refinement during the relevant phases:
 Preserve the approved visual direction while resolving these gaps.
 
 
-## 17. Animation and Cinematic Motion Plan
+# 17. Motion, Cinematic Login & Micro-Interaction Specification
 
-### 17.1. Goal
+## 17.1 Purpose
 
-Give AegisBridge a polished, cinematic welcome experience and subtle,
-useful motion throughout the application.
+Motion must make AegisBridge feel premium, modern, and responsive without distracting from security work.
 
-Preserve the approved Figma layouts, typography, colors, and navigation.
-Motion should explain changes, guide attention, and strengthen the brand.
+The strongest cinematic experience applies to the sign-in page. Authenticated dashboard pages use short and purposeful motion that helps users understand navigation, loading, selection, and changes of state.
 
-This section is a proposed implementation specification. It does not
-mean these animations have already been built or verified.
+Motion must never make fictional activity appear to be real security telemetry, incidents, vulnerabilities, or alerts.
 
-### 17.2. Tools and Responsibilities
+---
 
-| Tool | Responsibility |
-|---|---|
-| Figma | Reference for layouts, visual states, and interaction annotations |
-| Spline | Camera movement, lighting, and animation inside the existing 3D scene |
-| CSS | Simple hover, focus, opacity, and color transitions |
-| Frontend animation library, if needed | Coordinated entrances, drawers, and scroll-linked sequences |
-| Cursor | Implement, integrate, and verify the motion behavior |
+## 17.2 Motion Technology
 
-No additional Figma plugin is required.
+Cursor must inspect existing dependencies before adding new packages.
 
-Inspect existing frontend dependencies before adding an animation
-library. Use the smallest suitable approach and avoid multiple libraries
-for overlapping tasks.
+Preferred implementation approach:
 
-### 17.3. Motion Levels
+- Use CSS transitions and existing motion tokens for button hover, focus, navigation, loading, and simple state changes.
+- Use the existing Spline implementation for the interactive 3D cybersecurity artwork.
+- Use the downloaded Higgsfield video as a local frontend asset.
+- Do not add multiple animation libraries unless there is a clear approved need.
+- Motion for React may be considered later for coordinated page transitions, but it is not required for the approved sign-in cinematic implementation.
+- GSAP ScrollTrigger may only be considered for a future public product landing page with approved scroll-driven scenes.
 
-Use three levels of motion:
+---
 
-1. Cinematic motion on the welcome page and any future public landing page.
-2. Short interface transitions for navigation, tabs, and drawers.
-3. Minimal feedback for loading, saving, and data updates.
+## 17.3 Cinematic Sign-In Page Structure
 
-Operational screens must remain stable and readable.
+The approved sign-in experience uses a two-layer composition.
 
-### 17.4. Welcome Page Cinematic Sequence
+### Layer 1: Cinematic Background
 
-Preserve the existing “Your Security Workspace” copy and approved layout.
+The looping AegisBridge network video fills the entire browser viewport.
 
-On a fresh page entry:
+Video file:
 
-- Render the sign-in form and static artwork immediately.
-- Gently reveal the heading and supporting copy.
-- Fade in the live Spline scene when it is ready.
-- Run a restrained camera push toward the scene.
-- Continue with subtle cyan pulses along existing connections.
+    apps/web/public/media/aegisbridge-network-loop.mp4
 
-Suggested timing targets:
+The background video provides:
 
-| Element | Behavior | Duration |
-|---|---|---|
-| Heading and supporting copy | Fade with up to 8 px upward movement | 300–450 ms |
-| Sign-in panel | Subtle opacity entrance; controls remain usable | 200–300 ms |
-| Static-to-live artwork | Crossfade without changing layout size | 250–400 ms |
-| Spline camera | Small push toward the protected core | 2–3 seconds |
-| Circuit lighting | Gentle, low-intensity pulse | 6–8 second cycle |
+- Blue-black cybersecurity atmosphere
+- Cyan network pulses
+- Slate infrastructure surfaces
+- Slow, restrained camera movement
+- Silent looping motion
+- No fake company names, fake dashboards, readable security alerts, or invented metrics
 
-Do not wait for the 3D scene before allowing sign-in.
-Do not replay the entrance during typing, validation, or data updates.
+### Layer 2: Existing Sign-In Experience
 
-Keep the full scene visible throughout the camera movement.
-Avoid dramatic zooming, continuous rotation, flashing, and heavy bloom.
+The existing AegisBridge sign-in page remains above the background video:
 
-Camera and lighting changes require access to the editable Spline scene.
-Do not assume the public preview exposes runtime camera controls.
+- Existing welcome copy
+- Existing sign-in form
+- Existing authentication behavior
+- Existing routes
+- Existing `GuestOnly` behavior
+- Existing Spline 3D cybersecurity artwork
+- Existing desktop and mobile layout
 
-### 17.5. Pointer Interaction
+The cinematic video must support the sign-in page. It must not replace the login interface or the existing 3D artwork.
 
-On supported desktop devices, allow a small pointer-responsive tilt
-around the artwork.
+---
 
-- Limit the tilt to approximately 1–2 degrees.
-- Return smoothly to the resting position when the pointer leaves.
-- Apply the effect only to the artwork area.
-- Do not move the sign-in form.
-- Disable it for touch input and reduced-motion preferences.
+## 17.4 Video Background Behavior
 
-Avoid combining strong camera movement, parallax, and tilt.
-The overall composition should remain calm.
+The sign-in video must:
 
-### 17.6. Application Motion
+- Cover the full viewport.
+- Use `autoPlay`, `muted`, `loop`, `playsInline`, and `preload="metadata"`.
+- Use `object-fit: cover`.
+- Remain behind all page content through correct `z-index` layering.
+- Be decorative and use `aria-hidden="true"`.
+- Start without delaying form interaction or authentication checks.
+- Remain silent.
+- Be used only for the approved sign-in cinematic experience unless reused later through an approved design decision.
 
-| Area | Behavior | Suggested duration |
-|---|---|---|
-| Sidebar | Smooth expand/collapse; active-item color transition | 150–220 ms |
-| Tabs | Brief content fade, with minimal movement if useful | 120–180 ms |
-| Drawers | Slide from the appropriate edge with a backdrop fade | 180–250 ms |
-| Dialogs | Short fade with a very small scale change | 150–200 ms |
-| Buttons | Color, border, and pressed-state feedback | 100–150 ms |
-| Toasts | Brief entrance and exit without covering key controls | 150–200 ms |
-| Cyber range selection | Highlight the selected asset and related paths | 150–250 ms |
+A blue-black overlay must sit above the video and behind the foreground interface. The overlay must protect readability of text, labels, input fields, buttons, validation messages, and keyboard focus states.
 
-Use a consistent ease-out curve for entrances and a short ease-in
-curve for exits.
+---
 
-Keep keyboard focus and dialog behavior correct throughout transitions.
-Animations must not delay navigation or block repeated input.
+## 17.5 Responsive and Reduced-Motion Behavior
 
-### 17.7. Tables, Metrics, and Data Updates
+The cinematic background video must not render when:
 
-Keep operational data visually stable.
+- The viewport is narrower than `1024px`.
+- The user enables `prefers-reduced-motion: reduce`.
+- The device cannot reliably support the visual effect.
 
-- Preserve table position during filtering, pagination, and refresh.
-- Use loading indicators appropriate to the request.
-- Respect reduced motion in skeletons and loading effects.
-- Use a brief, restrained highlight when a record changes if useful.
-- Show final metric values immediately.
-- Do not animate numbers through invented intermediate values.
-- Do not replay card entrances on background refresh.
-- Do not animate every table row.
+When video does not render, AegisBridge must use the existing static canvas gradient and existing static Spline fallback.
 
-Motion must not imply healthy integration status, live activity,
-or verified security results when the data does not support that claim.
+Reduced-motion reference:
 
-Decorative Spline pulses represent branding, not operational telemetry.
+    @media (prefers-reduced-motion: reduce)
 
-### 17.8. Cyber Range Motion
+For reduced-motion users:
 
-Begin with the existing 2D segment view.
+- Disable looping video.
+- Disable parallax and pointer tilt.
+- Disable decorative cyan pulse loops.
+- Remove entrance staggers.
+- Keep essential state changes short or instant.
+- Preserve all sign-in functionality, form behavior, and visual hierarchy.
 
-When a user selects an asset:
+---
 
-- Highlight the selected node.
-- Emphasize its related connections.
-- Show the corresponding details.
-- Preserve the user's position and zoom.
+## 17.6 Spline 3D Artwork
 
-Animate threat paths or packet movement only when their meaning is
-defined and the source is clearly identified as live, recorded,
-or simulated.
+The existing Spline cybersecurity artwork remains the primary interactive hero visual.
 
-Custom interactive 3D topology remains a separate feature decision.
-It is not required for this motion pass.
+Do not remove, replace, hide, or downgrade the Spline artwork because of the cinematic background video.
 
-### 17.9. Future Scroll-Driven Landing Page
+Spline behavior:
 
-This subsection applies only if a separate public product landing page
-is approved. It does not authorize creating that page now.
+- Render the live interactive scene only on desktop viewports of at least `1024px`.
+- Use the existing static fallback on smaller screens and for reduced-motion users.
+- Remain visually above the background video.
+- Preserve the existing transparent-canvas behavior.
+- Avoid excessive pointer tilt, camera movement, or distracting animation.
+- Keep all interaction decorative and separate from real security data.
 
-A proposed sequence could introduce:
+The threat-hunter and Splunk-style Higgsfield video is retained as an approved future visual asset for a dedicated landing page, Cyber Range visual, or future campaign page. It is not part of the full-page sign-in background unless explicitly approved later.
 
-1. The protected cybersecurity core.
-2. Connected assets and vulnerability exposure.
-3. Detection and incident response.
-4. Governance, controls, and evidence.
-5. A final demo or sign-in action.
-
-Scrolling may reveal text and move the artwork between a small number
-of deliberate compositions.
-
-Requirements:
-
-- Preserve normal browser scrolling.
-- Do not hijack the scroll wheel.
-- Do not require animation completion to access content.
-- Keep content readable without 3D or JavaScript animation.
-- Avoid long pinned sequences on smaller screens.
-- Do not add scroll-driven camera movement to operational dashboards.
-
-If the Spline export does not support the required scene control,
-use restrained page-level transitions or document an alternative.
-Do not promise scroll-linked 3D behavior before verifying support.
-
-### 17.10. Reduced Motion and User Control
-
-Honor `prefers-reduced-motion`.
-
-With reduced motion enabled:
-
-- Disable camera pushes, parallax, pointer tilt, and traveling pulses.
-- Present the static scene.
-- Replace sliding and scaling with immediate state changes or brief fades.
-- Keep all information and actions available.
-
-Provide a way to pause any ongoing decorative animation.
-If an application motion preference is implemented, it must be able
-to reduce motion beyond the operating-system setting.
-
-### 17.11. Performance and Fallbacks
-
-- Preserve the existing static artwork fallback.
-- Keep the current desktop-only 3D loading rule unless explicitly revised.
-- Do not introduce a second renderer for the same brand scene.
-- Prefer transform and opacity for frontend movement.
-- Avoid large animated blurs and expensive continuous effects.
-- Reserve artwork dimensions to prevent layout shifts.
-- Pause or unload unnecessary scene activity when it is offscreen
-  or the browser tab is hidden, where supported.
-- Verify behavior on the project's Intel MacBook Pro.
-- Keep navigation and authentication usable if animation fails.
-
-### 17.12. Implementation Order
-
-Implement this as a separate, reviewable UI enhancement after the
-current functional milestone is stable.
-
-1. Inspect existing motion, Spline integration, and dependencies.
-2. Establish shared timing and easing tokens.
-3. Add button, sidebar, tab, and drawer transitions.
-4. Add the welcome-page text entrance.
-5. Refine the Spline camera and lighting in the editable scene.
-6. Integrate the verified scene and static-to-live transition.
-7. Add reduced-motion behavior and animation controls.
-8. Verify performance, keyboard access, and existing workflows.
-
-Do not change API contracts, authentication behavior, permissions,
-or business logic as part of this motion pass.
-
-Motion Phase 1 adds shared tokens only. They live in
-`apps/web/src/styles/tokens.css` and `apps/web/src/lib/motion.ts`.
-No animation library was added. The global reduced-motion rule is unchanged.
-
-Motion Phase 2 applies those tokens with CSS. Buttons and tab triggers
-use the fast duration. Sidebar active color and the mobile navigation
-drawer use the standard duration. Tab panels fade in by half the
-8px distance. Radix Dialog remains the mobile drawer. The welcome
-sequence, pointer tilt, Spline camera, toasts, and data animations
-remain proposed.
-
-| Token | Value | Intended use |
-|---|---|---|
-| `--motion-duration-fast` | 150ms | Immediate control feedback |
-| `--motion-duration-standard` | 200ms | Navigation, tabs, drawers, and dialogs |
-| `--motion-duration-cinematic` | 400ms | Welcome copy and artwork crossfades |
-| `--motion-ease-enter` | `cubic-bezier(0, 0, 0.2, 1)` | Ease-out entrances |
-| `--motion-ease-exit` | `cubic-bezier(0.4, 0, 1, 1)` | Ease-in exits |
-| `--motion-distance` | 8px | Maximum subtle travel |
-
-### 17.13. Acceptance Criteria
-
-The motion pass is complete when:
-
-- The approved visual design remains recognizable.
-- Sign-in is usable immediately.
-- Navigation and form input are not delayed.
-- Tables and metrics remain stable.
-- The Spline scene has a working static fallback.
-- Reduced-motion preferences are respected.
-- Ongoing decorative animation can be paused.
-- Motion does not misrepresent security data.
-- Existing functional checks still pass.
-- Browser review confirms no clipping, layout shifts, or new errors.
-
-Record which effects were implemented, which were verified,
-and which remain proposed.
+---
+
+## 17.7 Button Glass and Glossy Hover Effects
+
+AegisBridge buttons should use subtle glass and glossy effects that fit the existing blue-black and cyan visual system.
+
+### Primary Buttons
+
+Primary buttons must:
+
+- Brighten slightly on hover.
+- Add a restrained cyan edge glow.
+- Add a faint glossy internal highlight.
+- Move upward no more than `1–2px`.
+- Use a `100ms–150ms` transition.
+- Return to the resting position when clicked.
+- Preserve visible keyboard focus states.
+- Remain readable at all times.
+
+### Secondary Buttons
+
+Secondary buttons must:
+
+- Use a subtle surface brightening effect on hover.
+- Increase border contrast slightly.
+- Avoid strong glow effects.
+- Maintain a clear disabled state.
+- Keep motion under `150ms`.
+
+### Glass Button Behavior
+
+    Default: dark elevated surface with restrained border
+    Hover: brighter border, faint cyan reflection, small lift
+    Pressed: return to resting position with slightly reduced brightness
+    Focus: visible cyan focus ring
+    Disabled: no lift, no glow, reduced contrast
+
+---
+
+## 17.8 Glass Cards and Interactive Surface Effects
+
+Clickable cards, panels, and navigation surfaces may use restrained glass feedback.
+
+Allowed effects:
+
+- Slight border brightening on hover.
+- Soft internal reflection.
+- Faint cyan light edge.
+- Surface lift of no more than `2px`.
+- Short `150ms–220ms` transition.
+
+Do not apply card lift, glossy effects, or floating behavior to:
+
+- Dense data tables
+- Audit records
+- Incident timelines
+- Compliance evidence
+- Investigation logs
+- High-volume operational data
+
+Visual effects must help users identify what is interactive without making the platform feel like a game.
+
+---
+
+## 17.9 Entrance Motion
+
+Use entrance motion only when it helps establish hierarchy.
+
+| Element | Motion | Duration |
+|---|---|---:|
+| Sign-in background video | Gentle fade in | 400–700ms |
+| Sign-in foreground content | Fade and rise up to 8px | 300–450ms |
+| Page headings | Fade and rise up to 8px | 300–450ms |
+| Summary cards | Short staggered fade | 250–400ms |
+| Side panels | Fade or slide from edge | 180–250ms |
+| Drawers | Slide from right or left | 180–250ms |
+| Dialogs | Fade and slight scale | 150–200ms |
+| Tabs | Content crossfade | 120–180ms |
+| Toasts | Fade and rise slightly | 150–200ms |
+
+Do not replay page-entry animations every time a user returns to the same dashboard page during one session.
+
+---
+
+## 17.10 Loaders and Data Feedback
+
+Loading states must feel smooth while preserving stable layout.
+
+Use:
+
+- Skeleton loaders for cards, tables, detail panels, and dashboard sections.
+- Low-contrast cyan shimmer only when content is actually loading.
+- Stable table and card dimensions to prevent layout jumping.
+- Brief success feedback after completed actions.
+- Clear inline validation feedback for forms.
+
+Do not:
+
+- Animate numbers through fake intermediate values.
+- Use decorative pulses that look like live threat detection.
+- Move table rows while users are reading.
+- Replay loading animation after data has already loaded.
+- Invent security events, findings, risk scores, or system status.
+
+---
+
+## 17.11 Dashboard Motion Rules
+
+Authenticated dashboard areas must prioritize clarity, speed, and investigation work.
+
+Use motion for:
+
+- Sidebar expand and collapse
+- Active navigation state
+- Tabs
+- Drawer opening and closing
+- Dialogs
+- Toast notifications
+- Button and control feedback
+- Loading states
+- Cyber Range asset selection
+- Asset relationship highlighting
+- Filter-chip appearance
+- Expand and collapse controls
+
+Avoid motion for:
+
+- Threat counts
+- Vulnerability totals
+- Compliance scores
+- Incident severity labels
+- Audit records
+- Investigation timestamps
+- Dense tables
+- Critical status messages
+
+Any security state displayed in the dashboard must come from real application data.
+
+---
+
+## 17.12 Parallax, Pointer Motion and 3D Interaction
+
+Parallax and 3D effects are allowed only in decorative areas.
+
+Allowed:
+
+- Subtle pointer movement in the Spline cybersecurity scene.
+- Slow background light movement on the sign-in page.
+- Slight pointer shift in decorative hero artwork.
+- Future approved landing-page scroll scenes.
+
+Limits:
+
+- Pointer tilt must remain under `1–2 degrees`.
+- Do not hijack browser scrolling.
+- Do not move forms, dashboards, tables, dialogs, or alert content with scrolling.
+- Do not tilt text-heavy cards.
+- Do not create effects that reduce readability or cause motion discomfort.
+
+---
+
+## 17.13 Acceptance Criteria
+
+The cinematic and motion implementation is complete when:
+
+- `/signin` uses the approved full-page looping background video on desktop.
+- The background video is stored locally at `apps/web/public/media/aegisbridge-network-loop.mp4`.
+- The foreground sign-in page remains fully usable.
+- The existing Spline 3D artwork remains above the video.
+- Authentication behavior, routes, and API communication remain unchanged.
+- Mobile and reduced-motion users receive the existing static fallback.
+- Buttons include restrained glossy, glass, hover, pressed, disabled, and keyboard-focus states.
+- Interactive cards and panels use motion only where it improves usability.
+- Dashboard motion remains quiet and does not interfere with investigation work.
+- No motion or visual effect fabricates real security activity.
+- The temporary prototype route is removed after approval.
+- Prettier, ESLint, TypeScript typecheck, and relevant sign-in tests pass.

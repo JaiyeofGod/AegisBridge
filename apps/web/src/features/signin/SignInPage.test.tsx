@@ -6,6 +6,23 @@ import { AppRouter } from "@/app/router";
 import { currentUserFixture, installApiFetch } from "@/test/api-fixtures";
 import { renderWithProviders } from "@/test/render";
 
+function stubMatchMedia({ desktop, reducedMotion }: { desktop: boolean; reducedMotion: boolean }) {
+  window.matchMedia = ((query: string) => ({
+    matches: query.includes("prefers-reduced-motion")
+      ? reducedMotion
+      : query.includes("min-width: 1024px")
+        ? desktop
+        : false,
+    media: query,
+    onchange: null,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => false,
+  })) as typeof window.matchMedia;
+}
+
 describe("Sign-in page", () => {
   it("renders welcome copy and form controls when unauthenticated", async () => {
     installApiFetch(undefined, { authenticated: false });
@@ -27,23 +44,63 @@ describe("Sign-in page", () => {
 
   it("uses static scene fallback when reduced motion is preferred", async () => {
     installApiFetch(undefined, { authenticated: false });
-    window.matchMedia = ((query: string) => ({
-      matches: query.includes("prefers-reduced-motion"),
-      media: query,
-      onchange: null,
-      addEventListener: () => undefined,
-      removeEventListener: () => undefined,
-      addListener: () => undefined,
-      removeListener: () => undefined,
-      dispatchEvent: () => false,
-    })) as typeof window.matchMedia;
+    stubMatchMedia({ desktop: true, reducedMotion: true });
 
     await renderWithProviders(<AppRouter />, { initialEntries: ["/signin"] });
-    const visual = screen.getByTestId("signin-visual");
+    const page = screen.getByTestId("signin-page");
+    expect(page).toHaveAttribute("data-background", "static-canvas");
+    expect(within(page).getByTestId("signin-static-background")).toBeInTheDocument();
+    expect(within(page).getByTestId("signin-readability-overlay")).toBeInTheDocument();
+    expect(within(page).queryByTestId("signin-background-video")).not.toBeInTheDocument();
+    const visual = within(page).getByTestId("signin-visual");
     expect(visual).toHaveAttribute("data-visual-mode", "static-fallback");
     const card = within(visual).getByTestId("signin-visual-card");
     expect(card).toBeInTheDocument();
     expect(within(card).getByTestId("signin-scene-fallback")).toBeInTheDocument();
+  });
+
+  it("plays the looping background video on desktop when motion is allowed", async () => {
+    installApiFetch(undefined, { authenticated: false });
+    stubMatchMedia({ desktop: true, reducedMotion: false });
+
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/signin"] });
+    const page = screen.getByTestId("signin-page");
+    expect(page).toHaveAttribute("data-background", "video");
+    const video = within(page).getByTestId("signin-background-video");
+    expect(video).toHaveAttribute(
+      "src",
+      expect.stringContaining("/media/aegisbridge-network-loop.mp4"),
+    );
+    expect(video).toHaveAttribute("autoplay");
+    expect(video).toHaveProperty("muted", true);
+    expect(video).toHaveAttribute("loop");
+    expect(video).toHaveAttribute("playsinline");
+    expect(within(page).getByTestId("signin-readability-overlay")).toBeInTheDocument();
+    expect(within(page).queryByTestId("signin-static-background")).not.toBeInTheDocument();
+    expect(within(page).getByTestId("signin-spline-scene")).toBeInTheDocument();
+    expect(within(page).getByRole("textbox", { name: /work email/i })).toBeInTheDocument();
+  });
+
+  it("uses the static canvas instead of video below 1024px", async () => {
+    installApiFetch(undefined, { authenticated: false });
+    stubMatchMedia({ desktop: false, reducedMotion: false });
+
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/signin"] });
+    const page = screen.getByTestId("signin-page");
+    expect(page).toHaveAttribute("data-background", "static-canvas");
+    expect(within(page).getByTestId("signin-static-background")).toBeInTheDocument();
+    expect(within(page).queryByTestId("signin-background-video")).not.toBeInTheDocument();
+    expect(within(page).getByTestId("signin-visual")).toHaveAttribute(
+      "data-visual-mode",
+      "static-fallback",
+    );
+  });
+
+  it("no longer serves the cinematic login prototype route", async () => {
+    installApiFetch(undefined, { authenticated: false });
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/prototype/cinematic-login"] });
+    expect(await screen.findByTestId("signin-page")).toBeInTheDocument();
+    expect(screen.queryByTestId("cinematic-login-prototype")).not.toBeInTheDocument();
   });
 
   it("signs in with credentials include and navigates to overview", async () => {
