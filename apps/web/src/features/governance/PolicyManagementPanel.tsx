@@ -1039,7 +1039,11 @@ export function PolicyManagementPanel({ canRead, canManage, canApprove, onOpenCo
         </div>
       ) : null}
       {successMessage ? (
-        <p className="text-sm text-[var(--accent)]" data-testid="policy-success" role="status">
+        <p
+          className="motion-status-enter text-sm text-[var(--accent)]"
+          data-testid="policy-success"
+          role="status"
+        >
           {successMessage}
         </p>
       ) : null}

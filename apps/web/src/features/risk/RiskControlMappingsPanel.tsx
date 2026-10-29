@@ -494,7 +494,7 @@ export function RiskControlMappingsPanel({ riskId, mappings, canManage, status, 
 
       {successMessage ? (
         <p
-          className="text-sm text-[var(--accent)]"
+          className="motion-status-enter text-sm text-[var(--accent)]"
           data-testid="risk-control-mapping-success"
           role="status"
         >

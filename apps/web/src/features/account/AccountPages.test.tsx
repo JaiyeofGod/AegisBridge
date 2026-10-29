@@ -96,7 +96,10 @@ describe("Account", () => {
     await user.click(within(preferences).getByRole("radio", { name: "dark" }));
     await user.click(screen.getByTestId("preferences-save"));
 
-    expect(await screen.findByTestId("preferences-success")).toHaveTextContent("Preferences saved");
+    const saved = await screen.findByTestId("preferences-success");
+    expect(saved).toHaveTextContent("Preferences saved");
+    expect(saved).toHaveAttribute("role", "status");
+    expect(saved).toHaveClass("motion-status-enter");
     expect(await screen.findByTestId("preferences-persistence")).toHaveTextContent("Stored");
 
     const patchIndex = calls.findIndex(

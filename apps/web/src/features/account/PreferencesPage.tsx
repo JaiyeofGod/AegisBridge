@@ -146,7 +146,7 @@ export function PreferencesPage() {
           </div>
           {successMessage ? (
             <p
-              className="text-sm text-[var(--accent)]"
+              className="motion-status-enter text-sm text-[var(--accent)]"
               role="status"
               data-testid="preferences-success"
             >

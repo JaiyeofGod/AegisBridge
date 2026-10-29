@@ -254,7 +254,11 @@ export function RemediationEditor({
         ) : null}
       </div>
       {successMessage ? (
-        <p className="text-sm text-[var(--accent)]" role="status" data-testid="remediation-success">
+        <p
+          className="motion-status-enter text-sm text-[var(--accent)]"
+          role="status"
+          data-testid="remediation-success"
+        >
           {successMessage}
         </p>
       ) : null}

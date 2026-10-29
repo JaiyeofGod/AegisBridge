@@ -147,7 +147,11 @@ export function UserStatusEditor({ userId, status, updatedAt, canManage }: Props
         requires confirmation.
       </p>
       {successMessage ? (
-        <p className="text-sm text-[var(--accent)]" data-testid="user-status-success" role="status">
+        <p
+          className="motion-status-enter text-sm text-[var(--accent)]"
+          data-testid="user-status-success"
+          role="status"
+        >
           {successMessage}
         </p>
       ) : null}

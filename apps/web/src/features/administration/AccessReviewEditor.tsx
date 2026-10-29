@@ -162,7 +162,7 @@ export function AccessReviewEditor({ reviewId, name, status, updatedAt, canManag
       </p>
       {successMessage ? (
         <p
-          className="text-sm text-[var(--accent)]"
+          className="motion-status-enter text-sm text-[var(--accent)]"
           data-testid="access-review-success"
           role="status"
         >

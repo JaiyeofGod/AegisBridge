@@ -304,7 +304,7 @@ export function ControlTestPanel({ controlId, tests, canManage }: Props) {
 
       {successMessage ? (
         <p
-          className="text-sm text-[var(--accent)]"
+          className="motion-status-enter text-sm text-[var(--accent)]"
           data-testid="control-test-success"
           role="status"
         >

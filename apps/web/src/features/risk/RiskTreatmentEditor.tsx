@@ -230,7 +230,11 @@ export function RiskTreatmentEditor({
         ) : null}
       </div>
       {successMessage ? (
-        <p className="text-sm text-[var(--accent)]" role="status" data-testid="treatment-success">
+        <p
+          className="motion-status-enter text-sm text-[var(--accent)]"
+          role="status"
+          data-testid="treatment-success"
+        >
           {successMessage}
         </p>
       ) : null}

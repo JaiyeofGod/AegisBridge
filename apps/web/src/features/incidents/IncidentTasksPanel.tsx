@@ -314,7 +314,11 @@ export function IncidentTasksPanel({ incidentId, incidentStatus, openTaskCount }
         </div>
       ) : null}
       {successMessage ? (
-        <p className="text-sm text-[var(--text)]" data-testid="task-success" role="status">
+        <p
+          className="motion-status-enter text-sm text-[var(--text)]"
+          data-testid="task-success"
+          role="status"
+        >
           {successMessage}
         </p>
       ) : null}

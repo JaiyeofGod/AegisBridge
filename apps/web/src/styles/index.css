@@ -78,7 +78,8 @@
       scroll-behavior: auto !important;
     }
 
-    .motion-signin-enter {
+    .motion-signin-enter,
+    .motion-status-enter {
       animation: none !important;
     }
 
@@ -153,6 +154,10 @@
   .motion-signin-enter {
     animation: motion-signin-enter var(--motion-duration-cinematic) var(--motion-ease-enter) both;
     pointer-events: auto;
+  }
+
+  .motion-status-enter {
+    animation: motion-status-enter var(--motion-duration-fast) var(--motion-ease-enter) both;
   }
 
   .motion-glass-primary,
@@ -302,6 +307,17 @@
   from {
     opacity: 0;
     transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes motion-status-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, calc(var(--motion-distance) / 2), 0);
   }
   to {
     opacity: 1;

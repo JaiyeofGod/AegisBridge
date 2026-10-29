@@ -405,7 +405,7 @@ export function PolicyControlMappingsPanel({
 
       {successMessage ? (
         <p
-          className="text-sm text-[var(--accent)]"
+          className="motion-status-enter text-sm text-[var(--accent)]"
           data-testid="policy-mapping-success"
           role="status"
         >

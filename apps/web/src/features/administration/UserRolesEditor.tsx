@@ -159,7 +159,11 @@ export function UserRolesEditor({ userId, roleNames, updatedAt, canManageRoles }
         not supported.
       </p>
       {successMessage ? (
-        <p className="text-sm text-[var(--accent)]" data-testid="user-roles-success" role="status">
+        <p
+          className="motion-status-enter text-sm text-[var(--accent)]"
+          data-testid="user-roles-success"
+          role="status"
+        >
           {successMessage}
         </p>
       ) : null}

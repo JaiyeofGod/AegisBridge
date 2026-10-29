@@ -298,7 +298,11 @@ export function IncidentEditor({
         ) : null}
       </div>
       {successMessage ? (
-        <p className="text-sm text-[var(--accent)]" role="status" data-testid="incident-success">
+        <p
+          className="motion-status-enter text-sm text-[var(--accent)]"
+          role="status"
+          data-testid="incident-success"
+        >
           {successMessage}
         </p>
       ) : null}

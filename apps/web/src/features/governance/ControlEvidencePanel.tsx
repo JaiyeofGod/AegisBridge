@@ -443,7 +443,7 @@ export function ControlEvidencePanel({
 
       {successMessage ? (
         <p
-          className="text-sm text-[var(--accent)]"
+          className="motion-status-enter text-sm text-[var(--accent)]"
           data-testid="control-evidence-success"
           role="status"
         >

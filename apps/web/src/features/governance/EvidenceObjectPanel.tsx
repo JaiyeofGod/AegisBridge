@@ -412,7 +412,7 @@ export function EvidenceObjectPanel({
 
       {statusMessage ? (
         <p
-          className="text-sm text-[var(--accent)]"
+          className="motion-status-enter text-sm text-[var(--accent)]"
           data-testid="evidence-object-success"
           role="status"
         >
