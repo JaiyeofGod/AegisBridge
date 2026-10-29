@@ -1,11 +1,19 @@
-"""Cyber-range reads. Catalog only; Lenovo stays private and disconnected."""
+"""Cyber-range catalog reads and documented relationship writes.
 
-from datetime import datetime
+Relationship writes are catalog associations. They are not live reachability,
+observed traffic, or remote lab control.
+"""
+
+from datetime import UTC, datetime
+from typing import NoReturn
+from uuid import UUID
 
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.errors import not_found
+from app.api.errors import ApiError, not_found
+from app.core.config import get_settings
 from app.models.cyber_range import (
     LabScenario,
     LabScenarioAttackMapping,
@@ -27,10 +35,20 @@ from app.schemas.cyber_range import (
     LabSystemDetail,
     LabSystemListItem,
     LabSystemRelationshipItem,
+    LabSystemRelationshipWrite,
     LabTelemetryItem,
     LabZoneItem,
 )
-from app.services.support import PageParams, like_pattern, page, paginate, require_choice
+from app.security.rbac import AuthenticatedPrincipal
+from app.services.audit_write import record_audit_event
+from app.services.support import (
+    PageParams,
+    like_pattern,
+    next_human_id,
+    page,
+    paginate,
+    require_choice,
+)
 
 SUMMARY_SEMANTICS = (
     "DEVELOPMENT / SEEDED cyber-range catalog. "
@@ -212,6 +230,248 @@ def list_system_relationships(
             for row in rows
         ],
     )
+
+
+def _relationship_item(row: LabSystemRelationship) -> LabSystemRelationshipItem:
+    return LabSystemRelationshipItem(
+        id=row.human_id,
+        source_system_id=row.source_system.human_id,
+        target_system_id=row.target_system.human_id,
+        relationship_kind=row.relationship_kind,
+    )
+
+
+def _require_relationship_kind(kind: str) -> str:
+    normalized = kind.strip()
+    if normalized not in RELATIONSHIP_KINDS:
+        raise ApiError(
+            422,
+            "validation_error",
+            "Relationship kind must be connected_to, depends_on, manages, or monitors.",
+        )
+    return normalized
+
+
+def _require_lab_system(session: Session, system_id: str) -> LabSystem:
+    row = session.scalar(select(LabSystem).where(LabSystem.human_id == system_id.strip()))
+    if row is None:
+        raise not_found("Lab system", system_id.strip())
+    return row
+
+
+def _reject_duplicate(
+    session: Session,
+    *,
+    source: LabSystem,
+    target: LabSystem,
+    kind: str,
+    except_id: UUID | None = None,
+) -> None:
+    statement = select(LabSystemRelationship.id).where(
+        LabSystemRelationship.source_system_id == source.id,
+        LabSystemRelationship.target_system_id == target.id,
+        LabSystemRelationship.relationship_kind == kind,
+    )
+    if except_id is not None:
+        statement = statement.where(LabSystemRelationship.id != except_id)
+    if session.scalar(statement) is not None:
+        raise ApiError(
+            409,
+            "conflict",
+            "That catalog relationship is already stored.",
+        )
+
+
+def _constraint_name(exc: IntegrityError) -> str:
+    orig = getattr(exc, "orig", None)
+    diag = getattr(orig, "diag", None)
+    name = getattr(diag, "constraint_name", None)
+    return name if isinstance(name, str) else ""
+
+
+def _raise_relationship_integrity(exc: IntegrityError) -> NoReturn:
+    name = _constraint_name(exc)
+    if "source_target_kind" in name:
+        raise ApiError(
+            409,
+            "conflict",
+            "That catalog relationship is already stored.",
+        ) from exc
+    if "distinct_systems" in name:
+        raise ApiError(
+            422,
+            "validation_error",
+            "A catalog relationship cannot use the same system as source and target.",
+        ) from exc
+    if "relationship_kind" in name:
+        raise ApiError(
+            422,
+            "validation_error",
+            "Relationship kind must be connected_to, depends_on, manages, or monitors.",
+        ) from exc
+    if name.startswith("fk_lab_system_relationships_"):
+        raise not_found("Lab system", "referenced system") from exc
+    raise ApiError(
+        409,
+        "conflict",
+        "The catalog relationship could not be saved. Refresh and try again.",
+    ) from exc
+
+
+def _audit_relationship(
+    session: Session,
+    principal: AuthenticatedPrincipal,
+    *,
+    organization_id: UUID,
+    action: str,
+    relationship_id: str,
+    detail: str,
+) -> None:
+    settings = get_settings()
+    record_audit_event(
+        session,
+        organization_id=organization_id,
+        action=action,
+        object_type="lab_system_relationship",
+        object_id=relationship_id,
+        result="success",
+        actor_user_id=principal.user_id,
+        actor_label=principal.human_id,
+        environment_name=settings.app_env,
+        detail=detail,
+    )
+
+
+def create_system_relationship(
+    session: Session,
+    principal: AuthenticatedPrincipal,
+    body: LabSystemRelationshipWrite,
+) -> LabSystemRelationshipItem:
+    kind = _require_relationship_kind(body.relationship_kind)
+    source = _require_lab_system(session, body.source_system_id)
+    target = _require_lab_system(session, body.target_system_id)
+    if source.id == target.id:
+        raise ApiError(
+            422,
+            "validation_error",
+            "A catalog relationship cannot use the same system as source and target.",
+        )
+    _reject_duplicate(session, source=source, target=target, kind=kind)
+    row = LabSystemRelationship(
+        human_id=next_human_id(session, LabSystemRelationship.human_id, "REL"),
+        source_system_id=source.id,
+        target_system_id=target.id,
+        relationship_kind=kind,
+    )
+    session.add(row)
+    try:
+        session.flush()
+    except IntegrityError as exc:
+        session.rollback()
+        _raise_relationship_integrity(exc)
+    row.source_system = source
+    row.target_system = target
+    _audit_relationship(
+        session,
+        principal,
+        organization_id=source.organization_id,
+        action="LAB_RELATIONSHIP_CREATE",
+        relationship_id=row.human_id,
+        detail=(
+            f"Documented catalog relationship {row.human_id}: "
+            f"{source.human_id} {kind} {target.human_id}. Not live reachability."
+        ),
+    )
+    session.commit()
+    return _relationship_item(row)
+
+
+def update_system_relationship(
+    session: Session,
+    principal: AuthenticatedPrincipal,
+    relationship_id: str,
+    body: LabSystemRelationshipWrite,
+) -> LabSystemRelationshipItem:
+    row = session.scalar(
+        select(LabSystemRelationship)
+        .where(LabSystemRelationship.human_id == relationship_id)
+        .options(
+            selectinload(LabSystemRelationship.source_system),
+            selectinload(LabSystemRelationship.target_system),
+        )
+        .with_for_update()
+    )
+    if row is None:
+        raise not_found("Catalog relationship", relationship_id)
+    kind = _require_relationship_kind(body.relationship_kind)
+    source = _require_lab_system(session, body.source_system_id)
+    target = _require_lab_system(session, body.target_system_id)
+    if source.id == target.id:
+        raise ApiError(
+            422,
+            "validation_error",
+            "A catalog relationship cannot use the same system as source and target.",
+        )
+    _reject_duplicate(session, source=source, target=target, kind=kind, except_id=row.id)
+    row.source_system_id = source.id
+    row.target_system_id = target.id
+    row.relationship_kind = kind
+    row.source_system = source
+    row.target_system = target
+    row.updated_at = datetime.now(UTC)
+    try:
+        session.flush()
+    except IntegrityError as exc:
+        session.rollback()
+        _raise_relationship_integrity(exc)
+    _audit_relationship(
+        session,
+        principal,
+        organization_id=source.organization_id,
+        action="LAB_RELATIONSHIP_UPDATE",
+        relationship_id=row.human_id,
+        detail=(
+            f"Updated documented catalog relationship {row.human_id}: "
+            f"{source.human_id} {kind} {target.human_id}. Not live reachability."
+        ),
+    )
+    session.commit()
+    return _relationship_item(row)
+
+
+def delete_system_relationship(
+    session: Session,
+    principal: AuthenticatedPrincipal,
+    relationship_id: str,
+) -> LabSystemRelationshipItem:
+    row = session.scalar(
+        select(LabSystemRelationship)
+        .where(LabSystemRelationship.human_id == relationship_id)
+        .options(
+            selectinload(LabSystemRelationship.source_system),
+            selectinload(LabSystemRelationship.target_system),
+        )
+        .with_for_update()
+    )
+    if row is None:
+        raise not_found("Catalog relationship", relationship_id)
+    item = _relationship_item(row)
+    organization_id = row.source_system.organization_id
+    session.delete(row)
+    _audit_relationship(
+        session,
+        principal,
+        organization_id=organization_id,
+        action="LAB_RELATIONSHIP_DELETE",
+        relationship_id=item.id,
+        detail=(
+            f"Removed documented catalog relationship {item.id}: "
+            f"{item.source_system_id} {item.relationship_kind} {item.target_system_id}. "
+            "Systems were not deleted."
+        ),
+    )
+    session.commit()
+    return item
 
 
 def get_system(session: Session, system_id: str) -> LabSystemDetail:

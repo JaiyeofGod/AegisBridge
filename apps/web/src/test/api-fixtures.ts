@@ -117,6 +117,8 @@ export const currentUserFixture = {
     "incident.close",
     "vulnerability.read",
     "vulnerability.manage",
+    "cyber_range.read",
+    "cyber_range.manage",
   ],
   privileged: true,
   organization: "AegisBridge Technologies",

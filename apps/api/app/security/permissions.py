@@ -58,6 +58,7 @@ PERMISSION_CATALOG: Final[dict[str, str]] = {
     "dataset.read": "Read dataset registry metadata.",
     "dataset.manage": "Manage dataset registry metadata.",
     "cyber_range.read": "Read cyber-range catalog metadata.",
+    "cyber_range.manage": "Create, update, or delete documented cyber-range catalog relationships.",
     "audit.read": "Read audit history.",
 }
 
@@ -138,6 +139,7 @@ ROLE_PERMISSIONS: Final[dict[str, frozenset[str]]] = {
             "integration.read",
             "integration.manage",
             "cyber_range.read",
+            "cyber_range.manage",
             "dataset.read",
             "dataset.manage",
             "report.read",

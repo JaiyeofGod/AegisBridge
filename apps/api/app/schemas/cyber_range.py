@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.common import RelatedRecord
 
@@ -66,6 +66,14 @@ class LabSystemRelationshipItem(BaseModel):
     source_system_id: str
     target_system_id: str
     relationship_kind: str
+
+
+class LabSystemRelationshipWrite(BaseModel):
+    """Documented catalog association. Not detected connectivity."""
+
+    source_system_id: str = Field(min_length=1, max_length=32)
+    target_system_id: str = Field(min_length=1, max_length=32)
+    relationship_kind: str = Field(min_length=1, max_length=32)
 
 
 class LabSystemDetail(LabSystemListItem):

@@ -35,7 +35,7 @@ Audit date: 24 Oct 2026 (updated after Research experiment results on `/reports`
 | Credentials | `credentials: "include"` on all API client fetches. CSRF token never in localStorage/sessionStorage. |
 | Route guards | `RequireAuth` / `GuestOnly` — **UX only**. Not the security boundary. |
 | Domain GET authz | Enforced on the backend. Frontend still uses server permission labels for UX. |
-| Remaining writes / MFA / SSO | Integration credentials, reports, and cyber-range writes still deferred. |
+| Remaining writes / MFA / SSO | Integration credentials and reports still deferred. Cyber Range catalog relationship create, update, and delete are wired for `cyber_range.manage` with the existing session and CSRF client. Remote control, scenario execution, connectivity changes, inference, live discovery, Wazuh/Suricata-generated relationships, attack paths, graph drag editing, and bulk management remain deferred. |
 
 Development sign-in hint shows seeded email `amara.okonkwo@aegisbridge.example` only. The development password is never rendered.
 
@@ -61,7 +61,7 @@ Development sign-in hint shows seeded email `amara.okonkwo@aegisbridge.example` 
 | `/soc` | Protected (UX). |
 | `/incidents` | Protected (UX). Incident fields editable with `incident.manage`. Response Tasks use `TASK-NNNN`, server pagination/status filter, and `incident.manage` for create/edit/complete/reopen/cancel. Assignee selection uses the operational directory when `directory.read` is also present. |
 | `/threat-intelligence` | Protected (UX). Indicators, advisories, enrichment, and sources stay on the page. The indicator list is server-paged (25) and shows value, type, source, last seen, and status. The selected row loads detail for subtype, data origin (external feed or simulated), threat type, malware family, tags, source status, source confidence, fetch time, and a source reference link. Indicator URL values stay plain text. `threat_intel.read` adds a MITRE ATT&CK tab: pinned Enterprise 20.0 tactics and techniques, server-side search, tactic filter, sub-techniques, pagination, and read-only detail. Revoked and deprecated rows stay out of the default list. |
-| `/cyber-range` | Protected (UX). Controls still disabled. |
+| `/cyber-range` | Protected (UX). Stored relationships stay visible with `cyber_range.read`. Create, update, and delete of one documented catalog relationship require `cyber_range.manage`. Backend authorization is authoritative. Remote control and scenario execution stay disabled. |
 | `/reports` | Protected (UX). Research tab lists stored experiments and loads one detail (`dataset.read`). Completed `RSCH-0005` shows provenance, feature pipeline, model settings, metrics, confusion matrix, and SHA-256 integrity hashes. No training control, model download, or raw URL. |
 | `/administration` | Protected (UX). Access-review / user status / role assignment wired; integration credential writes still disabled. |
 | `/account/profile` | Protected (UX). API profile fields; save still disabled. |
@@ -73,7 +73,7 @@ Unknown paths redirect to `/signin`. Auth status unknown shows a session loading
 
 ## Issues intentionally deferred
 
-- Integration credential writes, Cyber Range control, reports.
+- Integration credential writes, reports, and Cyber Range remote control, scenario execution, connectivity changes, automatic relationship inference, live topology discovery, Wazuh/Suricata-generated relationships, attack paths, graph drag editing, and bulk relationship management.
 - Incident task priority, due date, description, and hard deletion. Automated containment and SOAR remain unsupported. Incident owner selection is still deferred.
 - Policy rich-text editors, PDF/document generation, e-signature, email notifications, AI generation, attachments, policy↔risk mappings, evidence↔risk direct mappings, bulk/drag-drop mapping, graph views, URL-persisted catalog query state, infinite scroll.
 - Evidence malware scanning, independent integrity re-verification, public evidence URLs, browser-to-S3 uploads, R2 production cutover UI.
@@ -93,4 +93,4 @@ Route-level lazy loading remains. Auth adds a small session query on protected a
 
 ## Readiness assessment
 
-Frontend CSRF handling, preferences, risk treatment, risk↔control mapping, incident updates, vulnerability remediation, administration (access reviews, user status, role assignment), and governance (control implementation, manual tests, evidence metadata + private object storage + linking, mapped risks on control detail) are wired. Risk detail can link an existing control through the server-paginated catalog (`page_size` 20). Mapping is relationship-only: it does not change likelihood, impact, score, treatment, or implementation status, and it does not claim the control is effective. Open control navigates to Governance control detail (tests and evidence). Licensed CIS safeguard prose is not shown. **Backend remains the authorization boundary.** Files flow only through authenticated FastAPI; SHA-256 is server-calculated at ingestion; `integrity_verified` stays false; malware scanning is not claimed. Integration/credential and remaining write APIs stay disabled in the UI.
+Frontend CSRF handling, preferences, risk treatment, risk↔control mapping, incident updates, vulnerability remediation, administration (access reviews, user status, role assignment), and governance (control implementation, manual tests, evidence metadata + private object storage + linking, mapped risks on control detail) are wired. Risk detail can link an existing control through the server-paginated catalog (`page_size` 20). Mapping is relationship-only: it does not change likelihood, impact, score, treatment, or implementation status, and it does not claim the control is effective. Open control navigates to Governance control detail (tests and evidence). Licensed CIS safeguard prose is not shown. **Backend remains the authorization boundary.** Files flow only through authenticated FastAPI; SHA-256 is server-calculated at ingestion; `integrity_verified` stays false; malware scanning is not claimed. Cyber Range catalog relationship management is enabled for `cyber_range.manage` and changes catalog metadata only. Integration credential writes and other remaining write APIs stay disabled in the UI.

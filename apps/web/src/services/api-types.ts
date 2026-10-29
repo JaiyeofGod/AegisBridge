@@ -1208,6 +1208,12 @@ export type LabSystemRelationshipItem = {
   relationship_kind: string;
 };
 
+export type LabSystemRelationshipWrite = {
+  source_system_id: string;
+  target_system_id: string;
+  relationship_kind: string;
+};
+
 export type LabSystemQuery = {
   search?: string;
   zone?: string;

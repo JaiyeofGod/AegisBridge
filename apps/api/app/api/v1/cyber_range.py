@@ -1,8 +1,11 @@
-"""Read-only cyber-range catalog. No remote control or inbound lab management."""
+"""Cyber-range catalog. Relationship writes document architecture only.
+
+They do not discover networks, execute scenarios, or control the lab.
+"""
 
 from fastapi import APIRouter, Depends
 
-from app.api.deps import DbSession, PageQuery, require_permissions
+from app.api.deps import DbSession, PageQuery, RequireCsrf, require_permissions
 from app.schemas.common import ErrorBody, Page
 from app.schemas.cyber_range import (
     CyberRangeSummary,
@@ -12,6 +15,7 @@ from app.schemas.cyber_range import (
     LabSystemDetail,
     LabSystemListItem,
     LabSystemRelationshipItem,
+    LabSystemRelationshipWrite,
     LabTelemetryItem,
     LabZoneItem,
 )
@@ -60,6 +64,62 @@ def read_system_relationships(
     session: DbSession, page: PageQuery
 ) -> Page[LabSystemRelationshipItem]:
     return service.list_system_relationships(session, page)
+
+
+@router.post(
+    "/system-relationships",
+    response_model=LabSystemRelationshipItem,
+    responses={
+        403: {"model": ErrorBody},
+        404: {"model": ErrorBody},
+        409: {"model": ErrorBody},
+        422: {"model": ErrorBody},
+    },
+    dependencies=[Depends(require_permissions("cyber_range.manage"))],
+)
+def create_system_relationship(
+    body: LabSystemRelationshipWrite,
+    session: DbSession,
+    principal: RequireCsrf,
+) -> LabSystemRelationshipItem:
+    """Store one documented catalog relationship. CSRF required."""
+    return service.create_system_relationship(session, principal, body)
+
+
+@router.patch(
+    "/system-relationships/{relationship_id}",
+    response_model=LabSystemRelationshipItem,
+    responses={
+        403: {"model": ErrorBody},
+        404: {"model": ErrorBody},
+        409: {"model": ErrorBody},
+        422: {"model": ErrorBody},
+    },
+    dependencies=[Depends(require_permissions("cyber_range.manage"))],
+)
+def update_system_relationship(
+    relationship_id: str,
+    body: LabSystemRelationshipWrite,
+    session: DbSession,
+    principal: RequireCsrf,
+) -> LabSystemRelationshipItem:
+    """Replace the stored source, target, and kind. CSRF required."""
+    return service.update_system_relationship(session, principal, relationship_id, body)
+
+
+@router.delete(
+    "/system-relationships/{relationship_id}",
+    response_model=LabSystemRelationshipItem,
+    responses={403: {"model": ErrorBody}, 404: {"model": ErrorBody}},
+    dependencies=[Depends(require_permissions("cyber_range.manage"))],
+)
+def delete_system_relationship(
+    relationship_id: str,
+    session: DbSession,
+    principal: RequireCsrf,
+) -> LabSystemRelationshipItem:
+    """Remove one catalog relationship. Systems stay. CSRF required."""
+    return service.delete_system_relationship(session, principal, relationship_id)
 
 
 @router.get(

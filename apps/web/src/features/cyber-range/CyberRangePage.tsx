@@ -22,9 +22,12 @@ import {
   mapLabTelemetry,
   mapLabZone,
   type CatalogRelationshipStatement,
+  type LabSystemRelationshipView,
   type LabSystemView,
 } from "@/features/cyber-range/mapCyberRange";
+import { CatalogRelationshipManager } from "@/features/cyber-range/CatalogRelationshipManager";
 import { RangeTopology } from "@/features/cyber-range/RangeTopology";
+import { useAuthStatus } from "@/features/auth/useAuthSession";
 import {
   useCyberRangeSummary,
   useLabDetectionCatalog,
@@ -78,6 +81,8 @@ const emptyDetectionFilters = {
 };
 
 export function CyberRangePage() {
+  const auth = useAuthStatus();
+  const canManageRelationships = auth.user?.permissions.includes("cyber_range.manage") === true;
   const summary = useCyberRangeSummary();
   const zonesQuery = useLabZones();
   const systemCatalog = useLabSystemCatalog();
@@ -161,6 +166,7 @@ export function CyberRangePage() {
     scenarioItems.find((item) => item.id === selectedScenarioId) ??
     null;
 
+  const catalogSystems = (systemCatalog.data?.items ?? []).map(mapLabSystem);
   const relationshipItems = (relationshipsQuery.data?.items ?? []).flatMap((item) => {
     const mappedRelationship = mapLabSystemRelationship(item);
     return mappedRelationship ? [mappedRelationship] : [];
@@ -376,6 +382,9 @@ export function CyberRangePage() {
                         relationshipsPending={relationshipsQuery.isPending}
                         relationshipsError={relationshipsQuery.isError}
                         onRetryRelationships={() => void relationshipsQuery.refetch()}
+                        canManageRelationships={canManageRelationships}
+                        catalogSystems={catalogSystems}
+                        relationships={relationshipItems}
                       />
                     ) : (
                       <p className="text-sm text-[var(--muted)]">No lab system is selected.</p>
@@ -799,6 +808,9 @@ function SystemContext({
   relationshipsPending,
   relationshipsError,
   onRetryRelationships,
+  canManageRelationships,
+  catalogSystems,
+  relationships,
 }: {
   system: LabSystemView;
   detailPending: boolean;
@@ -806,6 +818,9 @@ function SystemContext({
   relationshipsPending: boolean;
   relationshipsError: boolean;
   onRetryRelationships: () => void;
+  canManageRelationships: boolean;
+  catalogSystems: LabSystemView[];
+  relationships: LabSystemRelationshipView[];
 }) {
   return (
     <div className="space-y-4 text-sm" data-testid="range-context">
@@ -879,6 +894,12 @@ function SystemContext({
           Catalog relationships describe documented lab architecture. They do not represent live
           reachability or observed traffic.
         </p>
+        <CatalogRelationshipManager
+          canManage={canManageRelationships}
+          systems={catalogSystems}
+          relationships={relationships}
+          selectedSystemId={system.id}
+        />
       </div>
     </div>
   );

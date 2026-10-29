@@ -812,18 +812,24 @@ def test_cyber_range_catalog_keeps_lab_private_and_disconnected(client: TestClie
         "/api/v1/cyber-range/systems",
         "/api/v1/cyber-range/systems/{system_id}",
         "/api/v1/cyber-range/system-relationships",
+        "/api/v1/cyber-range/system-relationships/{relationship_id}",
         "/api/v1/cyber-range/scenarios",
         "/api/v1/cyber-range/scenarios/{scenario_id}",
         "/api/v1/cyber-range/telemetry",
         "/api/v1/cyber-range/detections",
     }
+    relationship_methods = {
+        "/api/v1/cyber-range/system-relationships": {"get", "post"},
+        "/api/v1/cyber-range/system-relationships/{relationship_id}": {"patch", "delete"},
+    }
     for path in cyber_paths:
-        methods = set(openapi["paths"][path])
-        assert methods == {"get"}
-        assert "post" not in methods
+        methods = {
+            key
+            for key in openapi["paths"][path]
+            if key in {"get", "post", "put", "patch", "delete"}
+        }
+        assert methods == relationship_methods.get(path, {"get"})
         assert "put" not in methods
-        assert "patch" not in methods
-        assert "delete" not in methods
 
     too_large = client.get("/api/v1/cyber-range/systems", params={"page_size": 101})
     assert too_large.status_code == 422

@@ -14,6 +14,8 @@ import {
 } from "@/services/cyber-range";
 
 const systemsKey = ["cyber-range", "systems"] as const;
+
+export const labSystemRelationshipsKey = [...systemsKey, "relationships"] as const;
 const scenariosKey = ["cyber-range", "scenarios"] as const;
 const detectionsKey = ["cyber-range", "detections"] as const;
 
@@ -57,7 +59,7 @@ export function useLabSystemList(query: LabSystemQuery, enabled: boolean) {
 
 export function useLabSystemRelationships() {
   return useQuery({
-    queryKey: [...systemsKey, "relationships"],
+    queryKey: labSystemRelationshipsKey,
     queryFn: fetchLabSystemRelationships,
     retry: false,
     staleTime: 30_000,

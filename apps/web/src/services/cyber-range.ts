@@ -1,4 +1,4 @@
-import { apiGet } from "@/services/api-client";
+import { apiDelete, apiGet, apiPatch, apiPostCsrf } from "@/services/api-client";
 import type {
   CyberRangeSummary,
   LabDetectionItem,
@@ -10,6 +10,7 @@ import type {
   LabSystemListItem,
   LabSystemQuery,
   LabSystemRelationshipItem,
+  LabSystemRelationshipWrite,
   LabTelemetryItem,
   LabZoneItem,
   PageResponse,
@@ -34,6 +35,26 @@ export function fetchLabSystems(query: LabSystemQuery = {}) {
   params.set("page_size", String(query.pageSize ?? 100));
   return apiGet<PageResponse<LabSystemListItem>>(
     `/api/v1/cyber-range/systems?${params.toString()}`,
+  );
+}
+
+export function createLabSystemRelationship(body: LabSystemRelationshipWrite) {
+  return apiPostCsrf<LabSystemRelationshipItem>("/api/v1/cyber-range/system-relationships", body);
+}
+
+export function updateLabSystemRelationship(
+  relationshipId: string,
+  body: LabSystemRelationshipWrite,
+) {
+  return apiPatch<LabSystemRelationshipItem>(
+    `/api/v1/cyber-range/system-relationships/${encodeURIComponent(relationshipId)}`,
+    body,
+  );
+}
+
+export function deleteLabSystemRelationship(relationshipId: string) {
+  return apiDelete<LabSystemRelationshipItem>(
+    `/api/v1/cyber-range/system-relationships/${encodeURIComponent(relationshipId)}`,
   );
 }
 

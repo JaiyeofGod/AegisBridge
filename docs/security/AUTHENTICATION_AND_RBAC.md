@@ -1,6 +1,6 @@
 # Authentication and RBAC
 
-**Status:** Backend authentication, domain read authorization, **CSRF-protected authenticated writes** (preferences, risk treatment, risk↔control link/unlink, incident update, incident response tasks, vulnerability remediation, administration access reviews/users/roles, governance control implementation/tests, evidence metadata + control linking, policy lifecycle + policy↔control mapping), and session CSRF foundation are in place. Frontend route guards remain UX only. SSO/OIDC, MFA, email reset, rate limiting, and remaining domain writes (integrations, reports, cyber-range control) remain deferred.
+**Status:** Backend authentication, domain read authorization, **CSRF-protected authenticated writes** (preferences, risk treatment, risk↔control link/unlink, incident update, incident response tasks, vulnerability remediation, administration access reviews/users/roles, governance control implementation/tests, evidence metadata + control linking, policy lifecycle + policy↔control mapping, documented cyber-range catalog relationships), and session CSRF foundation are in place. Frontend route guards remain UX only. SSO/OIDC, MFA, email reset, rate limiting, and remaining domain writes (integrations, reports, cyber-range remote control) remain deferred.
 
 ## Authentication model
 
@@ -80,6 +80,8 @@ Session cookies remain HttpOnly. CSRF uses a **synchronizer token** bound to the
 | GET | `/evidence/{evidence_id}/object` | Authenticated + `evidence.read` (no CSRF; private stream) |
 | POST | `/governance/controls/{control_id}/evidence/{evidence_id}` | Authenticated + `control.manage` + `evidence.manage` + CSRF |
 | DELETE | `/governance/controls/{control_id}/evidence/{evidence_id}` | Authenticated + `control.manage` + `evidence.manage` + CSRF |
+| POST | `/cyber-range/system-relationships` | Authenticated + `cyber_range.read` + `cyber_range.manage` + CSRF. Documented catalog metadata only. |
+| PATCH/DELETE | `/cyber-range/system-relationships/{relationship_id}` | Authenticated + `cyber_range.read` + `cyber_range.manage` + CSRF. Documented catalog metadata only. |
 
 ### CSRF exemptions
 
@@ -137,8 +139,8 @@ Effective permissions for a principal are the **union** of permissions for their
 | Administrator | All catalog permissions |
 | CISO | Broad `*.read` across domains + `audit.read` + `policy.approve` (no draft `policy.manage`) |
 | GRC Analyst | Risk/control/policy/evidence/report/dataset + `risk.accept`, `control.update`, `evidence.download`, `policy.manage`, `directory.read` |
-| SOC Analyst | Alert/detection/incident/threat intel/policy reads + `incident.manage`, `incident.close`, `directory.read` |
-| Security Engineer | Detection/vuln/integration/cyber-range/dataset/policy reads + `detection.manage`, `integration.manage`, `directory.read` |
+| SOC Analyst | Alert/detection/incident/threat intel/policy reads + `incident.manage`, `incident.close`, `directory.read`, `cyber_range.read` |
+| Security Engineer | Detection/vuln/integration/cyber-range/dataset/policy reads + `detection.manage`, `integration.manage`, `directory.read`, `cyber_range.manage` |
 | Auditor | Read-heavy GRC/policy/evidence/audit + `evidence.download` |
 | Read Only | Limited reads (assets, risk, control, policy, vuln, alert, detection, incident, threat intel, report, dataset, cyber range) |
 
@@ -204,7 +206,7 @@ Authenticated session required (401 without a valid cookie):
 | Threat intelligence | `threat_intel.read` | Yes |
 | Reports | `report.read` (+ manage for writes later) | Yes (read) |
 | Datasets / experiments | `dataset.read` (+ manage for writes later) | Yes (read) |
-| Cyber range | `cyber_range.read` | Yes (read-only; no execution) |
+| Cyber range | `cyber_range.read` to view catalog data and relationships. Create, update, and delete of documented relationships require `cyber_range.manage` + CSRF. | Yes (catalog metadata only; no execution or remote control) |
 | Administration summary/users/roles/access-reviews | `administration.read` | Yes |
 | Administration integrations | `administration.read` **and** `integration.read` | Yes |
 | Administration audit events | `administration.read` **and** `audit.read` | Yes |
@@ -231,7 +233,26 @@ Authenticated session required (401 without a valid cookie):
 
 **Policy lifecycle** (`policy.read` / `policy.manage` / `policy.approve` + CSRF on mutations): create/edit drafts, transition/publish, self-acknowledge published versions, link/unlink controls. Published versions are immutable; replacements create new drafts. External e-signature and email notification are not implemented.
 
-**Remaining authenticated domain writes** (integration credentials, reports, cyber-range control, access-review findings) remain deferred. No Cyber Range remote control. Automated containment, host isolation, and SOAR are not implemented.
+**Cyber range catalog relationships** (`cyber_range.read` / `cyber_range.manage`):
+
+- `cyber_range.read` permits viewing Cyber Range catalog data and stored relationships.
+- `cyber_range.manage` permits creating, updating, and deleting documented catalog relationships.
+
+Current role assignments for this capability:
+
+| Role | Cyber range access |
+|---|---|
+| Administrator | `cyber_range.manage` (the full catalog also includes `cyber_range.read`) |
+| Security Engineer | `cyber_range.read` and `cyber_range.manage` |
+| SOC Analyst | `cyber_range.read` |
+| CISO | `cyber_range.read` |
+| Read Only | `cyber_range.read` |
+| GRC Analyst | neither `cyber_range.read` nor `cyber_range.manage` |
+| Auditor | neither `cyber_range.read` nor `cyber_range.manage` |
+
+Frontend-hidden controls are not the authorization boundary. Backend authorization is authoritative. A modifying relationship request requires the normal authenticated session and CSRF protection. Relationship management changes documented catalog metadata only. It does not change actual connectivity, telemetry, Wazuh, or network reachability. There is no Cyber Range remote control or scenario execution.
+
+**Remaining authenticated domain writes** (integration credentials, reports, cyber-range remote control, access-review findings) remain deferred. Automated containment, host isolation, and SOAR are not implemented.
 
 ### Incident mutation scope (`incident.manage`)
 
@@ -328,7 +349,7 @@ Never commit the real password. Production must not rely on this variable.
 ## Production hardening still required
 
 - Login rate limiting / lockout (structure is ready; not implemented)
-- Remaining CSRF-protected domain writes (integrations, reports, cyber-range)
+- Remaining CSRF-protected domain writes (integrations, reports, cyber-range remote control). Documented catalog relationship writes are already enforced.
 - MFA/TOTP
 - Password reset email flows
 - SSO/OIDC
