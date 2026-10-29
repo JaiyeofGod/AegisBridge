@@ -77,6 +77,10 @@
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
+
+    .motion-signin-enter {
+      animation: none !important;
+    }
   }
 }
 
@@ -136,6 +140,11 @@
   .motion-dialog {
     animation: motion-dialog-in var(--motion-duration-standard) var(--motion-ease-enter);
   }
+
+  .motion-signin-enter {
+    animation: motion-signin-enter var(--motion-duration-cinematic) var(--motion-ease-enter) both;
+    pointer-events: auto;
+  }
 }
 
 @keyframes motion-panel-enter {
@@ -189,6 +198,17 @@
   from {
     opacity: 0;
     transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes motion-signin-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, var(--motion-distance), 0);
   }
   to {
     opacity: 1;

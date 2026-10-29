@@ -28,7 +28,7 @@
   --focus-ring: 2px solid var(--accent);
   --focus-offset: 2px;
 
-  /* Shared motion tokens. Phase 2 applies the fast and standard values. */
+  /* Shared motion tokens. Fast and standard cover controls; cinematic covers the sign-in entrance. */
   --motion-duration-fast: 150ms;
   --motion-duration-standard: 200ms;
   --motion-duration-cinematic: 400ms;

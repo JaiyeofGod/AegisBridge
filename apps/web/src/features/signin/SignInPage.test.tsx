@@ -40,6 +40,16 @@ describe("Sign-in page", () => {
       "amara.okonkwo@aegisbridge.example",
     );
     expect(page.textContent ?? "").not.toMatch(/AEGIS_DEV_ADMIN_PASSWORD|Dev-Only/i);
+    expect(
+      within(page)
+        .getByRole("heading", { name: /see the threat/i })
+        .closest(".motion-signin-enter"),
+    ).toBeTruthy();
+    const panel = within(page)
+      .getByRole("heading", { name: /^sign in$/i })
+      .closest(".motion-signin-enter");
+    expect(panel).toBeTruthy();
+    expect(within(page).getByRole("textbox", { name: /work email/i })).toBeEnabled();
   });
 
   it("uses static scene fallback when reduced motion is preferred", async () => {
@@ -57,6 +67,16 @@ describe("Sign-in page", () => {
     const card = within(visual).getByTestId("signin-visual-card");
     expect(card).toBeInTheDocument();
     expect(within(card).getByTestId("signin-scene-fallback")).toBeInTheDocument();
+    expect(
+      within(page)
+        .getByRole("heading", { name: /see the threat/i })
+        .closest(".motion-signin-enter"),
+    ).toBeTruthy();
+    expect(
+      within(page)
+        .getByRole("heading", { name: /^sign in$/i })
+        .closest(".motion-signin-enter"),
+    ).toBeTruthy();
   });
 
   it("plays the looping background video on desktop when motion is allowed", async () => {
@@ -77,8 +97,10 @@ describe("Sign-in page", () => {
     expect(video).toHaveAttribute("playsinline");
     expect(within(page).getByTestId("signin-readability-overlay")).toBeInTheDocument();
     expect(within(page).queryByTestId("signin-static-background")).not.toBeInTheDocument();
-    expect(within(page).getByTestId("signin-spline-scene")).toBeInTheDocument();
-    expect(within(page).getByRole("textbox", { name: /work email/i })).toBeInTheDocument();
+    const scene = within(page).getByTestId("signin-spline-scene");
+    expect(scene.querySelector(".duration-500")).toBeTruthy();
+    expect(scene.querySelector(".duration-700")).toBeTruthy();
+    expect(within(page).getByRole("textbox", { name: /work email/i })).toBeEnabled();
   });
 
   it("uses the static canvas instead of video below 1024px", async () => {
@@ -128,6 +150,9 @@ describe("Sign-in page", () => {
     const user = userEvent.setup();
     await renderWithProviders(<AppRouter />, { initialEntries: ["/signin"] });
     const page = screen.getByTestId("signin-page");
+    const panel = within(page)
+      .getByRole("heading", { name: /^sign in$/i })
+      .closest(".motion-signin-enter");
 
     await user.type(
       within(page).getByRole("textbox", { name: /work email/i }),
@@ -138,6 +163,11 @@ describe("Sign-in page", () => {
     await user.click(within(page).getByRole("button", { name: /continue with email/i }));
 
     expect(await within(page).findByRole("alert")).toHaveTextContent("Invalid email or password.");
+    expect(
+      within(page)
+        .getByRole("heading", { name: /^sign in$/i })
+        .closest(".motion-signin-enter"),
+    ).toBe(panel);
     expect(password).toHaveValue("");
     expect(within(page).queryByText(/does not exist|inactive|USR-0001/i)).not.toBeInTheDocument();
   });
@@ -177,5 +207,10 @@ describe("Sign-in page", () => {
     const email = within(page).getByRole("textbox", { name: /work email/i });
     email.focus();
     expect(email).toHaveFocus();
+    expect(email.closest(".motion-signin-enter")).toBe(
+      within(page)
+        .getByRole("heading", { name: /^sign in$/i })
+        .closest(".motion-signin-enter"),
+    );
   });
 });

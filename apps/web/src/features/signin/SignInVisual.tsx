@@ -23,7 +23,7 @@ export function SignInVisual({ surface = "canvas" }: { surface?: "canvas" | "cle
       data-testid="signin-visual"
       data-visual-mode={useLiveScene ? "spline-live" : "static-fallback"}
     >
-      <div className="relative z-10 shrink-0 px-8 pt-8 pb-6 text-left md:px-12 md:pt-12 md:pb-8">
+      <div className="motion-signin-enter relative z-10 shrink-0 px-8 pt-8 pb-6 text-left md:px-12 md:pt-12 md:pb-8">
         <div className="max-w-xl">
           <p className="text-xs font-semibold tracking-[0.18em] text-[var(--accent)] uppercase">
             AegisBridge
