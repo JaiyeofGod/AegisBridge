@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { AppRouter } from "@/app/router";
+import motionCss from "@/styles/index.css?raw";
 import { currentUserFixture, installApiFetch } from "@/test/api-fixtures";
 import { renderWithProviders } from "@/test/render";
 
@@ -50,16 +51,41 @@ describe("Sign-in page", () => {
       "amara.okonkwo@aegisbridge.example",
     );
     expect(page.textContent ?? "").not.toMatch(/AEGIS_DEV_ADMIN_PASSWORD|Dev-Only/i);
-    expect(
-      within(page)
-        .getByRole("heading", { name: /see the threat/i })
-        .closest(".motion-signin-enter"),
-    ).toBeTruthy();
+    const copy = within(page)
+      .getByRole("heading", { name: /see the threat/i })
+      .closest(".motion-signin-enter");
     const panel = within(page)
       .getByRole("heading", { name: /^sign in$/i })
       .closest(".motion-signin-enter");
-    expect(panel).toBeTruthy();
-    expect(within(page).getByRole("textbox", { name: /work email/i })).toBeEnabled();
+    const email = within(page).getByRole("textbox", { name: /work email/i });
+    expect(copy).toBeTruthy();
+    expect(copy).not.toHaveClass("motion-signin-enter-stagger");
+    expect(panel).toHaveClass("motion-signin-enter-stagger");
+    expect(email).toBeEnabled();
+    expect(email).not.toHaveClass("motion-signin-enter");
+    expect(email.closest(".motion-signin-enter")).toBe(panel);
+    expect(
+      within(page)
+        .getByLabelText(/^Password$/i)
+        .closest(".motion-signin-enter"),
+    ).toBe(panel);
+  });
+
+  it("keeps the foreground entrance on one mount and disables it for reduced motion", () => {
+    expect(motionCss).toMatch(
+      /\.motion-signin-enter\s*\{[^}]*animation:\s*motion-signin-enter\s+var\(--motion-duration-cinematic\)\s+var\(--motion-ease-enter\)\s+both/,
+    );
+    expect(motionCss).toContain("animation-delay: calc(var(--motion-duration-fast) / 2)");
+    expect(motionCss).toMatch(
+      /@keyframes motion-signin-enter[\s\S]*?opacity:\s*0\.82;[\s\S]*?translate3d\(0,\s*var\(--motion-distance\)/,
+    );
+
+    const reduced = motionCss.slice(
+      motionCss.indexOf("@media (prefers-reduced-motion: reduce)"),
+      motionCss.indexOf("@layer utilities"),
+    );
+    expect(reduced).toContain(".motion-signin-enter");
+    expect(reduced).toMatch(/\.motion-signin-enter[\s\S]*?animation:\s*none\s*!important/);
   });
 
   it("uses static scene fallback when reduced motion is preferred", async () => {
@@ -79,16 +105,16 @@ describe("Sign-in page", () => {
     expect(within(card).getByTestId("signin-scene-fallback")).toBeInTheDocument();
     expect(within(card).getByTestId("signin-artwork")).toHaveAttribute("data-parallax", "off");
     expect(within(page).queryByTestId("signin-spline-scene")).not.toBeInTheDocument();
-    expect(
-      within(page)
-        .getByRole("heading", { name: /see the threat/i })
-        .closest(".motion-signin-enter"),
-    ).toBeTruthy();
-    expect(
-      within(page)
-        .getByRole("heading", { name: /^sign in$/i })
-        .closest(".motion-signin-enter"),
-    ).toBeTruthy();
+    const copy = within(page)
+      .getByRole("heading", { name: /see the threat/i })
+      .closest(".motion-signin-enter");
+    const panel = within(page)
+      .getByRole("heading", { name: /^sign in$/i })
+      .closest(".motion-signin-enter");
+    expect(copy).toBeTruthy();
+    expect(copy).not.toHaveClass("motion-signin-enter-stagger");
+    expect(panel).toHaveClass("motion-signin-enter-stagger");
+    expect(within(page).getByRole("textbox", { name: /work email/i })).toBeEnabled();
   });
 
   it("plays the looping background video on desktop when motion is allowed", async () => {
@@ -225,10 +251,13 @@ describe("Sign-in page", () => {
       .getByRole("heading", { name: /^sign in$/i })
       .closest(".motion-signin-enter");
 
-    await user.type(
-      within(page).getByRole("textbox", { name: /work email/i }),
-      currentUserFixture.email,
-    );
+    const email = within(page).getByRole("textbox", { name: /work email/i });
+    await user.type(email, currentUserFixture.email);
+    expect(
+      within(page)
+        .getByRole("heading", { name: /^sign in$/i })
+        .closest(".motion-signin-enter"),
+    ).toBe(panel);
     const password = within(page).getByLabelText(/^Password$/i);
     await user.type(password, "wrong-password");
     await user.click(within(page).getByRole("button", { name: /continue with email/i }));
@@ -256,6 +285,9 @@ describe("Sign-in page", () => {
     const user = userEvent.setup();
     await renderWithProviders(<AppRouter />, { initialEntries: ["/signin"] });
     const page = screen.getByTestId("signin-page");
+    const panel = within(page)
+      .getByRole("heading", { name: /^sign in$/i })
+      .closest(".motion-signin-enter");
     await user.type(
       within(page).getByRole("textbox", { name: /work email/i }),
       currentUserFixture.email,
@@ -263,6 +295,11 @@ describe("Sign-in page", () => {
     await user.type(within(page).getByLabelText(/^Password$/i), "local-dev-password");
     await user.click(within(page).getByRole("button", { name: /continue with email/i }));
     expect(await within(page).findByRole("button", { name: /signing in/i })).toBeDisabled();
+    expect(
+      within(page)
+        .getByRole("heading", { name: /^sign in$/i })
+        .closest(".motion-signin-enter"),
+    ).toBe(panel);
   });
 
   it("redirects authenticated users away from sign-in", async () => {

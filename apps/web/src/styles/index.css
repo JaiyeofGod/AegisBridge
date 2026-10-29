@@ -158,6 +158,11 @@
     pointer-events: auto;
   }
 
+  /* Form follows the copy. The class stays on for the life of the panel, so typing and validation do not restart it. */
+  .motion-signin-enter-stagger {
+    animation-delay: calc(var(--motion-duration-fast) / 2);
+  }
+
   .motion-status-enter {
     animation: motion-status-enter var(--motion-duration-fast) var(--motion-ease-enter) both;
   }
@@ -402,7 +407,8 @@
 
 @keyframes motion-signin-enter {
   from {
-    opacity: 0;
+    /* Stay readable so the form can be used while the 8px rise finishes. */
+    opacity: 0.82;
     transform: translate3d(0, var(--motion-distance), 0);
   }
   to {

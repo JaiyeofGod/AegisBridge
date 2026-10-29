@@ -41,7 +41,7 @@ export function SignInForm() {
   });
 
   return (
-    <div className="motion-signin-enter flex h-full flex-col justify-center px-6 py-10 md:px-12 lg:px-16">
+    <div className="motion-signin-enter motion-signin-enter-stagger flex h-full flex-col justify-center px-6 py-10 md:px-12 lg:px-16">
       <div className="mx-auto w-full max-w-md space-y-6">
         <div>
           <p className="text-xs font-semibold tracking-[0.16em] text-[var(--accent)] uppercase">
