@@ -15,31 +15,31 @@ export function AppShell({
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-[var(--canvas)] text-[var(--text)]">
-      <div className="hidden lg:block">
-        <div className="sticky top-0 h-screen">
-          <Sidebar />
+    <Dialog.Root open={mobileOpen} onOpenChange={setMobileOpen}>
+      <div className="flex min-h-screen bg-[var(--canvas)] text-[var(--text)]">
+        <div className="hidden lg:block">
+          <div className="sticky top-0 h-screen">
+            <Sidebar />
+          </div>
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <GlobalHeader environmentLabel={environmentLabel} showNavTrigger />
+          <main id="main-content" className="flex-1">
+            {children}
+          </main>
         </div>
       </div>
 
-      <Dialog.Root open={mobileOpen} onOpenChange={setMobileOpen}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="motion-overlay fixed inset-0 z-40 bg-black/60 lg:hidden" />
-          <Dialog.Content className="motion-drawer fixed inset-y-0 left-0 z-50 w-[min(100%,280px)] bg-[var(--surface)] shadow-xl outline-none lg:hidden">
-            <VisuallyHidden>
-              <Dialog.Title>Navigation</Dialog.Title>
-            </VisuallyHidden>
-            <Sidebar onNavigate={() => setMobileOpen(false)} />
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <GlobalHeader environmentLabel={environmentLabel} onOpenNav={() => setMobileOpen(true)} />
-        <main id="main-content" className="flex-1">
-          {children}
-        </main>
-      </div>
-    </div>
+      <Dialog.Portal>
+        <Dialog.Overlay className="motion-overlay fixed inset-0 z-40 bg-black/60 lg:hidden" />
+        <Dialog.Content className="motion-drawer fixed inset-y-0 left-0 z-50 w-[min(100%,280px)] bg-[var(--surface)] shadow-xl outline-none lg:hidden">
+          <VisuallyHidden>
+            <Dialog.Title>Navigation</Dialog.Title>
+          </VisuallyHidden>
+          <Sidebar onNavigate={() => setMobileOpen(false)} />
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
