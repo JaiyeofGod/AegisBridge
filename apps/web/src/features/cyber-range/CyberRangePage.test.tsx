@@ -3,7 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { AppRouter } from "@/app/router";
+import { anchorOnBox, offsetsForBundle, stableOffset } from "@/features/cyber-range/catalogEdges";
 import {
+  catalogEdgeCaption,
+  catalogEdgeShowsArrow,
+  catalogEdgeTouchesSelection,
   catalogRelationState,
   catalogRelationshipStatements,
   directCatalogPeerIds,
@@ -223,6 +227,8 @@ describe("Cyber range", () => {
     expect(await within(page).findByText(/Lab Bridge: not_connected/)).toBeInTheDocument();
     expect(within(page).queryByText("LAB-GW-01")).not.toBeInTheDocument();
     expect(within(page).queryByText("RUN-014")).not.toBeInTheDocument();
+    expect(within(page).getByText("No catalog relationships are stored.")).toBeInTheDocument();
+    expect(within(page).queryByTestId("catalog-edge-list")).not.toBeInTheDocument();
 
     await user.click(within(page).getByRole("tab", { name: "Segments" }));
     expect(within(page).getByText("No zones are stored.")).toBeInTheDocument();
@@ -292,6 +298,22 @@ describe("Cyber range", () => {
     expect(list).toHaveTextContent("Dependency of ← WIN-USER-01");
     expect(list).not.toHaveTextContent("KALI-RED-01");
     expect(list).not.toHaveTextContent("LAB-GW-01");
+
+    const edgeList = within(page).getByTestId("catalog-edge-list");
+    expect(edgeList).toHaveTextContent("Monitors: SEC-WAZUH-01 → WIN-USER-01");
+    expect(edgeList).toHaveTextContent("Monitors: SEC-WAZUH-01 → LINUX-APP-01");
+    expect(edgeList).toHaveTextContent("Depends on: WIN-USER-01 → SEC-WAZUH-01");
+    expect(edgeList).not.toHaveTextContent("LAB-GW-01");
+    expect(edgeList).not.toHaveTextContent("KALI-RED-01");
+    const lines = page.querySelectorAll("[data-relationship-id]");
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toHaveAttribute("marker-end");
+    expect(page.querySelector("[data-relationship-id='REL-0002']")).toHaveAttribute(
+      "data-edge-emphasis",
+      "direct",
+    );
+    expect(page.querySelector("[data-relationship-kind='attack_path']")).toBeNull();
+    expect(page.querySelector(".catalog-edge-layer")).toHaveAttribute("aria-hidden", "true");
   });
 
   it("selects a lab system from the keyboard and keeps the catalog highlight", async () => {
@@ -312,6 +334,18 @@ describe("Cyber range", () => {
     );
     expect(within(page).getByTestId("catalog-relationship-list")).toHaveTextContent(
       "Monitored by ← SEC-WAZUH-01",
+    );
+    expect(page.querySelector("[data-relationship-id='REL-0002']")).toHaveAttribute(
+      "data-edge-emphasis",
+      "direct",
+    );
+    expect(page.querySelector("[data-relationship-id='REL-0001']")).toHaveAttribute(
+      "data-edge-emphasis",
+      "baseline",
+    );
+    expect(page.querySelector("[data-relationship-id='REL-0003']")).toHaveAttribute(
+      "data-edge-emphasis",
+      "baseline",
     );
   });
 
@@ -339,6 +373,14 @@ describe("Cyber range", () => {
       "transition-property: border-color, background-color, opacity, box-shadow",
     );
     expect(rule).not.toContain("transform");
+    const edgeRule = motionCss.slice(
+      motionCss.indexOf(".catalog-edge {"),
+      motionCss.indexOf('.catalog-edge[data-edge-emphasis="direct"]'),
+    );
+    expect(edgeRule).toContain("transition-property: opacity, stroke-width");
+    expect(edgeRule).not.toContain("transform");
+    expect(edgeRule).not.toContain("stroke-dasharray");
+    expect(edgeRule).not.toContain("animation");
     const reduced = motionCss.slice(motionCss.indexOf("@media (prefers-reduced-motion: reduce)"));
     expect(reduced).toContain("transition-duration: 0.01ms !important");
     delete document.documentElement.dataset.motion;
@@ -390,6 +432,26 @@ describe("Cyber range", () => {
       "LINUX-APP-01",
       "WIN-USER-01",
     ]);
+    expect(catalogEdgeShowsArrow("monitors")).toBe(true);
+    expect(catalogEdgeShowsArrow("connected_to")).toBe(false);
+    expect(catalogEdgeTouchesSelection(stored[1], "LINUX-APP-01")).toBe(true);
+    expect(catalogEdgeTouchesSelection(stored[0], "LINUX-APP-01")).toBe(false);
+    expect(
+      catalogEdgeCaption(
+        stored[0],
+        new Map([
+          ["SEC-WAZUH-01", "SEC-WAZUH-01"],
+          ["WIN-USER-01", "WIN-USER-01"],
+        ]),
+      ),
+    ).toBe("Monitors: SEC-WAZUH-01 → WIN-USER-01");
+    const right = anchorOnBox({ left: 0, top: 0, width: 20, height: 10 }, { x: 40, y: 5 });
+    expect(right).toEqual({ x: 20, y: 5 });
+    expect(offsetsForBundle(2)).toEqual([-4, 4]);
+    const forward = stableOffset("AAA", "BBB", { x: 0, y: 0 }, { x: 10, y: 0 }, 8);
+    const reverse = stableOffset("BBB", "AAA", { x: 10, y: 0 }, { x: 0, y: 0 }, -8);
+    expect(forward).toEqual({ x: 0, y: 8 });
+    expect(reverse).toEqual({ x: 0, y: -8 });
   });
 });
 

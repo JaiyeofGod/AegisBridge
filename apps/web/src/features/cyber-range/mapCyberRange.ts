@@ -366,6 +366,30 @@ export function catalogRelationState(
   return peers.has(systemId) ? "related" : "unrelated";
 }
 
+export function catalogEdgeCaption(
+  relationship: LabSystemRelationshipView,
+  hostnameById: ReadonlyMap<string, string>,
+): string {
+  const source = hostnameById.get(relationship.sourceSystemId) ?? relationship.sourceSystemId;
+  const target = hostnameById.get(relationship.targetSystemId) ?? relationship.targetSystemId;
+  return `${outgoingLabel[relationship.kind]}: ${source} → ${target}`;
+}
+
+/** Arrowheads mark stored source → target. connected_to stays a neutral line. */
+export function catalogEdgeShowsArrow(kind: CatalogRelationshipKind): boolean {
+  return kind !== "connected_to";
+}
+
+export function catalogEdgeTouchesSelection(
+  relationship: Pick<LabSystemRelationshipView, "sourceSystemId" | "targetSystemId">,
+  selectedId: string,
+): boolean {
+  return (
+    selectedId.length > 0 &&
+    (relationship.sourceSystemId === selectedId || relationship.targetSystemId === selectedId)
+  );
+}
+
 export function catalogRelationshipStatements(
   selectedId: string,
   relationships: LabSystemRelationshipView[],
