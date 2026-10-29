@@ -113,6 +113,7 @@ REQUIRED_TABLES = {
     "report_definitions",
     "lab_zones",
     "lab_systems",
+    "lab_system_relationships",
     "lab_scenarios",
     "lab_scenario_systems",
     "lab_scenario_detections",

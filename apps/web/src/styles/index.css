@@ -327,6 +327,27 @@
     box-shadow: none;
     transform: none;
   }
+
+  .motion-catalog-state {
+    transition-property: border-color, background-color, opacity, box-shadow;
+    transition-duration: var(--motion-duration-standard);
+    transition-timing-function: var(--motion-ease-enter);
+  }
+
+  .motion-catalog-state[data-catalog-relation="selected"] {
+    border-color: var(--accent);
+    background-color: color-mix(in srgb, var(--accent) 14%, var(--surface));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+
+  .motion-catalog-state[data-catalog-relation="related"] {
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+    background-color: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  }
+
+  .motion-catalog-state[data-catalog-relation="unrelated"]:not(:focus-visible) {
+    opacity: 0.72;
+  }
 }
 
 @keyframes motion-panel-enter {

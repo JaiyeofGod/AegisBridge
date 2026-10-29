@@ -9,6 +9,7 @@ import type {
   LabSystemDetail,
   LabSystemListItem,
   LabSystemQuery,
+  LabSystemRelationshipItem,
   LabTelemetryItem,
   LabZoneItem,
   PageResponse,
@@ -33,6 +34,12 @@ export function fetchLabSystems(query: LabSystemQuery = {}) {
   params.set("page_size", String(query.pageSize ?? 100));
   return apiGet<PageResponse<LabSystemListItem>>(
     `/api/v1/cyber-range/systems?${params.toString()}`,
+  );
+}
+
+export function fetchLabSystemRelationships() {
+  return apiGet<PageResponse<LabSystemRelationshipItem>>(
+    "/api/v1/cyber-range/system-relationships?page=1&page_size=100",
   );
 }
 

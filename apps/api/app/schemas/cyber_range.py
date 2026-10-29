@@ -59,6 +59,15 @@ class LabSystemListItem(BaseModel):
     notes: str | None
 
 
+class LabSystemRelationshipItem(BaseModel):
+    """Directed catalog association. Not live reachability or observed traffic."""
+
+    id: str
+    source_system_id: str
+    target_system_id: str
+    relationship_kind: str
+
+
 class LabSystemDetail(LabSystemListItem):
     telemetry_source: str | None
     telemetry_expected: bool

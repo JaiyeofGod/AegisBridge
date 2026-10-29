@@ -1201,6 +1201,13 @@ export type LabSystemDetail = LabSystemListItem & {
   telemetry_semantics: string | null;
 };
 
+export type LabSystemRelationshipItem = {
+  id: string;
+  source_system_id: string;
+  target_system_id: string;
+  relationship_kind: string;
+};
+
 export type LabSystemQuery = {
   search?: string;
   zone?: string;

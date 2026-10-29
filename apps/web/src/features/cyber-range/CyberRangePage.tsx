@@ -13,12 +13,15 @@ import { StatusBadge } from "@/components/status/StatusBadge";
 import { StaleDataIndicator } from "@/components/status/StaleDataIndicator";
 import { SEEDED_DATA_LABEL, SEEDED_DATA_NOTE } from "@/features/data-origin";
 import {
+  catalogRelationshipStatements,
   mapCyberRangeSummary,
   mapLabDetection,
   mapLabScenario,
   mapLabSystem,
+  mapLabSystemRelationship,
   mapLabTelemetry,
   mapLabZone,
+  type CatalogRelationshipStatement,
   type LabSystemView,
 } from "@/features/cyber-range/mapCyberRange";
 import { RangeTopology } from "@/features/cyber-range/RangeTopology";
@@ -32,6 +35,7 @@ import {
   useLabSystemCatalog,
   useLabSystemDetail,
   useLabSystemList,
+  useLabSystemRelationships,
   useLabTelemetry,
   useLabZones,
 } from "@/features/cyber-range/useCyberRangeData";
@@ -145,6 +149,7 @@ export function CyberRangePage() {
   }, [scenarioItems, selectedScenarioId]);
 
   const systemDetail = useLabSystemDetail(selectedSystemId);
+  const relationshipsQuery = useLabSystemRelationships();
   const scenarioDetail = useLabScenarioDetail(selectedScenarioId);
 
   const selectedSystem =
@@ -156,6 +161,16 @@ export function CyberRangePage() {
     scenarioItems.find((item) => item.id === selectedScenarioId) ??
     null;
 
+  const relationshipItems = (relationshipsQuery.data?.items ?? []).flatMap((item) => {
+    const mappedRelationship = mapLabSystemRelationship(item);
+    return mappedRelationship ? [mappedRelationship] : [];
+  });
+  const hostnameById = new Map(systemItems.map((item) => [item.id, item.hostname]));
+  const relationshipStatements = catalogRelationshipStatements(
+    selectedSystemId,
+    relationshipItems,
+    hostnameById,
+  );
   const mapped = summary.data ? mapCyberRangeSummary(summary.data) : null;
   const generatedAt = summary.dataUpdatedAt
     ? new Date(summary.dataUpdatedAt).toISOString()
@@ -338,6 +353,8 @@ export function CyberRangePage() {
                           ? systemItems
                           : (systemCatalog.data.items.map(mapLabSystem) ?? [])
                       }
+                      relationships={relationshipItems}
+                      relationshipsKnown={relationshipsQuery.isSuccess}
                       selectedId={selectedSystem?.id ?? ""}
                       onSelect={setSelectedSystemId}
                     />
@@ -355,6 +372,10 @@ export function CyberRangePage() {
                       <SystemContext
                         system={selectedSystem}
                         detailPending={systemDetail.isPending}
+                        relationshipStatements={relationshipStatements}
+                        relationshipsPending={relationshipsQuery.isPending}
+                        relationshipsError={relationshipsQuery.isError}
+                        onRetryRelationships={() => void relationshipsQuery.refetch()}
                       />
                     ) : (
                       <p className="text-sm text-[var(--muted)]">No lab system is selected.</p>
@@ -774,9 +795,17 @@ export function CyberRangePage() {
 function SystemContext({
   system,
   detailPending,
+  relationshipStatements,
+  relationshipsPending,
+  relationshipsError,
+  onRetryRelationships,
 }: {
   system: LabSystemView;
   detailPending: boolean;
+  relationshipStatements: CatalogRelationshipStatement[];
+  relationshipsPending: boolean;
+  relationshipsError: boolean;
+  onRetryRelationships: () => void;
 }) {
   return (
     <div className="space-y-4 text-sm" data-testid="range-context">
@@ -811,6 +840,45 @@ function SystemContext({
       <div>
         <p className="text-[var(--muted)]">Notes</p>
         <p className="mt-1 text-[var(--text)]">{system.notes}</p>
+      </div>
+      <div>
+        <p className="text-[var(--muted)]">Catalog relationships</p>
+        {relationshipsPending ? (
+          <p className="mt-1 text-[var(--muted)]">Updating catalog relationships…</p>
+        ) : null}
+        {relationshipsError ? (
+          <div className="mt-1">
+            <p className="text-[var(--text)]">
+              Catalog relationships could not be loaded. Shared zone membership is not used as a
+              substitute.
+            </p>
+            <button
+              type="button"
+              className="mt-2 min-h-11 text-[var(--accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+              onClick={onRetryRelationships}
+            >
+              Retry catalog relationships
+            </button>
+          </div>
+        ) : null}
+        {!relationshipsPending && !relationshipsError && relationshipStatements.length === 0 ? (
+          <p className="mt-1 text-[var(--text)]">
+            No catalog relationships are stored for this system.
+          </p>
+        ) : null}
+        {!relationshipsPending && !relationshipsError && relationshipStatements.length > 0 ? (
+          <ul className="mt-1 space-y-1" data-testid="catalog-relationship-list">
+            {relationshipStatements.map((statement) => (
+              <li key={statement.id} className="text-[var(--text)]">
+                {statement.text}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <p className="mt-2 text-xs text-[var(--muted)]">
+          Catalog relationships describe documented lab architecture. They do not represent live
+          reachability or observed traffic.
+        </p>
       </div>
     </div>
   );

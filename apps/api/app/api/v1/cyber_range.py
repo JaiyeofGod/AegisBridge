@@ -11,6 +11,7 @@ from app.schemas.cyber_range import (
     LabScenarioListItem,
     LabSystemDetail,
     LabSystemListItem,
+    LabSystemRelationshipItem,
     LabTelemetryItem,
     LabZoneItem,
 )
@@ -52,6 +53,13 @@ def read_systems(
         telemetry_status=telemetry_status,
         observed_state=observed_state,
     )
+
+
+@router.get("/system-relationships", response_model=Page[LabSystemRelationshipItem])
+def read_system_relationships(
+    session: DbSession, page: PageQuery
+) -> Page[LabSystemRelationshipItem]:
+    return service.list_system_relationships(session, page)
 
 
 @router.get(

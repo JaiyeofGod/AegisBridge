@@ -12,6 +12,7 @@ from app.models.cyber_range import (
     LabScenarioDetection,
     LabScenarioSystem,
     LabSystem,
+    LabSystemRelationship,
     LabZone,
 )
 from app.models.detection import AttackTechnique, Detection, DetectionAttackMapping
@@ -25,6 +26,7 @@ from app.schemas.cyber_range import (
     LabScenarioListItem,
     LabSystemDetail,
     LabSystemListItem,
+    LabSystemRelationshipItem,
     LabTelemetryItem,
     LabZoneItem,
 )
@@ -40,6 +42,7 @@ SUMMARY_SEMANTICS = (
     "Wazuh and Suricata stay not_connected or reference_only unless a stored row says otherwise."
 )
 
+RELATIONSHIP_KINDS = frozenset({"connected_to", "depends_on", "manages", "monitors"})
 SYSTEM_OBSERVED = frozenset(
     {"not_observed", "simulated_reporting", "simulated_stopped", "reference_only"}
 )
@@ -181,6 +184,34 @@ def list_systems(
         statement = statement.where(LabSystem.observed_state == observed_state)
     total, rows = paginate(session, statement, page_params)
     return page(page_params, total, [_system_list(row) for row in rows])
+
+
+def list_system_relationships(
+    session: Session, page_params: PageParams
+) -> Page[LabSystemRelationshipItem]:
+    statement = (
+        select(LabSystemRelationship)
+        .options(
+            selectinload(LabSystemRelationship.source_system),
+            selectinload(LabSystemRelationship.target_system),
+        )
+        .where(LabSystemRelationship.relationship_kind.in_(RELATIONSHIP_KINDS))
+        .order_by(LabSystemRelationship.human_id)
+    )
+    total, rows = paginate(session, statement, page_params)
+    return page(
+        page_params,
+        total,
+        [
+            LabSystemRelationshipItem(
+                id=row.human_id,
+                source_system_id=row.source_system.human_id,
+                target_system_id=row.target_system.human_id,
+                relationship_kind=row.relationship_kind,
+            )
+            for row in rows
+        ],
+    )
 
 
 def get_system(session: Session, system_id: str) -> LabSystemDetail:

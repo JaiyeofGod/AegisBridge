@@ -96,6 +96,44 @@ class LabSystem(UUIDMixin, TimestampMixin, Base):
     zone: Mapped[LabZone] = relationship(back_populates="systems")
 
 
+class LabSystemRelationship(UUIDMixin, TimestampMixin, Base):
+    """Directed catalog association between two lab systems.
+
+    A row documents planned lab architecture. It is not live reachability,
+    observed traffic, or an attack path. The reverse direction is a separate row.
+    """
+
+    __tablename__ = "lab_system_relationships"
+    __table_args__ = (
+        CheckConstraint(
+            "relationship_kind IN ('connected_to', 'depends_on', 'manages', 'monitors')",
+            name="ck_lab_system_relationships_relationship_kind",
+        ),
+        CheckConstraint(
+            "source_system_id <> target_system_id",
+            name="ck_lab_system_relationships_distinct_systems",
+        ),
+        UniqueConstraint(
+            "source_system_id",
+            "target_system_id",
+            "relationship_kind",
+            name="uq_lab_system_relationships_source_target_kind",
+        ),
+    )
+
+    human_id: Mapped[str] = human_id_column()
+    source_system_id: Mapped[UUID] = mapped_column(
+        ForeignKey("lab_systems.id"), nullable=False, index=True
+    )
+    target_system_id: Mapped[UUID] = mapped_column(
+        ForeignKey("lab_systems.id"), nullable=False, index=True
+    )
+    relationship_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+
+    source_system: Mapped[LabSystem] = relationship(foreign_keys=[source_system_id])
+    target_system: Mapped[LabSystem] = relationship(foreign_keys=[target_system_id])
+
+
 class LabScenario(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "lab_scenarios"
     __table_args__ = (

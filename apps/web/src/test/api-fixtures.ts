@@ -28,6 +28,7 @@ import type {
   LabDetectionItem,
   LabScenarioListItem,
   LabSystemListItem,
+  LabSystemRelationshipItem,
   LabTelemetryItem,
   LabZoneItem,
   OverviewResponse,
@@ -1889,6 +1890,27 @@ export const labSystems: LabSystemListItem[] = [
     last_seen_at: null,
     source_origin: "development_seed",
     notes: "Authorized testing workstation. No remote control.",
+  },
+];
+
+export const labSystemRelationships: LabSystemRelationshipItem[] = [
+  {
+    id: "REL-0001",
+    source_system_id: "SEC-WAZUH-01",
+    target_system_id: "WIN-USER-01",
+    relationship_kind: "monitors",
+  },
+  {
+    id: "REL-0002",
+    source_system_id: "SEC-WAZUH-01",
+    target_system_id: "LINUX-APP-01",
+    relationship_kind: "monitors",
+  },
+  {
+    id: "REL-0003",
+    source_system_id: "WIN-USER-01",
+    target_system_id: "SEC-WAZUH-01",
+    relationship_kind: "depends_on",
   },
 ];
 
@@ -3797,6 +3819,9 @@ export function installApiFetch(
     }
     if (url.includes("/api/v1/cyber-range/summary")) return jsonResponse(cyberRangeSummary);
     if (url.includes("/api/v1/cyber-range/zones")) return jsonResponse(assetPage(labZones));
+    if (url.includes("/api/v1/cyber-range/system-relationships")) {
+      return jsonResponse(assetPage(labSystemRelationships));
+    }
     if (/\/api\/v1\/cyber-range\/systems\/[^/?]+/.test(url)) {
       const id = url.split("/systems/")[1]?.split("?")[0] ?? "";
       return jsonResponse(labSystemDetail(decodeURIComponent(id)));

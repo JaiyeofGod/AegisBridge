@@ -6,9 +6,11 @@ import type {
   LabScenarioListItem,
   LabSystemDetail,
   LabSystemListItem,
+  LabSystemRelationshipItem,
   LabTelemetryItem,
   LabZoneItem,
 } from "@/services/api-types";
+import { catalogRelationshipKinds, type CatalogRelationshipKind } from "@/types/cyber-range";
 import type { OverviewMetric } from "@/types/overview";
 
 export type LabZoneView = {
@@ -290,6 +292,105 @@ export function mapLabDetection(item: LabDetectionItem): LabDetectionView {
         : "None stored",
     notes: optionalText(item.notes),
   };
+}
+
+export type LabSystemRelationshipView = {
+  id: string;
+  sourceSystemId: string;
+  targetSystemId: string;
+  kind: CatalogRelationshipKind;
+};
+
+export type CatalogRelationState = "selected" | "related" | "unrelated" | "unknown";
+
+export type CatalogRelationshipStatement = {
+  id: string;
+  otherSystemId: string;
+  text: string;
+};
+
+const outgoingLabel: Record<CatalogRelationshipKind, string> = {
+  connected_to: "Connected to",
+  depends_on: "Depends on",
+  manages: "Manages",
+  monitors: "Monitors",
+};
+
+const incomingLabel: Record<CatalogRelationshipKind, string> = {
+  connected_to: "Connected from",
+  depends_on: "Dependency of",
+  manages: "Managed by",
+  monitors: "Monitored by",
+};
+
+function isCatalogRelationshipKind(value: string): value is CatalogRelationshipKind {
+  return (catalogRelationshipKinds as readonly string[]).includes(value);
+}
+
+export function mapLabSystemRelationship(
+  item: LabSystemRelationshipItem,
+): LabSystemRelationshipView | null {
+  if (!isCatalogRelationshipKind(item.relationship_kind)) return null;
+  if (item.source_system_id === item.target_system_id) return null;
+  return {
+    id: item.id,
+    sourceSystemId: item.source_system_id,
+    targetSystemId: item.target_system_id,
+    kind: item.relationship_kind,
+  };
+}
+
+/** Systems named by a stored edge that touches the selection. Not transitive. */
+export function directCatalogPeerIds(
+  selectedId: string,
+  relationships: LabSystemRelationshipView[],
+): Set<string> {
+  const peers = new Set<string>();
+  if (!selectedId) return peers;
+  for (const item of relationships) {
+    if (item.sourceSystemId === selectedId) peers.add(item.targetSystemId);
+    else if (item.targetSystemId === selectedId) peers.add(item.sourceSystemId);
+  }
+  peers.delete(selectedId);
+  return peers;
+}
+
+export function catalogRelationState(
+  systemId: string,
+  selectedId: string,
+  peers: ReadonlySet<string>,
+  relationshipsKnown: boolean,
+): CatalogRelationState {
+  if (selectedId && systemId === selectedId) return "selected";
+  if (!relationshipsKnown || !selectedId) return "unknown";
+  return peers.has(systemId) ? "related" : "unrelated";
+}
+
+export function catalogRelationshipStatements(
+  selectedId: string,
+  relationships: LabSystemRelationshipView[],
+  hostnameById: ReadonlyMap<string, string>,
+): CatalogRelationshipStatement[] {
+  if (!selectedId) return [];
+  const statements: CatalogRelationshipStatement[] = [];
+  for (const item of relationships) {
+    if (item.sourceSystemId === selectedId) {
+      const name = hostnameById.get(item.targetSystemId) ?? item.targetSystemId;
+      statements.push({
+        id: item.id,
+        otherSystemId: item.targetSystemId,
+        text: `${outgoingLabel[item.kind]} → ${name}`,
+      });
+    } else if (item.targetSystemId === selectedId) {
+      const name = hostnameById.get(item.sourceSystemId) ?? item.sourceSystemId;
+      statements.push({
+        id: item.id,
+        otherSystemId: item.sourceSystemId,
+        text: `${incomingLabel[item.kind]} ← ${name}`,
+      });
+    }
+  }
+  return statements;
 }
 
 export function observedTone(observedState: string): "success" | "warning" | "neutral" {

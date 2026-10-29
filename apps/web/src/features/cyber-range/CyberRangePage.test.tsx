@@ -4,6 +4,14 @@ import { describe, expect, it } from "vitest";
 
 import { AppRouter } from "@/app/router";
 import {
+  catalogRelationState,
+  catalogRelationshipStatements,
+  directCatalogPeerIds,
+  mapLabSystemRelationship,
+  type LabSystemRelationshipView,
+} from "@/features/cyber-range/mapCyberRange";
+import motionCss from "@/styles/index.css?raw";
+import {
   assetPage,
   cyberRangeSummary,
   emptyCyberRangeSummary,
@@ -101,7 +109,10 @@ describe("Cyber range", () => {
     expect(within(page).getByTestId("range-context")).toHaveTextContent("not_observed");
     expect(within(page).getByTestId("range-context")).toHaveTextContent("not_connected");
     expect(within(page).getByTestId("range-relationships")).toHaveTextContent(
-      "Relationship edges are not stored",
+      "documented lab architecture",
+    );
+    expect(within(page).getByTestId("range-relationships")).toHaveTextContent(
+      "do not represent live reachability",
     );
     expect(within(page).queryByText("Reporting")).not.toBeInTheDocument();
   });
@@ -239,4 +250,154 @@ describe("Cyber range", () => {
     expect(within(page).queryByText("RUN-014")).not.toBeInTheDocument();
     expect(within(page).queryByText("RUN-011")).not.toBeInTheDocument();
   });
+
+  it("highlights only explicit catalog relationships for the selected system", async () => {
+    const user = userEvent.setup();
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/cyber-range"] });
+    const page = screen.getByTestId("cyber-range-page");
+    await within(page).findAllByText("LAB-GW-01");
+
+    const wazuh = within(page).getAllByRole("button", { name: /SEC-WAZUH-01/ })[0];
+    await user.click(wazuh);
+
+    expect(wazuh).toHaveAttribute("aria-pressed", "true");
+    expect(wazuh).toHaveAttribute("data-catalog-relation", "selected");
+    expect(wazuh).toHaveTextContent("Selected");
+    expect(within(page).getAllByRole("button", { name: /WIN-USER-01/ })[0]).toHaveAttribute(
+      "data-catalog-relation",
+      "related",
+    );
+    expect(within(page).getAllByRole("button", { name: /WIN-USER-01/ })[0]).toHaveTextContent(
+      "Catalog link",
+    );
+    expect(within(page).getAllByRole("button", { name: /LINUX-APP-01/ })[0]).toHaveAttribute(
+      "data-catalog-relation",
+      "related",
+    );
+    expect(within(page).getAllByRole("button", { name: /KALI-RED-01/ })[0]).toHaveAttribute(
+      "data-catalog-relation",
+      "unrelated",
+    );
+    expect(within(page).getAllByRole("button", { name: /LAB-GW-01/ })[0]).toHaveAttribute(
+      "data-catalog-relation",
+      "unrelated",
+    );
+    expect(within(page).getAllByRole("button", { name: /KALI-RED-01/ })[0]).not.toHaveTextContent(
+      "Catalog link",
+    );
+
+    const list = within(page).getByTestId("catalog-relationship-list");
+    expect(list).toHaveTextContent("Monitors → WIN-USER-01");
+    expect(list).toHaveTextContent("Monitors → LINUX-APP-01");
+    expect(list).toHaveTextContent("Dependency of ← WIN-USER-01");
+    expect(list).not.toHaveTextContent("KALI-RED-01");
+    expect(list).not.toHaveTextContent("LAB-GW-01");
+  });
+
+  it("selects a lab system from the keyboard and keeps the catalog highlight", async () => {
+    const user = userEvent.setup();
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/cyber-range"] });
+    const page = screen.getByTestId("cyber-range-page");
+    await within(page).findAllByText("LAB-GW-01");
+
+    const app = within(page).getAllByRole("button", { name: /LINUX-APP-01/ })[0];
+    app.focus();
+    await user.keyboard("{Enter}");
+
+    expect(app).toHaveFocus();
+    expect(app).toHaveAttribute("aria-pressed", "true");
+    expect(within(page).getAllByRole("button", { name: /SEC-WAZUH-01/ })[0]).toHaveAttribute(
+      "data-catalog-relation",
+      "related",
+    );
+    expect(within(page).getByTestId("catalog-relationship-list")).toHaveTextContent(
+      "Monitored by ← SEC-WAZUH-01",
+    );
+  });
+
+  it("keeps catalog highlight without a motion transform when reduced motion is requested", async () => {
+    document.documentElement.dataset.motion = "reduce";
+    const user = userEvent.setup();
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/cyber-range"] });
+    const page = screen.getByTestId("cyber-range-page");
+    await within(page).findAllByText("LAB-GW-01");
+    const wazuh = within(page).getAllByRole("button", { name: /SEC-WAZUH-01/ })[0];
+    await user.click(wazuh);
+
+    expect(wazuh).toHaveAttribute("data-catalog-relation", "selected");
+    expect(wazuh.className).toContain("motion-catalog-state");
+    expect(wazuh.className).not.toContain("translate");
+    expect(within(page).getAllByRole("button", { name: /WIN-USER-01/ })[0]).toHaveTextContent(
+      "Catalog link",
+    );
+
+    const rule = motionCss.slice(
+      motionCss.indexOf(".motion-catalog-state {"),
+      motionCss.indexOf('.motion-catalog-state[data-catalog-relation="selected"]'),
+    );
+    expect(rule).toContain(
+      "transition-property: border-color, background-color, opacity, box-shadow",
+    );
+    expect(rule).not.toContain("transform");
+    const reduced = motionCss.slice(motionCss.indexOf("@media (prefers-reduced-motion: reduce)"));
+    expect(reduced).toContain("transition-duration: 0.01ms !important");
+    delete document.documentElement.dataset.motion;
+  });
+
+  it("does not infer second-degree, shared-zone, or unknown relationships", () => {
+    const stored = [
+      edge("REL-0001", "SEC-WAZUH-01", "WIN-USER-01", "monitors"),
+      edge("REL-0002", "SEC-WAZUH-01", "LINUX-APP-01", "monitors"),
+      edge("REL-0003", "WIN-USER-01", "SEC-WAZUH-01", "depends_on"),
+      edge("REL-0004", "LINUX-APP-01", "KALI-RED-01", "depends_on"),
+    ];
+    expect(directCatalogPeerIds("SEC-WAZUH-01", stored)).toEqual(
+      new Set(["WIN-USER-01", "LINUX-APP-01"]),
+    );
+    expect(directCatalogPeerIds("WIN-USER-01", stored.slice(0, 3))).toEqual(
+      new Set(["SEC-WAZUH-01"]),
+    );
+    expect(directCatalogPeerIds("LAB-GW-01", stored).size).toBe(0);
+    expect(
+      mapLabSystemRelationship({
+        id: "REL-0099",
+        source_system_id: "LAB-GW-01",
+        target_system_id: "LAB-GW-01",
+        relationship_kind: "connected_to",
+      }),
+    ).toBeNull();
+    expect(
+      mapLabSystemRelationship({
+        id: "REL-0098",
+        source_system_id: "KALI-RED-01",
+        target_system_id: "WIN-USER-01",
+        relationship_kind: "attack_path",
+      }),
+    ).toBeNull();
+    expect(
+      catalogRelationState("WIN-USER-01", "SEC-WAZUH-01", new Set(["WIN-USER-01"]), true),
+    ).toBe("related");
+    const statements = catalogRelationshipStatements(
+      "SEC-WAZUH-01",
+      stored.slice(0, 3),
+      new Map([
+        ["WIN-USER-01", "WIN-USER-01"],
+        ["LINUX-APP-01", "LINUX-APP-01"],
+      ]),
+    );
+    expect(statements.map((item) => item.otherSystemId)).toEqual([
+      "WIN-USER-01",
+      "LINUX-APP-01",
+      "WIN-USER-01",
+    ]);
+  });
 });
+
+function edge(
+  id: string,
+  sourceSystemId: string,
+  targetSystemId: string,
+  kind: LabSystemRelationshipView["kind"],
+): LabSystemRelationshipView {
+  return { id, sourceSystemId, targetSystemId, kind };
+}

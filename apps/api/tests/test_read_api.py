@@ -73,6 +73,7 @@ READ_PATHS = [
     "/api/v1/cyber-range/zones",
     "/api/v1/cyber-range/systems",
     "/api/v1/cyber-range/systems/{system_id}",
+    "/api/v1/cyber-range/system-relationships",
     "/api/v1/cyber-range/scenarios",
     "/api/v1/cyber-range/scenarios/{scenario_id}",
     "/api/v1/cyber-range/telemetry",
@@ -745,6 +746,23 @@ def test_cyber_range_catalog_keeps_lab_private_and_disconnected(client: TestClie
     missing = client.get("/api/v1/cyber-range/systems/LAB-MISSING")
     assert missing.status_code == 404
 
+    relationships = client.get("/api/v1/cyber-range/system-relationships").json()
+    assert relationships["total"] == 3
+    stored = {
+        (item["source_system_id"], item["target_system_id"], item["relationship_kind"])
+        for item in relationships["items"]
+    }
+    assert stored == {
+        ("SEC-WAZUH-01", "WIN-USER-01", "monitors"),
+        ("SEC-WAZUH-01", "LINUX-APP-01", "monitors"),
+        ("WIN-USER-01", "SEC-WAZUH-01", "depends_on"),
+    }
+    assert ("WIN-USER-01", "SEC-WAZUH-01", "monitors") not in stored
+    assert all(
+        item["source_system_id"] != item["target_system_id"] for item in relationships["items"]
+    )
+    assert_safe(relationships)
+
     scenarios = client.get("/api/v1/cyber-range/scenarios").json()
     assert scenarios["total"] == 6
     ready = client.get("/api/v1/cyber-range/scenarios", params={"status": "ready"}).json()
@@ -793,6 +811,7 @@ def test_cyber_range_catalog_keeps_lab_private_and_disconnected(client: TestClie
         "/api/v1/cyber-range/zones",
         "/api/v1/cyber-range/systems",
         "/api/v1/cyber-range/systems/{system_id}",
+        "/api/v1/cyber-range/system-relationships",
         "/api/v1/cyber-range/scenarios",
         "/api/v1/cyber-range/scenarios/{scenario_id}",
         "/api/v1/cyber-range/telemetry",

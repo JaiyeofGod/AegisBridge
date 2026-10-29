@@ -7,6 +7,7 @@ import {
   fetchLabScenario,
   fetchLabScenarios,
   fetchLabSystem,
+  fetchLabSystemRelationships,
   fetchLabSystems,
   fetchLabTelemetry,
   fetchLabZones,
@@ -51,6 +52,15 @@ export function useLabSystemList(query: LabSystemQuery, enabled: boolean) {
     retry: false,
     staleTime: 30_000,
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useLabSystemRelationships() {
+  return useQuery({
+    queryKey: [...systemsKey, "relationships"],
+    queryFn: fetchLabSystemRelationships,
+    retry: false,
+    staleTime: 30_000,
   });
 }
 

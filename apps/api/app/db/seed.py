@@ -54,6 +54,7 @@ from app.models import (
     LabScenarioDetection,
     LabScenarioSystem,
     LabSystem,
+    LabSystemRelationship,
     LabZone,
     Organization,
     Permission,
@@ -898,6 +899,7 @@ def _ensure_contract_records(session: Session, org: Organization) -> None:
     _ensure_lab_bridge(session, org)
     detections = _ensure_lab_detections(session, org)
     systems = _ensure_lab_zones_and_systems(session, org)
+    _ensure_lab_system_relationships(session, systems)
     _ensure_lab_scenarios(session, org, systems, detections)
     _ensure_policy_seed_shape(session, org)
     _ensure_incident_tasks(session, org)
@@ -1879,6 +1881,33 @@ def _ensure_lab_zones_and_systems(session: Session, org: Organization) -> dict[s
             )
         system_rows[human_id] = row
     return system_rows
+
+
+def _ensure_lab_system_relationships(session: Session, systems: dict[str, LabSystem]) -> None:
+    """Directed catalog associations. These are not live paths or observed traffic."""
+    catalog = (
+        ("REL-0001", "SEC-WAZUH-01", "WIN-USER-01", "monitors"),
+        ("REL-0002", "SEC-WAZUH-01", "LINUX-APP-01", "monitors"),
+        ("REL-0003", "WIN-USER-01", "SEC-WAZUH-01", "depends_on"),
+    )
+    for human_id, source_id, target_id, kind in catalog:
+        source = systems[source_id]
+        target = systems[target_id]
+        row = session.scalar(
+            select(LabSystemRelationship).where(LabSystemRelationship.human_id == human_id)
+        )
+        if row is None:
+            row = LabSystemRelationship(
+                human_id=human_id,
+                source_system_id=source.id,
+                target_system_id=target.id,
+                relationship_kind=kind,
+            )
+            session.add(row)
+            continue
+        row.source_system_id = source.id
+        row.target_system_id = target.id
+        row.relationship_kind = kind
 
 
 def _ensure_lab_scenarios(

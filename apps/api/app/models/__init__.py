@@ -24,6 +24,7 @@ from app.models.cyber_range import (
     LabScenarioDetection,
     LabScenarioSystem,
     LabSystem,
+    LabSystemRelationship,
     LabZone,
 )
 from app.models.dataset import Dataset, DatasetExperiment, DatasetFile, DatasetVersion
@@ -136,6 +137,7 @@ __all__ = [
     "LabScenarioDetection",
     "LabScenarioSystem",
     "LabSystem",
+    "LabSystemRelationship",
     "LabZone",
     "Organization",
     "Permission",
