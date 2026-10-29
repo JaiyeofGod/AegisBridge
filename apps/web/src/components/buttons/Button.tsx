@@ -14,11 +14,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "bg-[var(--accent)] text-[var(--ink)] hover:brightness-110",
+        primary: "motion-glass-primary bg-[var(--accent)] text-[var(--ink)] hover:brightness-110",
         secondary:
-          "border border-[var(--border)] bg-[var(--raised)] text-[var(--text)] hover:border-[var(--accent)]",
-        ghost: "bg-transparent text-[var(--text)] hover:bg-[var(--raised)]",
-        danger: "bg-[var(--critical)] text-[var(--ink)] hover:brightness-110",
+          "motion-glass-secondary border border-[var(--border)] bg-[var(--raised)] text-[var(--text)] hover:border-[var(--accent)]",
+        ghost: "motion-glass-ghost bg-transparent text-[var(--text)] hover:bg-[var(--raised)]",
+        danger: "motion-glass-danger bg-[var(--critical)] text-[var(--ink)] hover:brightness-110",
       },
       fullWidth: {
         true: "w-full",

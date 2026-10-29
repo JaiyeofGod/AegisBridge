@@ -81,6 +81,11 @@
     .motion-signin-enter {
       animation: none !important;
     }
+
+    .motion-glass-primary:hover,
+    .motion-glass-primary:active {
+      transform: none !important;
+    }
   }
 }
 
@@ -90,7 +95,8 @@
   }
 
   .motion-control {
-    transition-property: color, background-color, border-color, opacity, filter;
+    transition-property:
+      color, background-color, border-color, opacity, filter, box-shadow, transform;
     transition-duration: var(--motion-duration-fast);
     transition-timing-function: var(--motion-ease-enter);
   }
@@ -144,6 +150,64 @@
   .motion-signin-enter {
     animation: motion-signin-enter var(--motion-duration-cinematic) var(--motion-ease-enter) both;
     pointer-events: auto;
+  }
+
+  .motion-glass-primary,
+  .motion-glass-secondary,
+  .motion-glass-danger {
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 32%, transparent);
+  }
+
+  .motion-glass-primary:focus-visible,
+  .motion-glass-secondary:focus-visible,
+  .motion-glass-ghost:focus-visible,
+  .motion-glass-danger:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .motion-glass-ghost:hover:not(:disabled) {
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 42%, transparent);
+  }
+
+  .motion-glass-primary:hover:not(:disabled) {
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, white 48%, transparent),
+      0 1px 0 color-mix(in srgb, var(--accent) 45%, transparent),
+      0 8px 16px color-mix(in srgb, var(--accent) 16%, transparent);
+    transform: translateY(-1px);
+  }
+
+  .motion-glass-primary:active:not(:disabled) {
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent);
+    transform: none;
+  }
+
+  .motion-glass-secondary:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--raised) 86%, white);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent) 24%, transparent);
+  }
+
+  .motion-glass-secondary:active:not(:disabled) {
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 12%, transparent);
+  }
+
+  .motion-glass-danger:hover:not(:disabled) {
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, white 36%, transparent),
+      0 6px 14px color-mix(in srgb, var(--critical) 22%, transparent);
+  }
+
+  .motion-glass-danger:active:not(:disabled) {
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 14%, transparent);
+  }
+
+  .motion-glass-primary:disabled,
+  .motion-glass-secondary:disabled,
+  .motion-glass-ghost:disabled,
+  .motion-glass-danger:disabled {
+    box-shadow: none;
+    transform: none;
   }
 }
 
