@@ -1,18 +1,28 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { AppRouter } from "@/app/router";
 import { currentUserFixture, installApiFetch } from "@/test/api-fixtures";
 import { renderWithProviders } from "@/test/render";
 
-function stubMatchMedia({ desktop, reducedMotion }: { desktop: boolean; reducedMotion: boolean }) {
+function stubMatchMedia({
+  desktop,
+  reducedMotion,
+  finePointer = false,
+}: {
+  desktop: boolean;
+  reducedMotion: boolean;
+  finePointer?: boolean;
+}) {
   window.matchMedia = ((query: string) => ({
     matches: query.includes("prefers-reduced-motion")
       ? reducedMotion
       : query.includes("min-width: 1024px")
         ? desktop
-        : false,
+        : query.includes("pointer: fine")
+          ? finePointer
+          : false,
     media: query,
     onchange: null,
     addEventListener: () => undefined,
@@ -67,6 +77,7 @@ describe("Sign-in page", () => {
     const card = within(visual).getByTestId("signin-visual-card");
     expect(card).toBeInTheDocument();
     expect(within(card).getByTestId("signin-scene-fallback")).toBeInTheDocument();
+    expect(within(card).getByTestId("signin-artwork")).toHaveAttribute("data-parallax", "off");
     expect(within(page).queryByTestId("signin-spline-scene")).not.toBeInTheDocument();
     expect(
       within(page)
@@ -119,6 +130,63 @@ describe("Sign-in page", () => {
     );
     expect(within(page).queryByTestId("signin-spline-scene")).not.toBeInTheDocument();
     expect(within(page).getByTestId("signin-scene-fallback")).toBeInTheDocument();
+    expect(within(page).getByTestId("signin-artwork")).toHaveAttribute("data-parallax", "off");
+  });
+
+  it("enables artwork parallax only for a wide fine pointer without reduced motion", async () => {
+    installApiFetch(undefined, { authenticated: false });
+    stubMatchMedia({ desktop: true, reducedMotion: false, finePointer: true });
+
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/signin"] });
+    const page = screen.getByTestId("signin-page");
+    const artwork = within(page).getByTestId("signin-artwork");
+    const card = within(page).getByTestId("signin-visual-card");
+    const form = within(page).getByRole("textbox", { name: /work email/i });
+
+    expect(page).toHaveAttribute("data-background", "video");
+    expect(within(page).getByTestId("signin-spline-scene")).toBeInTheDocument();
+    expect(artwork).toHaveAttribute("data-parallax", "on");
+    expect(artwork).toHaveClass("motion-artwork-parallax");
+    expect(form.closest(".motion-artwork-parallax")).toBeNull();
+    expect(
+      within(page)
+        .getByRole("heading", { name: /see the threat/i })
+        .closest(".motion-artwork-parallax"),
+    ).toBeNull();
+
+    vi.spyOn(card, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 200,
+      bottom: 100,
+      width: 200,
+      height: 100,
+      toJSON: () => ({}),
+    });
+    card.dispatchEvent(new MouseEvent("pointermove", { clientX: 200, clientY: 50, bubbles: true }));
+    expect(artwork.style.getPropertyValue("--artwork-x")).toBe("6.00px");
+    expect(artwork.style.getPropertyValue("--artwork-ry")).toBe("1.00deg");
+    expect(form.style.transform).toBe("");
+
+    card.dispatchEvent(new MouseEvent("pointerleave"));
+    expect(artwork.style.getPropertyValue("--artwork-x")).toBe("0px");
+    expect(artwork.style.getPropertyValue("--artwork-y")).toBe("0px");
+    expect(artwork.style.getPropertyValue("--artwork-rx")).toBe("0deg");
+    expect(artwork.style.getPropertyValue("--artwork-ry")).toBe("0deg");
+  });
+
+  it("keeps artwork still for a coarse pointer on a wide screen", async () => {
+    installApiFetch(undefined, { authenticated: false });
+    stubMatchMedia({ desktop: true, reducedMotion: false, finePointer: false });
+
+    await renderWithProviders(<AppRouter />, { initialEntries: ["/signin"] });
+    const page = screen.getByTestId("signin-page");
+    const artwork = within(page).getByTestId("signin-artwork");
+    expect(within(page).getByTestId("signin-spline-scene")).toBeInTheDocument();
+    expect(artwork).toHaveAttribute("data-parallax", "off");
+    expect(artwork).not.toHaveClass("motion-artwork-parallax");
   });
 
   it("no longer serves the cinematic login prototype route", async () => {

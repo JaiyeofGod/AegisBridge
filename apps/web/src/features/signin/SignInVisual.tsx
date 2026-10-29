@@ -1,3 +1,6 @@
+import { useEffect, useRef } from "react";
+
+import { artworkParallax, artworkParallaxRest } from "@/features/signin/artwork-parallax";
 import { SignInSceneFallback } from "@/features/signin/SignInSceneFallback";
 import { SignInSplineScene } from "@/features/signin/SignInSplineScene";
 import { useMediaQuery, usePrefersReducedMotion } from "@/hooks/useMediaQuery";
@@ -13,7 +16,37 @@ export const signInCanvasBackground =
 export function SignInVisual({ surface = "canvas" }: { surface?: "canvas" | "clear" }) {
   const prefersReducedMotion = usePrefersReducedMotion();
   const isDesktopViewport = useMediaQuery("(min-width: 1024px)");
+  const hasFinePointer = useMediaQuery("(pointer: fine)");
   const useLiveScene = isDesktopViewport && !prefersReducedMotion;
+  const parallaxEnabled = useLiveScene && hasFinePointer;
+  const cardRef = useRef<HTMLDivElement>(null);
+  const artworkRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const card = cardRef.current;
+    const artwork = artworkRef.current;
+    if (!parallaxEnabled || !card || !artwork) return;
+
+    const apply = (offset: typeof artworkParallaxRest) => {
+      artwork.style.setProperty("--artwork-x", offset.x);
+      artwork.style.setProperty("--artwork-y", offset.y);
+      artwork.style.setProperty("--artwork-rx", offset.rx);
+      artwork.style.setProperty("--artwork-ry", offset.ry);
+    };
+    const rest = () => apply(artworkParallaxRest);
+    const onMove = (event: PointerEvent) => {
+      const next = artworkParallax(event.clientX, event.clientY, card.getBoundingClientRect());
+      if (next) apply(next);
+    };
+
+    card.addEventListener("pointermove", onMove);
+    card.addEventListener("pointerleave", rest);
+    return () => {
+      card.removeEventListener("pointermove", onMove);
+      card.removeEventListener("pointerleave", rest);
+      rest();
+    };
+  }, [parallaxEnabled]);
 
   return (
     <div
@@ -40,12 +73,22 @@ export function SignInVisual({ surface = "canvas" }: { surface?: "canvas" | "cle
       </div>
 
       <div
-        className="relative z-10 min-h-[220px] w-full min-w-0 flex-1 overflow-hidden bg-transparent sm:min-h-[260px]"
+        ref={cardRef}
+        className={`relative z-10 min-h-[220px] w-full min-w-0 flex-1 overflow-hidden bg-transparent sm:min-h-[260px] ${
+          parallaxEnabled ? "motion-artwork-stage" : ""
+        }`}
         data-testid="signin-visual-card"
         aria-hidden
       >
         {/* Explicit full-bleed box so @splinetool/react-spline ParentSize measures the panel. */}
-        <div className="absolute inset-0 h-full w-full bg-transparent">
+        <div
+          ref={artworkRef}
+          className={`absolute inset-0 h-full w-full bg-transparent ${
+            parallaxEnabled ? "motion-artwork-parallax" : ""
+          }`}
+          data-testid="signin-artwork"
+          data-parallax={parallaxEnabled ? "on" : "off"}
+        >
           {useLiveScene ? <SignInSplineScene /> : <SignInSceneFallback />}
         </div>
       </div>

@@ -88,7 +88,8 @@
     .motion-glass-primary:active,
     .motion-surface-interactive:hover,
     .motion-surface-interactive:active,
-    .motion-surface-interactive[aria-pressed="true"]:hover {
+    .motion-surface-interactive[aria-pressed="true"]:hover,
+    .motion-artwork-parallax {
       transform: none !important;
     }
   }
@@ -186,6 +187,19 @@
     transform-origin: center;
     animation: motion-workspace-loader calc(var(--motion-duration-cinematic) * 4)
       var(--motion-ease-enter) infinite alternate;
+  }
+
+  .motion-artwork-stage {
+    perspective: 800px;
+  }
+
+  .motion-artwork-parallax {
+    transform: translate3d(var(--artwork-x), var(--artwork-y), 0) rotateX(var(--artwork-rx))
+      rotateY(var(--artwork-ry));
+    transform-origin: center;
+    transition-property: --artwork-x, --artwork-y, --artwork-rx, --artwork-ry;
+    transition-duration: var(--motion-duration-standard);
+    transition-timing-function: var(--motion-ease-exit);
   }
 
   .motion-glass-primary,
@@ -340,6 +354,30 @@
     opacity: 1;
     transform: none;
   }
+}
+
+@property --artwork-x {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --artwork-y {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --artwork-rx {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@property --artwork-ry {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
 }
 
 @keyframes motion-workspace-loader {
