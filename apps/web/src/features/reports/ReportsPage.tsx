@@ -882,7 +882,7 @@ function ExperimentList({
                 aria-pressed={selectedId === item.id}
                 onClick={() => onSelect(item.id)}
                 className={cn(
-                  "w-full rounded-[var(--radius-control)] border bg-[var(--raised)] px-4 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",
+                  "motion-surface-interactive w-full rounded-[var(--radius-control)] border bg-[var(--raised)] px-4 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",
                   selectedId === item.id ? "border-[var(--accent)]" : "border-[var(--border)]",
                 )}
               >

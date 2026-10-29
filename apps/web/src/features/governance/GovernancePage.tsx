@@ -536,11 +536,12 @@ function ControlsSection({
                       <button
                         type="button"
                         className={cn(
-                          "w-full rounded-[var(--radius-control)] border px-3 py-3 text-left transition",
+                          "motion-surface-interactive w-full rounded-[var(--radius-control)] border px-3 py-3 text-left",
                           item.id === activeId
                             ? "border-[var(--accent)] bg-[var(--raised)]"
-                            : "border-[var(--border)] bg-[var(--canvas)] hover:border-[var(--accent)]",
+                            : "border-[var(--border)] bg-[var(--canvas)]",
                         )}
+                        aria-pressed={item.id === activeId}
                         data-testid={`governance-control-${item.id}`}
                         onClick={() => setSelectedId(item.id)}
                       >

@@ -25,7 +25,7 @@ export function SummaryMetric({ metric }: { metric: OverviewMetric }) {
   return (
     <article
       className={cn(
-        "flex min-h-[148px] flex-col rounded-[var(--radius-panel)] border bg-[var(--raised)] p-4",
+        "motion-surface flex min-h-[148px] flex-col rounded-[var(--radius-panel)] border bg-[var(--raised)] p-4",
         toneBorder[metric.tone],
       )}
       aria-label={`${metric.label}: ${metric.primaryValue}`}

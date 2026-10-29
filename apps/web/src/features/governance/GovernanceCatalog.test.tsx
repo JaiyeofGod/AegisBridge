@@ -97,7 +97,9 @@ describe("Governance control catalog discovery", () => {
       ).toBe(true);
     });
 
-    expect(await within(page).findByTestId("governance-control-CTRL-0011")).toBeInTheDocument();
+    const control = await within(page).findByTestId("governance-control-CTRL-0011");
+    expect(control).toHaveClass("motion-surface-interactive");
+    expect(control).toHaveAttribute("aria-pressed");
   });
 
   it("shows no-match empty state without treating it as an error", async () => {
